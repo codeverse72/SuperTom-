@@ -6,6 +6,7 @@ import { SpinTimer } from '../components/SpinTimer';
 import { ProductionCard } from '../components/ProductionCard';
 import { FeedingModal } from '../components/FeedingModal';
 import { SpinWheelModal } from '../components/SpinWheelModal';
+import feedTomButtonImg from '../assets/dashboard/feed_tom_button_3d.png';
 
 interface HomeProps {
   onNavigateToStore: () => void;
@@ -40,7 +41,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigateToStore }) => {
 
           {/* High-Resolution 3D Rendered Feed Tom Pill Button */}
           <img
-            src="/assets/dashboard/feed_tom_button_3d.png"
+            src={feedTomButtonImg}
             alt="Feed Tom"
             className="w-full h-auto object-contain filter drop-shadow-[0_8px_18px_rgba(0,0,0,0.65)] drop-shadow-[0_0_15px_rgba(245,158,11,0.35)] transition-all group-hover:brightness-105"
           />

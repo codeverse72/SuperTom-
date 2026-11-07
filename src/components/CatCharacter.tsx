@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Heart } from 'lucide-react';
 import { useGame } from '../context/GameContext';
+import catThroneImg from '../assets/dashboard/cat_throne_coins.png';
 
 interface FloatingTap {
   id: number;
@@ -71,7 +72,7 @@ export const CatCharacter: React.FC = () => {
 
         {/* High-Resolution King Tom Throne Image */}
         <img
-          src="/assets/dashboard/cat_throne_coins.png"
+          src={catThroneImg}
           alt="King Tom on Royal Throne with Gold Coins"
           className="w-full h-auto object-contain filter drop-shadow-[0_12px_24px_rgba(0,0,0,0.65)] drop-shadow-[0_0_20px_rgba(217,70,239,0.25)] transition-all group-hover:brightness-105"
         />

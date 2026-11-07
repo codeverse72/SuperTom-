@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import chestPurpleImg from '../assets/dashboard/chest_purple.png';
 import { 
   Send, 
   MessageCircle, 
@@ -121,7 +122,7 @@ export const Missions: React.FC = () => {
             {/* Treasure Chest */}
             <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border border-amber-400/50 p-0.5 bg-purple-950/80 shadow-[0_0_20px_rgba(234,179,8,0.35)] -mr-4 z-10">
               <img
-                src="/assets/dashboard/chest_purple.png"
+                src={chestPurpleImg}
                 alt="Treasure Chest"
                 className="w-full h-full object-contain p-1 rounded-xl"
               />

@@ -1,6 +1,8 @@
 import React from 'react';
 import { useGame } from '../context/GameContext';
 import { formatNumber, poopsToUsdt } from '../utils/probability';
+import poopMascotImg from '../assets/dashboard/poop_character.png';
+import chestPurpleImg from '../assets/dashboard/chest_purple.png';
 
 export const BalanceCard: React.FC = () => {
   const { balance } = useGame();
@@ -18,7 +20,7 @@ export const BalanceCard: React.FC = () => {
         {/* Left: 3D Smiling Poop Character Mascot */}
         <div className="relative shrink-0 w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center">
           <img
-            src="/assets/dashboard/poop_character.png"
+            src={poopMascotImg}
             alt="Poop Mascot"
             className="w-full h-full object-contain filter drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)] drop-shadow-[0_0_12px_rgba(255,140,0,0.4)] select-none transition-transform hover:scale-105"
           />
@@ -46,7 +48,7 @@ export const BalanceCard: React.FC = () => {
         {/* Right: 3D Glowing Purple Treasure Chest */}
         <div className="relative shrink-0 w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center">
           <img
-            src="/assets/dashboard/chest_purple.png"
+            src={chestPurpleImg}
             alt="Treasure Chest"
             className="w-full h-full object-contain filter drop-shadow-[0_4px_14px_rgba(0,0,0,0.6)] drop-shadow-[0_0_14px_rgba(168,85,247,0.45)] hover:scale-105 active:scale-95 transition-transform select-none cursor-pointer"
           />
