@@ -80,6 +80,21 @@ interface GameContextType {
   feedTom: (biscuitId: string, count?: number) => boolean;
   buyBiscuit: (biscuitId: string, count?: number) => boolean;
   buyAndFeedBiscuit: (biscuitId: string) => boolean;
+  buyAndActivatePlan: (biscuitId: string) => Promise<{ success: boolean; newRate?: number; error?: string }>;
+  selectedPlanForDeposit: {
+    id: string;
+    name: string;
+    boostPerHour: number;
+    costPoops: number;
+    usdtAmount: number;
+  } | null;
+  setSelectedPlanForDeposit: (plan: {
+    id: string;
+    name: string;
+    boostPerHour: number;
+    costPoops: number;
+    usdtAmount: number;
+  } | null) => void;
   executeSpin: () => { reward: SpinRewardConfig; index: number };
   claimSpinMilestone: (reward: SpinRewardConfig) => void;
   startMission: (missionId: string) => void;
@@ -128,6 +143,15 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Clean empty withdrawals and deposits list
   const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>([]);
   const [deposits, setDeposits] = useState<DepositRecord[]>([]);
+
+  // Selected mining plan package for deposit flow
+  const [selectedPlanForDeposit, setSelectedPlanForDeposit] = useState<{
+    id: string;
+    name: string;
+    boostPerHour: number;
+    costPoops: number;
+    usdtAmount: number;
+  } | null>(null);
 
   // Local UI settings
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
@@ -366,6 +390,52 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     }
     return buyBiscuit(biscuitId, 1);
+  };
+
+  /**
+   * Buys a mining booster pack with Poops and immediately activates it to boost mining speed.
+   */
+  const buyAndActivatePlan = async (
+    biscuitId: string
+  ): Promise<{ success: boolean; newRate?: number; error?: string }> => {
+    try {
+      // 1. Purchase
+      const buyRes = await storeService.purchaseBiscuit({ biscuitId: biscuitId as any, quantity: 1 });
+      if (!buyRes.success || !buyRes.data) {
+        const err = buyRes.error?.message || 'Purchase failed';
+        showToast('Purchase Failed', err, 'error');
+        return { success: false, error: err };
+      }
+
+      setBalance(buyRes.data.newBalancePoops);
+      setBiscuitInventory(buyRes.data.newInventory);
+
+      // 2. Feed immediately to adjust mining speed
+      const feedRes = await storeService.feedBiscuit(biscuitId, 1);
+      if (feedRes.success && feedRes.data) {
+        setProductionRate(feedRes.data.newProductionRate);
+        setBiscuitInventory(feedRes.data.newInventory);
+        setBiscuitFedCount((prev) => ({
+          ...prev,
+          [biscuitId]: (prev[biscuitId] || 0) + 1,
+        }));
+
+        sound.playEating();
+        showToast(
+          'Mining Speed Boosted!',
+          `Plan activated! Hourly mining speed increased to +${feedRes.data.newProductionRate} Poops/hr 🚀`,
+          'reward'
+        );
+        return { success: true, newRate: feedRes.data.newProductionRate };
+      } else {
+        setProductionRate(buyRes.data.newProductionRate);
+        return { success: true, newRate: buyRes.data.newProductionRate };
+      }
+    } catch (e: any) {
+      const err = e?.message || 'Failed to activate plan';
+      showToast('Activation Failed', err, 'error');
+      return { success: false, error: err };
+    }
   };
 
   // Spin Wheel Execution
@@ -612,6 +682,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         missions,
         withdrawals,
         deposits,
+        selectedPlanForDeposit,
+        setSelectedPlanForDeposit,
+        buyAndActivatePlan,
         user,
         soundEnabled,
         activeToast,

@@ -163,7 +163,9 @@ export const Payout: React.FC = () => {
     refreshWithdrawals, 
     submitDeposit, 
     refreshDeposits,
-    showToast 
+    showToast,
+    selectedPlanForDeposit,
+    setSelectedPlanForDeposit,
   } = useGame();
 
   // Top Section: 'deposit' or 'withdraw'
@@ -184,6 +186,15 @@ export const Payout: React.FC = () => {
   const [depositNotes, setDepositNotes] = useState('');
   const [depositError, setDepositError] = useState<string | null>(null);
   const [isDepositing, setIsDepositing] = useState(false);
+
+  // Automatically switch to deposit section and pre-fill when a mining plan is clicked from Store
+  useEffect(() => {
+    if (selectedPlanForDeposit) {
+      setActiveSection('deposit');
+      setDepositAmountUsdt(selectedPlanForDeposit.costUsdt.toString());
+      setDepositNotes(`[Mining Plan: ${selectedPlanForDeposit.name} (+${selectedPlanForDeposit.boostPerHour.toLocaleString()}/hr)]`);
+    }
+  }, [selectedPlanForDeposit]);
 
   // Treasury addresses map fetched from server (with defaults)
   const [treasuryWallets, setTreasuryWallets] = useState<Record<string, string>>({});
@@ -314,6 +325,14 @@ export const Payout: React.FC = () => {
       setDepositTxHash('');
       setDepositNotes('');
       setDepositError(null);
+      if (selectedPlanForDeposit) {
+        showToast(
+          'Mining Plan Proof Submitted!',
+          `Your deposit for ${selectedPlanForDeposit.name} (+${selectedPlanForDeposit.boostPerHour.toLocaleString()}/hr) was submitted. Mining boost will activate upon admin approval.`,
+          'success'
+        );
+        setSelectedPlanForDeposit(null);
+      }
     } else {
       setDepositError(res.error || 'Failed to submit deposit proof.');
     }
@@ -703,14 +722,99 @@ export const Payout: React.FC = () => {
             </span>
           </div>
 
+          {/* Target Mining Plan Banner (When activated from Store or selected here) */}
+          {selectedPlanForDeposit && (
+            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-950 via-indigo-950 to-purple-950 border-2 border-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.25)] space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-2xl">⚡</span>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-amber-300 uppercase tracking-wider font-display">
+                        Mining Pack: {selectedPlanForDeposit.name}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-amber-400 text-purple-950 text-[10px] font-black">
+                        +{selectedPlanForDeposit.boostPerHour.toLocaleString()}/hr
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-purple-200 mt-0.5">
+                      Required Deposit: <strong className="text-emerald-400">${selectedPlanForDeposit.costUsdt.toFixed(2)} USDT</strong> (equivalent to {(selectedPlanForDeposit.costUsdt * 2000).toLocaleString()} Poops)
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPlanForDeposit(null)}
+                  className="px-2.5 py-1 rounded-xl bg-purple-900/60 hover:bg-purple-800 text-purple-300 hover:text-white text-[10px] font-bold transition-all cursor-pointer"
+                >
+                  Clear Plan
+                </button>
+              </div>
+              <div className="text-[10px] text-purple-300/80 bg-purple-900/40 p-2 rounded-xl flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>
+                  Once your deposit is confirmed by admin, your mining speed will automatically receive this +{selectedPlanForDeposit.boostPerHour.toLocaleString()}/hr boost!
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Quick Mining Pack Selector */}
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-bold text-purple-300 flex items-center gap-1">
+              <span>🚀 Select Mining Speed Pack (Optional)</span>
+            </span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                { name: 'Common', cost: 1.0, boost: 10, biscuitId: 'biscuit_common' },
+                { name: 'Silver', cost: 2.5, boost: 50, biscuitId: 'biscuit_silver' },
+                { name: 'Gold', cost: 5.0, boost: 200, biscuitId: 'biscuit_gold' },
+                { name: 'Diamond', cost: 10.0, boost: 1000, biscuitId: 'biscuit_diamond' },
+              ].map((pack) => {
+                const isSelected = selectedPlanForDeposit?.biscuitId === pack.biscuitId;
+                return (
+                  <button
+                    key={pack.biscuitId}
+                    type="button"
+                    onClick={() => {
+                      setSelectedPlanForDeposit({
+                        biscuitId: pack.biscuitId,
+                        name: `${pack.name} Plan`,
+                        costUsdt: pack.cost,
+                        boostPerHour: pack.boost,
+                        tier: pack.name.toUpperCase(),
+                      });
+                      setDepositAmountUsdt(pack.cost.toString());
+                      setDepositNotes(`[Mining Plan: ${pack.name} Plan (+${pack.boost.toLocaleString()}/hr)]`);
+                    }}
+                    className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-md ring-1 ring-amber-400'
+                        : 'bg-purple-950/40 border-purple-800/40 text-purple-200 hover:bg-purple-900/40'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold">{pack.name}</span>
+                      <span className="text-[10px] text-emerald-400 font-mono font-bold">${pack.cost.toFixed(2)}</span>
+                    </div>
+                    <div className="text-[10px] text-amber-400 font-bold mt-0.5">+{pack.boost.toLocaleString()}/hr</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Official Treasury Address Card */}
           <div className="p-4 rounded-2xl bg-[#0e0622] border border-purple-900/50 space-y-2.5">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-purple-200 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Official Project Treasury Address ({selectedCurrency.network})</span>
+                <ShieldCheck className="w-4 h-4 text-amber-400" />
+                <span>Connected Trust Wallet Treasury ({selectedCurrency.network})</span>
               </span>
-              <span className="text-[10px] font-mono text-emerald-400 font-bold">ACTIVE</span>
+              <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/40 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                ACTIVE
+              </span>
             </div>
 
             <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-[#070312] border border-purple-900/60">

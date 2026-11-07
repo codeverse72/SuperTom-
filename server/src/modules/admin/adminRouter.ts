@@ -123,6 +123,14 @@ adminRouter.post(
   AdminPayoutController.manualCreditDeposit
 );
 
+// Receiving Trust Wallet Treasury Configuration
+adminRouter.get('/treasury-settings', AdminPayoutController.getTreasurySettings);
+adminRouter.post(
+  '/treasury-settings',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  AdminPayoutController.updateTreasurySettings
+);
+
 // Ledger & Transaction Management
 adminRouter.get('/transactions', AdminTransactionController.listTransactions);
 

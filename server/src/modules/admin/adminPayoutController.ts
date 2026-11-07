@@ -15,15 +15,17 @@ const rejectWithdrawalSchema = z.object({
 });
 
 const confirmDepositSchema = z.object({
-  txHash: z.string().min(10, 'Transaction hash required'),
+  txHash: z.string().min(6, 'Transaction hash required'),
+  boostPerHour: z.number().int().min(0).optional(),
 });
 
 const manualCreditDepositSchema = z.object({
   identifier: z.string().min(1, 'User Telegram ID or Username is required'),
   amountUsdt: z.number().positive('USDT amount must be greater than zero'),
-  network: z.enum(['TRC20', 'TON', 'BEP20']).default('TRC20'),
+  network: z.string().default('TRC20'),
   txHash: z.string().optional(),
   notes: z.string().min(3, 'Audit explanation required'),
+  boostPerHour: z.number().int().min(0).default(0),
 });
 
 export class AdminPayoutController {
@@ -436,9 +438,11 @@ export class AdminPayoutController {
       return;
     }
 
-    const { txHash } = parse.data;
+    const { txHash, boostPerHour } = parse.data;
 
     try {
+      let appliedBoost = boostPerHour || 0;
+
       await prisma.$transaction(async (tx) => {
         const deposit = await tx.deposit.findUnique({ where: { id } });
         if (!deposit) {
@@ -449,6 +453,15 @@ export class AdminPayoutController {
           throw new Error(`Cannot confirm deposit with status: ${deposit.status}`);
         }
 
+        // Auto-detect mining plan boost from deposit notes if not explicitly passed
+        if (!appliedBoost && deposit.notes) {
+          const n = deposit.notes.toLowerCase();
+          if (n.includes('+1000') || n.includes('diamond')) appliedBoost = 1000;
+          else if (n.includes('+200') || n.includes('gold')) appliedBoost = 200;
+          else if (n.includes('+50') || n.includes('silver')) appliedBoost = 50;
+          else if (n.includes('+10') || n.includes('common')) appliedBoost = 10;
+        }
+
         await tx.deposit.update({
           where: { id },
           data: {
@@ -457,7 +470,7 @@ export class AdminPayoutController {
           },
         });
 
-        // Credit Poops to user
+        // 1. Credit Poops to user balance via Ledger
         await LedgerService.executeBalanceTransaction(tx, {
           userId: deposit.userId,
           type: 'ADMIN_ADJUSTMENT',
@@ -466,6 +479,17 @@ export class AdminPayoutController {
           description: `Confirmed deposit of ${deposit.amountUsdt} USDT (${deposit.amountPoops} Poops)`,
           idempotencyKey: `dep_conf_${deposit.id}`,
         });
+
+        // 2. Adjust mining speed if a plan boost applies
+        if (appliedBoost > 0) {
+          await tx.miningSettlement.update({
+            where: { userId: deposit.userId },
+            data: {
+              boostRatePerHour: { increment: appliedBoost },
+              totalRatePerHour: { increment: appliedBoost },
+            },
+          });
+        }
       });
 
       await recordAuditLog({
@@ -473,11 +497,15 @@ export class AdminPayoutController {
         action: 'CONFIRM_DEPOSIT',
         targetEntity: 'Deposit',
         targetId: id,
-        newValue: { status: 'CONFIRMED', txHash },
+        newValue: { status: 'CONFIRMED', txHash, appliedBoost },
         req,
       });
 
-      sendSuccess(res, { message: 'Deposit confirmed and Poops credited to player' });
+      sendSuccess(res, {
+        message: appliedBoost > 0 
+          ? `Deposit confirmed! Poops credited and mining speed boosted by +${appliedBoost}/hr.`
+          : 'Deposit confirmed and Poops credited to player',
+      });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Deposit confirmation failed';
       sendError(res, msg, 400, 'CONFIRMATION_FAILED');
@@ -501,7 +529,7 @@ export class AdminPayoutController {
       return;
     }
 
-    const { identifier, amountUsdt, network, txHash, notes } = parse.data;
+    const { identifier, amountUsdt, network, txHash, notes, boostPerHour } = parse.data;
     const cleanId = identifier.trim();
 
     try {
@@ -534,7 +562,7 @@ export class AdminPayoutController {
             network,
             txHash: txHash ? txHash.trim() : `admin_manual_${Date.now()}`,
             status: 'CONFIRMED',
-            notes: `[Admin Manual Credit]: ${notes}`,
+            notes: `[Admin Manual Credit]: ${notes}${boostPerHour > 0 ? ` (+${boostPerHour}/hr boost)` : ''}`,
           },
         });
 
@@ -548,13 +576,30 @@ export class AdminPayoutController {
           idempotencyKey: `dep_manual_${deposit.id}`,
         });
 
-        // 3. Return updated user
-        const updatedUser = await tx.user.findUnique({
-          where: { id: targetUser.id },
-          select: { id: true, telegramId: true, username: true, poopsBalance: true },
-        });
+        // 3. Adjust mining speed if a plan boost applies
+        if (boostPerHour > 0) {
+          await tx.miningSettlement.update({
+            where: { userId: targetUser.id },
+            data: {
+              boostRatePerHour: { increment: boostPerHour },
+              totalRatePerHour: { increment: boostPerHour },
+            },
+          });
+        }
 
-        return { deposit, updatedUser };
+        // 4. Return updated user & mining rate
+        const [updatedUser, updatedSettlement] = await Promise.all([
+          tx.user.findUnique({
+            where: { id: targetUser.id },
+            select: { id: true, telegramId: true, username: true, poopsBalance: true },
+          }),
+          tx.miningSettlement.findUnique({
+            where: { userId: targetUser.id },
+            select: { totalRatePerHour: true },
+          }),
+        ]);
+
+        return { deposit, updatedUser, rate: updatedSettlement?.totalRatePerHour };
       });
 
       await recordAuditLog({
@@ -567,6 +612,8 @@ export class AdminPayoutController {
           creditedUsdt: amountUsdt,
           creditedPoops: amountPoops.toString(),
           newBalance: result.updatedUser?.poopsBalance.toString(),
+          boostPerHour,
+          newRate: result.rate,
           notes,
         },
         req,
@@ -586,12 +633,90 @@ export class AdminPayoutController {
           telegramId: result.updatedUser?.telegramId.toString(),
           username: result.updatedUser?.username,
           newBalance: Number(result.updatedUser?.poopsBalance),
+          productionRate: result.rate,
         },
-        message: `Successfully credited $${amountUsdt} USDT (${amountPoops} Poops) to @${result.updatedUser?.username || cleanId}`,
+        message: `Successfully credited $${amountUsdt} USDT (${amountPoops} Poops) to @${result.updatedUser?.username || cleanId}${boostPerHour > 0 ? ` with +${boostPerHour}/hr mining speed boost!` : '!'}`
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Manual credit deposit failed';
       sendError(res, msg, 400, 'MANUAL_CREDIT_FAILED');
+    }
+  }
+
+  /**
+   * GET /api/v1/admin/treasury-settings
+   * Fetches receiving Trust Wallet addresses from DB SystemSetting
+   */
+  public static async getTreasurySettings(_req: AuthenticatedAdminRequest, res: Response): Promise<void> {
+    try {
+      const settings = await prisma.systemSetting.findMany({
+        where: {
+          key: {
+            in: [
+              'TRUST_WALLET_EVM_ADDRESS',
+              'TRUST_WALLET_TRON_ADDRESS',
+              'TRUST_WALLET_TON_ADDRESS',
+              'TRUST_WALLET_SOL_ADDRESS',
+            ],
+          },
+        },
+      });
+
+      const map: Record<string, string> = {};
+      settings.forEach((s) => {
+        map[s.key] = s.value;
+      });
+
+      sendSuccess(res, {
+        trustWalletEvm: map['TRUST_WALLET_EVM_ADDRESS'] || process.env.TRUST_WALLET_EVM_ADDRESS || '0x71C8360216Ac3456952771bEc438F5e85d99623C',
+        trustWalletTron: map['TRUST_WALLET_TRON_ADDRESS'] || process.env.TRUST_WALLET_TRON_ADDRESS || 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+        trustWalletTon: map['TRUST_WALLET_TON_ADDRESS'] || process.env.TRUST_WALLET_TON_ADDRESS || 'EQBvW8Z5huBkMJYdn3PCDKNKKqiqXDjvjjx29JqYpn8SoGSq',
+        trustWalletSol: map['TRUST_WALLET_SOL_ADDRESS'] || process.env.TRUST_WALLET_SOL_ADDRESS || '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
+      });
+    } catch {
+      sendError(res, 'Failed to fetch treasury settings', 500, 'SERVER_ERROR');
+    }
+  }
+
+  /**
+   * POST /api/v1/admin/treasury-settings
+   * Updates receiving Trust Wallet addresses in DB SystemSetting with audit logging
+   */
+  public static async updateTreasurySettings(req: AuthenticatedAdminRequest, res: Response): Promise<void> {
+    const adminId = req.admin?.adminId;
+    if (!adminId) {
+      sendError(res, 'Unauthorized', 401, 'UNAUTHORIZED');
+      return;
+    }
+
+    const { trustWalletEvm, trustWalletTron, trustWalletTon, trustWalletSol } = req.body;
+
+    try {
+      const updates: Array<{ key: string; value: string; desc: string }> = [];
+      if (trustWalletEvm) updates.push({ key: 'TRUST_WALLET_EVM_ADDRESS', value: trustWalletEvm.trim(), desc: 'Trust Wallet BSC/EVM Treasury' });
+      if (trustWalletTron) updates.push({ key: 'TRUST_WALLET_TRON_ADDRESS', value: trustWalletTron.trim(), desc: 'Trust Wallet TRON Treasury' });
+      if (trustWalletTon) updates.push({ key: 'TRUST_WALLET_TON_ADDRESS', value: trustWalletTon.trim(), desc: 'Trust Wallet TON Treasury' });
+      if (trustWalletSol) updates.push({ key: 'TRUST_WALLET_SOL_ADDRESS', value: trustWalletSol.trim(), desc: 'Trust Wallet Solana Treasury' });
+
+      for (const item of updates) {
+        await prisma.systemSetting.upsert({
+          where: { key: item.key },
+          create: { key: item.key, value: item.value, description: item.desc },
+          update: { value: item.value, updatedAt: new Date() },
+        });
+      }
+
+      await recordAuditLog({
+        adminId,
+        action: 'UPDATE_TREASURY_SETTINGS',
+        targetEntity: 'SystemSetting',
+        newValue: { updates },
+        req,
+      });
+
+      sendSuccess(res, { message: 'Trust Wallet treasury receiving addresses updated successfully!' });
+    } catch {
+      sendError(res, 'Failed to update treasury settings', 500, 'SERVER_ERROR');
     }
   }
 }

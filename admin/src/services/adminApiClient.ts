@@ -285,10 +285,10 @@ class AdminApiClient {
     }>(`/deposits?${q.toString()}`);
   }
 
-  public async confirmDeposit(id: string, txHash: string) {
+  public async confirmDeposit(id: string, txHash: string, boostPerHour?: number) {
     return this.request<{ message: string }>(`/deposits/${id}/confirm`, {
       method: 'POST',
-      body: JSON.stringify({ txHash }),
+      body: JSON.stringify({ txHash, boostPerHour }),
     });
   }
 
@@ -298,12 +298,34 @@ class AdminApiClient {
     network?: string;
     txHash?: string;
     notes: string;
+    boostPerHour?: number;
   }) {
     return this.request<{
       deposit: DepositItem;
-      user: { id: string; telegramId: string; username?: string; newBalance: number };
+      user: { id: string; telegramId: string; username?: string; newBalance: number; productionRate?: number };
       message: string;
     }>('/deposits/manual-credit', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  public async getTreasurySettings() {
+    return this.request<{
+      trustWalletEvm: string;
+      trustWalletTron: string;
+      trustWalletTon: string;
+      trustWalletSol: string;
+    }>('/treasury-settings');
+  }
+
+  public async updateTreasurySettings(data: {
+    trustWalletEvm?: string;
+    trustWalletTron?: string;
+    trustWalletTon?: string;
+    trustWalletSol?: string;
+  }) {
+    return this.request<{ message: string }>('/treasury-settings', {
       method: 'POST',
       body: JSON.stringify(data),
     });

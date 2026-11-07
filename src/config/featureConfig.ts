@@ -32,7 +32,7 @@ export const FEATURE_REGISTRY: Record<FeatureId, FeatureDefinition> = {
   biscuit_purchases: {
     id: 'biscuit_purchases',
     name: 'Store Purchases',
-    status: (IS_BACKEND_CONFIGURED && import.meta.env.VITE_FEATURE_STORE === 'true') ? 'AVAILABLE' : 'UNAVAILABLE',
+    status: (IS_BACKEND_CONFIGURED && import.meta.env.VITE_FEATURE_STORE !== 'false') ? 'AVAILABLE' : 'UNAVAILABLE',
     unavailableMessage: 'Purchases are currently unavailable.',
     requiresAuth: true,
     requiresBackend: true
@@ -40,7 +40,7 @@ export const FEATURE_REGISTRY: Record<FeatureId, FeatureDefinition> = {
   biscuit_feeding: {
     id: 'biscuit_feeding',
     name: 'Biscuit Feeding',
-    status: (IS_BACKEND_CONFIGURED && import.meta.env.VITE_FEATURE_FEEDING === 'true') ? 'AVAILABLE' : 'UNAVAILABLE',
+    status: (IS_BACKEND_CONFIGURED && import.meta.env.VITE_FEATURE_FEEDING !== 'false') ? 'AVAILABLE' : 'UNAVAILABLE',
     unavailableMessage: 'Feeding is temporarily unavailable.',
     requiresAuth: true,
     requiresBackend: true

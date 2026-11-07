@@ -180,59 +180,91 @@ export class PayoutController {
 
   /**
    * GET /api/v1/payouts/treasury-wallets
-   * Returns official deposit receiving addresses for all supported currencies
+   * Returns official deposit receiving addresses for all supported currencies.
+   * Priority: Dynamic Trust Wallet DB setting -> Process Env -> Default Fallback.
    */
   public static async getTreasuryWallets(_req: AuthenticatedRequest, res: Response): Promise<void> {
-    sendSuccess(res, {
-      wallets: {
-        GRAM: {
-          currency: 'GRAM',
-          network: 'TON',
-          address: process.env.TREASURY_TON_ADDRESS || 'EQBvW8Z5huBkMJYdn3PCDKNKKqiqXDjvjjx29JqYpn8SoGSq',
-          hint: 'Send GRAM on TON network to this official address',
+    try {
+      const dbSettings = await prisma.systemSetting.findMany({
+        where: {
+          key: {
+            in: [
+              'TRUST_WALLET_EVM_ADDRESS',
+              'TRUST_WALLET_TRON_ADDRESS',
+              'TRUST_WALLET_TON_ADDRESS',
+              'TRUST_WALLET_SOL_ADDRESS',
+              'TREASURY_EVM_ADDRESS',
+              'TREASURY_TRON_ADDRESS',
+              'TREASURY_TON_ADDRESS',
+              'TREASURY_SOLANA_ADDRESS',
+            ],
+          },
         },
-        'USDT (BEP20)': {
-          currency: 'USDT (BEP20)',
-          network: 'BNB',
-          address: process.env.TREASURY_EVM_ADDRESS || '0x71C8360216Ac3456952771bEc438F5e85d99623C',
-          hint: 'Send USDT (BEP20) on BNB Smart Chain to this address',
+      });
+
+      const settingsMap: Record<string, string> = {};
+      dbSettings.forEach((s) => {
+        settingsMap[s.key] = s.value;
+      });
+
+      const evmAddr = settingsMap['TRUST_WALLET_EVM_ADDRESS'] || settingsMap['TREASURY_EVM_ADDRESS'] || process.env.TRUST_WALLET_EVM_ADDRESS || process.env.TREASURY_EVM_ADDRESS || '0x71C8360216Ac3456952771bEc438F5e85d99623C';
+      const tronAddr = settingsMap['TRUST_WALLET_TRON_ADDRESS'] || settingsMap['TREASURY_TRON_ADDRESS'] || process.env.TRUST_WALLET_TRON_ADDRESS || process.env.TREASURY_TRON_ADDRESS || 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
+      const tonAddr = settingsMap['TRUST_WALLET_TON_ADDRESS'] || settingsMap['TREASURY_TON_ADDRESS'] || process.env.TRUST_WALLET_TON_ADDRESS || process.env.TREASURY_TON_ADDRESS || 'EQBvW8Z5huBkMJYdn3PCDKNKKqiqXDjvjjx29JqYpn8SoGSq';
+      const solAddr = settingsMap['TRUST_WALLET_SOL_ADDRESS'] || settingsMap['TREASURY_SOLANA_ADDRESS'] || process.env.TRUST_WALLET_SOL_ADDRESS || process.env.TREASURY_SOLANA_ADDRESS || '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU';
+
+      sendSuccess(res, {
+        wallets: {
+          GRAM: {
+            currency: 'GRAM',
+            network: 'TON',
+            address: tonAddr,
+            hint: 'Send GRAM on TON network to this official address',
+          },
+          'USDT (BEP20)': {
+            currency: 'USDT (BEP20)',
+            network: 'BNB',
+            address: evmAddr,
+            hint: 'Send USDT (BEP20) on BNB Smart Chain to this address',
+          },
+          'USDT (TRC20)': {
+            currency: 'USDT (TRC20)',
+            network: 'Tron',
+            address: tronAddr,
+            hint: 'Send USDT (TRC20) on TRON network to this address',
+          },
+          BNB: {
+            currency: 'BNB',
+            network: 'BNB',
+            address: evmAddr,
+            hint: 'Send BNB on BNB Smart Chain to this address',
+          },
+          TRX: {
+            currency: 'TRX',
+            network: 'Tron',
+            address: tronAddr,
+            hint: 'Send TRX on TRON network to this address',
+          },
+          'SOL (Solana)': {
+            currency: 'SOL (Solana)',
+            network: 'Solana',
+            address: solAddr,
+            hint: 'Send SOL on Solana network to this address',
+          },
+          'Base (USDC / ETH)': {
+            currency: 'Base (USDC / ETH)',
+            network: 'Base',
+            address: evmAddr,
+            hint: 'Send USDC or ETH on Base network to this address',
+          },
         },
-        'USDT (TRC20)': {
-          currency: 'USDT (TRC20)',
-          network: 'Tron',
-          address: process.env.TREASURY_TRON_ADDRESS || 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
-          hint: 'Send USDT (TRC20) on TRON network to this address',
+        rate: {
+          poopsPerUsdt: env.POOPS_PER_USDT,
+          minWithdrawalPoops: env.MIN_WITHDRAWAL_POOPS,
         },
-        BNB: {
-          currency: 'BNB',
-          network: 'BNB',
-          address: process.env.TREASURY_EVM_ADDRESS || '0x71C8360216Ac3456952771bEc438F5e85d99623C',
-          hint: 'Send BNB on BNB Smart Chain to this address',
-        },
-        TRX: {
-          currency: 'TRX',
-          network: 'Tron',
-          address: process.env.TREASURY_TRON_ADDRESS || 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
-          hint: 'Send TRX on TRON network to this address',
-        },
-        'SOL (Solana)': {
-          currency: 'SOL (Solana)',
-          network: 'Solana',
-          address: process.env.TREASURY_SOLANA_ADDRESS || '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
-          hint: 'Send SOL on Solana network to this address',
-        },
-        'Base (USDC / ETH)': {
-          currency: 'Base (USDC / ETH)',
-          network: 'Base',
-          address: process.env.TREASURY_BASE_ADDRESS || process.env.TREASURY_EVM_ADDRESS || '0x71C8360216Ac3456952771bEc438F5e85d99623C',
-          hint: 'Send USDC or ETH on Base network to this address',
-        },
-      },
-      rate: {
-        poopsPerUsdt: env.POOPS_PER_USDT,
-        minWithdrawalPoops: env.MIN_WITHDRAWAL_POOPS,
-      },
-    });
+      });
+    } catch {
+      sendError(res, 'Failed to fetch treasury wallets', 500, 'TREASURY_FETCH_ERROR');
+    }
   }
 
   /**

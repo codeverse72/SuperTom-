@@ -103,7 +103,9 @@ export default function App() {
               <Home onNavigateToStore={() => handleTabChange('store')} />
             )}
             {activeTab === 'missions' && <Missions />}
-            {activeTab === 'store' && <Store />}
+            {activeTab === 'store' && (
+              <Store onNavigateToDeposit={() => handleTabChange('payout')} />
+            )}
             {activeTab === 'payout' && <Payout />}
             {activeTab === 'profile' && <Profile />}
           </main>

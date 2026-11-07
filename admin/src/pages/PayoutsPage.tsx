@@ -19,6 +19,7 @@ import {
   Coins,
   Clock,
   AlertTriangle,
+  ShieldCheck,
 } from 'lucide-react';
 
 export const PayoutsPage: React.FC = () => {
@@ -53,6 +54,14 @@ export const PayoutsPage: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(false);
 
+  // Trust Wallet Treasury Settings state
+  const [showTrustWalletModal, setShowTrustWalletModal] = useState(false);
+  const [trustWalletEvm, setTrustWalletEvm] = useState('');
+  const [trustWalletTron, setTrustWalletTron] = useState('');
+  const [trustWalletTon, setTrustWalletTon] = useState('');
+  const [trustWalletSol, setTrustWalletSol] = useState('');
+  const [isSavingTrustWallet, setIsSavingTrustWallet] = useState(false);
+
   // Modals for actions
   const [completeModalItem, setCompleteModalItem] = useState<WithdrawalItem | null>(null);
   const [completeTxHash, setCompleteTxHash] = useState('');
@@ -64,6 +73,7 @@ export const PayoutsPage: React.FC = () => {
 
   const [confirmDepositItem, setConfirmDepositItem] = useState<DepositItem | null>(null);
   const [depositTxHash, setDepositTxHash] = useState('');
+  const [confirmDepositBoost, setConfirmDepositBoost] = useState('0');
   const [isConfirmingDeposit, setIsConfirmingDeposit] = useState(false);
 
   // Manual Deposit / Balance Credit Modal
@@ -73,6 +83,7 @@ export const PayoutsPage: React.FC = () => {
   const [manualDepositNetwork, setManualDepositNetwork] = useState('TRC20');
   const [manualDepositTxHash, setManualDepositTxHash] = useState('');
   const [manualDepositNotes, setManualDepositNotes] = useState('');
+  const [manualDepositBoost, setManualDepositBoost] = useState('0');
   const [isSubmittingDeposit, setIsSubmittingDeposit] = useState(false);
 
   const fetchWithdrawals = useCallback(async () => {
@@ -140,6 +151,34 @@ export const PayoutsPage: React.FC = () => {
     }
   };
 
+  const fetchTrustWalletSettings = async () => {
+    const res = await adminApi.getTreasurySettings();
+    if (res.success && res.data) {
+      setTrustWalletEvm(res.data.trustWalletEvm || '');
+      setTrustWalletTron(res.data.trustWalletTron || '');
+      setTrustWalletTon(res.data.trustWalletTon || '');
+      setTrustWalletSol(res.data.trustWalletSol || '');
+    }
+  };
+
+  const handleSaveTrustWallet = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingTrustWallet(true);
+    const res = await adminApi.updateTreasurySettings({
+      trustWalletEvm,
+      trustWalletTron,
+      trustWalletTon,
+      trustWalletSol,
+    });
+    setIsSavingTrustWallet(false);
+    if (res.success) {
+      alert('Trust Wallet treasury receiving addresses updated successfully!');
+      setShowTrustWalletModal(false);
+    } else {
+      alert(res.error || 'Failed to update Trust Wallet settings');
+    }
+  };
+
   const handleManualDepositSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const usdtNum = parseFloat(manualDepositAmount);
@@ -152,12 +191,14 @@ export const PayoutsPage: React.FC = () => {
       return;
     }
     setIsSubmittingDeposit(true);
+    const boostNum = parseInt(manualDepositBoost, 10) || 0;
     const res = await adminApi.manualCreditDeposit({
       identifier: manualDepositUser.trim(),
       amountUsdt: usdtNum,
       network: manualDepositNetwork,
       txHash: manualDepositTxHash.trim() || undefined,
       notes: manualDepositNotes.trim() || 'Admin manual balance deposit',
+      boostPerHour: boostNum > 0 ? boostNum : undefined,
     });
     setIsSubmittingDeposit(false);
     if (res.success) {
@@ -167,6 +208,7 @@ export const PayoutsPage: React.FC = () => {
       setManualDepositAmount('');
       setManualDepositTxHash('');
       setManualDepositNotes('');
+      setManualDepositBoost('0');
       fetchDeposits();
     } else {
       alert(res.error || 'Failed to credit deposit');
@@ -207,11 +249,18 @@ export const PayoutsPage: React.FC = () => {
     e.preventDefault();
     if (!confirmDepositItem || !depositTxHash) return;
     setIsConfirmingDeposit(true);
-    const res = await adminApi.confirmDeposit(confirmDepositItem.id, depositTxHash);
+    const boostNum = parseInt(confirmDepositBoost, 10) || 0;
+    const res = await adminApi.confirmDeposit(
+      confirmDepositItem.id, 
+      depositTxHash, 
+      boostNum > 0 ? boostNum : undefined
+    );
     setIsConfirmingDeposit(false);
     if (res.success) {
+      alert(res.data?.message || 'Deposit confirmed successfully!');
       setConfirmDepositItem(null);
       setDepositTxHash('');
+      setConfirmDepositBoost('0');
       fetchDeposits();
     } else {
       alert(res.error || 'Failed to confirm deposit');
@@ -549,12 +598,26 @@ export const PayoutsPage: React.FC = () => {
               <p className="text-[11px] text-slate-400">Manage verified on-chain payments and manual deposit adjustments</p>
             </div>
             {hasRole(['SUPER_ADMIN', 'ADMIN']) && (
-              <button
-                onClick={() => setShowManualDepositModal(true)}
-                className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
-              >
-                <span>+ Credit Manual Deposit</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    fetchTrustWalletSettings();
+                    setShowTrustWalletModal(true);
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-purple-950 border border-purple-500/40 hover:bg-purple-900 text-amber-300 font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Connect Trust Wallet</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowManualDepositModal(true)}
+                  className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                >
+                  <span>+ Credit Manual Deposit</span>
+                </button>
+              </div>
             )}
           </div>
           <div className="rounded-2xl bg-gradient-to-b from-[#120A25] to-[#090414] border border-purple-900/30 overflow-hidden shadow-xl">
@@ -594,7 +657,13 @@ export const PayoutsPage: React.FC = () => {
                             <button
                               onClick={() => {
                                 setConfirmDepositItem(d);
-                                setDepositTxHash('');
+                                setDepositTxHash(d.txHash && d.txHash !== 'Pending on-chain verification' ? d.txHash : '');
+                                let boost = '0';
+                                if (d.notes?.includes('Diamond') || d.notes?.includes('1000') || d.notes?.includes('1,000')) boost = '1000';
+                                else if (d.notes?.includes('Gold') || d.notes?.includes('200')) boost = '200';
+                                else if (d.notes?.includes('Silver') || d.notes?.includes('50')) boost = '50';
+                                else if (d.notes?.includes('Common') || d.notes?.includes('10')) boost = '10';
+                                setConfirmDepositBoost(boost);
                               }}
                               className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px]"
                             >
@@ -732,6 +801,26 @@ export const PayoutsPage: React.FC = () => {
             />
           </div>
 
+          <div>
+            <label className="block font-bold text-slate-300 uppercase mb-1">
+              Mining Speed Boost to Activate
+            </label>
+            <select
+              value={confirmDepositBoost}
+              onChange={(e) => setConfirmDepositBoost(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-[#090415] border border-purple-900/60 text-white focus:outline-hidden"
+            >
+              <option value="0">None / Standard Poops Only</option>
+              <option value="10">Common Plan (+10 Poops / hour)</option>
+              <option value="50">Silver Plan (+50 Poops / hour)</option>
+              <option value="200">Gold Plan (+200 Poops / hour)</option>
+              <option value="1000">Diamond Plan (+1,000 Poops / hour)</option>
+            </select>
+            <p className="text-[10px] text-slate-400 mt-1">
+              Automatically adjusts and increments the player's mining speed upon confirmation.
+            </p>
+          </div>
+
           <div className="flex justify-end gap-2 pt-3">
             <button
               type="button"
@@ -814,6 +903,26 @@ export const PayoutsPage: React.FC = () => {
 
           <div>
             <label className="block font-bold text-slate-300 uppercase mb-1">
+              Mining Speed Boost to Activate
+            </label>
+            <select
+              value={manualDepositBoost}
+              onChange={(e) => setManualDepositBoost(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-[#090415] border border-purple-900/60 text-white focus:outline-hidden"
+            >
+              <option value="0">None (Balance Only)</option>
+              <option value="10">Common Plan (+10 Poops / hour)</option>
+              <option value="50">Silver Plan (+50 Poops / hour)</option>
+              <option value="200">Gold Plan (+200 Poops / hour)</option>
+              <option value="1000">Diamond Plan (+1,000 Poops / hour)</option>
+            </select>
+            <p className="text-[10px] text-slate-400 mt-1">
+              Adds bonus mining speed directly to the player's mining settlement.
+            </p>
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-300 uppercase mb-1">
               On-Chain Transaction Hash (Optional)
             </label>
             <input
@@ -853,6 +962,98 @@ export const PayoutsPage: React.FC = () => {
               className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold transition-all disabled:opacity-50"
             >
               {isSubmittingDeposit ? 'Crediting...' : 'Confirm Deposit Credit'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Trust Wallet Treasury Configuration Modal */}
+      <Modal
+        isOpen={showTrustWalletModal}
+        onClose={() => setShowTrustWalletModal(false)}
+        title="Connect Trust Wallet Treasury"
+        subtitle="Configure the official receiving addresses where all player deposits are sent"
+        maxWidth="md"
+      >
+        <form onSubmit={handleSaveTrustWallet} className="space-y-4 text-xs">
+          <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-800/40 text-slate-300 space-y-1">
+            <p className="font-bold text-amber-300 flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-amber-400" />
+              Direct Trust Wallet Receiving Addresses
+            </p>
+            <p className="text-[11px] text-slate-400">
+              When players deposit on the bot, they are given these exact receiving addresses. In Trust Wallet, all EVM chains (BNB Smart Chain, Base, Ethereum) share the same address.
+            </p>
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-300 uppercase mb-1">
+              EVM Trust Wallet Address (BNB Smart Chain / Base / ETH)
+            </label>
+            <input
+              type="text"
+              value={trustWalletEvm}
+              onChange={(e) => setTrustWalletEvm(e.target.value)}
+              placeholder="0x... (from your Trust Wallet BNB or ETH account)"
+              className="w-full px-3 py-2 rounded-xl bg-[#090415] border border-purple-900/60 text-white font-mono focus:outline-hidden"
+            />
+            <p className="text-[10px] text-slate-400 mt-1">Used for USDT (BEP20), BNB, and Base network deposits.</p>
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-300 uppercase mb-1">
+              TRON Trust Wallet Address (TRC20 / TRX)
+            </label>
+            <input
+              type="text"
+              value={trustWalletTron}
+              onChange={(e) => setTrustWalletTron(e.target.value)}
+              placeholder="T... (from your Trust Wallet TRON account)"
+              className="w-full px-3 py-2 rounded-xl bg-[#090415] border border-purple-900/60 text-white font-mono focus:outline-hidden"
+            />
+            <p className="text-[10px] text-slate-400 mt-1">Used for USDT (TRC20) and TRX deposits.</p>
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-300 uppercase mb-1">
+              TON Wallet Address (Optional)
+            </label>
+            <input
+              type="text"
+              value={trustWalletTon}
+              onChange={(e) => setTrustWalletTon(e.target.value)}
+              placeholder="EQ... or UQ..."
+              className="w-full px-3 py-2 rounded-xl bg-[#090415] border border-purple-900/60 text-white font-mono focus:outline-hidden"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-300 uppercase mb-1">
+              Solana (SOL) Address (Optional)
+            </label>
+            <input
+              type="text"
+              value={trustWalletSol}
+              onChange={(e) => setTrustWalletSol(e.target.value)}
+              placeholder="Solana Base58 address..."
+              className="w-full px-3 py-2 rounded-xl bg-[#090415] border border-purple-900/60 text-white font-mono focus:outline-hidden"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3">
+            <button
+              type="button"
+              onClick={() => setShowTrustWalletModal(false)}
+              className="px-4 py-2 rounded-xl text-slate-400 font-semibold hover:text-white"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSavingTrustWallet}
+              className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold transition-all disabled:opacity-50"
+            >
+              {isSavingTrustWallet ? 'Saving...' : 'Save Receiving Addresses'}
             </button>
           </div>
         </form>
