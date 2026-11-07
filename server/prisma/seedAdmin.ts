@@ -26,8 +26,9 @@ async function seed() {
     where: { email: adminEmail },
   });
 
+  const passwordHash = hashPassword('shahid@Admin2026');
+
   if (!existing) {
-    const passwordHash = hashPassword('SuperTom@Admin2026!');
     const admin = await prisma.adminUser.create({
       data: {
         email: adminEmail,
@@ -40,7 +41,11 @@ async function seed() {
 
     console.log(`✔ Super Admin created: ${admin.email} (Role: ${admin.role})`);
   } else {
-    console.log(`✔ Super Admin already exists: ${existing.email}`);
+    await prisma.adminUser.update({
+      where: { email: adminEmail },
+      data: { passwordHash },
+    });
+    console.log(`✔ Super Admin password updated successfully for: ${existing.email}`);
   }
 
   // Also seed default biscuit products if empty
