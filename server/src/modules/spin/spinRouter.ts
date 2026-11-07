@@ -9,3 +9,4 @@ const spinLimiter = createRateLimiter(5000, 5);
 
 spinRouter.get('/status', requireAuth, SpinController.getStatus);
 spinRouter.post('/claim', requireAuth, spinLimiter, SpinController.claimSpin);
+

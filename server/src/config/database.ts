@@ -30,3 +30,4 @@ export async function connectDatabase(): Promise<boolean> {
     return false;
   }
 }
+

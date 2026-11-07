@@ -44,3 +44,4 @@ bootstrap().catch((err) => {
   logger.error('Fatal bootstrap failure:', err);
   process.exit(1);
 });
+

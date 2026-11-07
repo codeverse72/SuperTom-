@@ -10,3 +10,4 @@ const transactionLimiter = createRateLimiter(5000, 10);
 storeRouter.get('/inventory', requireAuth, StoreController.getInventory);
 storeRouter.post('/purchase', requireAuth, transactionLimiter, StoreController.purchaseBiscuit);
 storeRouter.post('/feed', requireAuth, transactionLimiter, StoreController.feedBiscuit);
+

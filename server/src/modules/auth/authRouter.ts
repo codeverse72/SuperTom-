@@ -10,3 +10,4 @@ const authLimiter = createRateLimiter(60000, 30);
 
 authRouter.post('/telegram', authLimiter, AuthController.authenticateTelegram);
 authRouter.post('/logout', requireAuth, AuthController.logout);
+

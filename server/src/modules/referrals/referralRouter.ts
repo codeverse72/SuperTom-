@@ -5,3 +5,4 @@ import { requireAuth } from '../../middleware/auth.js';
 export const referralRouter = Router();
 
 referralRouter.get('/stats', requireAuth, ReferralController.getStats);
+

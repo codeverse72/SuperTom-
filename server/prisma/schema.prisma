@@ -341,3 +341,4 @@ model SystemSetting {
   description String?
   updatedAt   DateTime @updatedAt
 }
+

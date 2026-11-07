@@ -45,3 +45,4 @@ export function optionalAuth(req: AuthenticatedRequest, res: Response, next: Nex
 
   next();
 }
+

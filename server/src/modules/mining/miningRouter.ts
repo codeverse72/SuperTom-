@@ -9,3 +9,4 @@ const claimLimiter = createRateLimiter(5000, 5); // Max 5 claims per 5 seconds
 
 miningRouter.get('/status', requireAuth, MiningController.getStatus);
 miningRouter.post('/claim', requireAuth, claimLimiter, MiningController.claimEarnings);
+

@@ -30,3 +30,4 @@ export function errorHandler(
   const message = err instanceof Error ? err.message : 'Internal server error';
   sendError(res, message, 500, 'INTERNAL_SERVER_ERROR');
 }
+

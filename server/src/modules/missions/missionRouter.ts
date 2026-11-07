@@ -10,3 +10,4 @@ const missionLimiter = createRateLimiter(5000, 10);
 missionRouter.get('/', requireAuth, MissionController.getMissions);
 missionRouter.post('/:id/verify', requireAuth, missionLimiter, MissionController.verifyMission);
 missionRouter.post('/:id/claim', requireAuth, missionLimiter, MissionController.claimReward);
+

@@ -74,3 +74,4 @@ export function isValidTronAddress(address: string): boolean {
   const tronRegex = /^T[1-9A-HJ-NP-za-km-z]{33}$/;
   return tronRegex.test(trimmed);
 }
+
