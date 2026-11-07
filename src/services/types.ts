@@ -79,6 +79,7 @@ export interface BiscuitInventoryDto {
   silver: number;
   gold: number;
   diamond: number;
+  [key: string]: number;
 }
 
 export interface PurchaseBiscuitRequest {

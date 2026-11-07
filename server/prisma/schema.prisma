@@ -1,0 +1,343 @@
+// Prisma Schema for SuperTom Telegram Mining Game
+// Designed for Supabase PostgreSQL (Supports Transaction Pooler & Direct URL)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+}
+
+enum CurrencyType {
+  POOPS
+  USDT_TRC20
+}
+
+enum MissionCategory {
+  DAILY
+  SOCIAL
+  REFERRAL
+  SPECIAL
+}
+
+enum VerificationType {
+  TELEGRAM_CHANNEL
+  TELEGRAM_GROUP
+  EXTERNAL_LINK
+  GAME_ACTION
+}
+
+enum MissionStatus {
+  START
+  IN_PROGRESS
+  VERIFY
+  COMPLETED
+  CLAIMED
+}
+
+enum SpinRewardType {
+  POOPS
+  BISCUIT
+}
+
+enum ReferralStatus {
+  PENDING
+  QUALIFIED
+  REWARDED
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  COMPLETED
+  REJECTED
+}
+
+enum LedgerType {
+  MINING_SETTLEMENT
+  MISSION_REWARD
+  SPIN_REWARD
+  REFERRAL_BONUS
+  REFERRAL_COMMISSION
+  BISCUIT_PURCHASE
+  WITHDRAWAL_RESERVATION
+  WITHDRAWAL_REFUND
+  WITHDRAWAL_COMPLETED
+  ADMIN_ADJUSTMENT
+}
+
+// 1. Core Player Account
+model User {
+  id              String         @id @default(uuid())
+  telegramId      BigInt         @unique
+  username        String?
+  firstName       String?
+  lastName        String?
+  photoUrl        String?
+  languageCode    String?        @default("en")
+  poopsBalance    BigInt         @default(0)
+  level           Int            @default(1)
+  levelTitle      String         @default("Feline Cadet")
+  referralCode    String         @unique
+  referredById    String?
+  accountStatus   AccountStatus  @default(ACTIVE)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // Relationships
+  referrer        User?          @relation("UserReferrals", fields: [referredById], references: [id])
+  referees        User[]         @relation("UserReferrals")
+  sessions        Session[]
+  miningSettlement MiningSettlement?
+  inventories     UserInventory[]
+  feedingEvents   FeedingEvent[]
+  userMissions    UserMission[]
+  spinHistories   SpinHistory[]
+  spinState       SpinState?
+  sentReferrals   Referral[]     @relation("ReferrerRel")
+  receivedReferral Referral?     @relation("RefereeRel")
+  withdrawals     Withdrawal[]
+  ledgerEntries   LedgerEntry[]
+
+  @@index([telegramId])
+  @@index([referralCode])
+  @@index([accountStatus])
+}
+
+// 2. Cryptographic Telegram Sessions
+model Session {
+  id               String    @id @default(uuid())
+  userId           String
+  tokenHash        String    @unique
+  refreshTokenHash String?
+  userAgent        String?
+  ipAddress        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+// 3. Server-Authoritative Mining Engine
+model MiningSettlement {
+  id                   String   @id @default(uuid())
+  userId               String   @unique
+  baseRatePerHour      Int      @default(10)
+  boostRatePerHour     Int      @default(0)
+  totalRatePerHour     Int      @default(10)
+  unclaimedPoops       BigInt   @default(0)
+  lastSettledAt        DateTime @default(now())
+  maxAccumulationHours Int      @default(24)
+  updatedAt            DateTime @updatedAt
+
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// 4. Biscuit Store Catalog
+model BiscuitProduct {
+  id                     String        @id // "common", "silver", "gold", "diamond"
+  name                   String
+  costPoops              BigInt
+  productionBoostPerHour Int
+  currencyType           CurrencyType  @default(POOPS)
+  badge                  String
+  color                  String
+  borderColor            String
+  glowColor              String
+  description            String
+  isActive               Boolean       @default(true)
+  createdAt              DateTime      @default(now())
+
+  inventories            UserInventory[]
+  feedingEvents          FeedingEvent[]
+}
+
+// 5. Player Biscuit Inventory
+model UserInventory {
+  id         String         @id @default(uuid())
+  userId     String
+  biscuitId  String
+  quantity   Int            @default(0)
+  updatedAt  DateTime       @updatedAt
+
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  biscuit    BiscuitProduct @relation(fields: [biscuitId], references: [id])
+
+  @@unique([userId, biscuitId])
+  @@index([userId])
+}
+
+// 6. Cat Feeding Audit Log
+model FeedingEvent {
+  id             String         @id @default(uuid())
+  userId         String
+  biscuitId      String
+  quantity       Int            @default(1)
+  boostAdded     Int
+  timestamp      DateTime       @default(now())
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  biscuit        BiscuitProduct @relation(fields: [biscuitId], references: [id])
+
+  @@index([userId])
+  @@index([timestamp])
+}
+
+// 7. Quest Catalogue
+model Mission {
+  id               String           @id
+  title            String
+  description      String
+  rewardPoops      BigInt
+  category         MissionCategory
+  verificationType VerificationType @default(GAME_ACTION)
+  icon             String           @default("Trophy")
+  badge            String?
+  actionUrl        String?
+  channelId        String?
+  isActive         Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+
+  userMissions     UserMission[]
+}
+
+// 8. Player Quest Progress
+model UserMission {
+  id        String        @id @default(uuid())
+  userId    String
+  missionId String
+  status    MissionStatus @default(START)
+  progress  Int           @default(0)
+  total     Int           @default(1)
+  claimedAt DateTime?
+  updatedAt DateTime      @updatedAt
+
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mission   Mission       @relation(fields: [missionId], references: [id])
+
+  @@unique([userId, missionId])
+  @@index([userId])
+}
+
+// 9. Lucky Wheel Milestone Cooldowns
+model SpinConfiguration {
+  id             String   @id // "milestone_1", "milestone_2", "milestone_3"
+  milestoneOrder Int      @unique // 1, 2, 3
+  cooldownHours  Int      // 2, 4, 8
+  label          String
+}
+
+// 10. Progressive Wheel State
+model SpinState {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  currentMilestone  Int      @default(1)
+  cycleCount        Int      @default(1)
+  nextUnlockAt      DateTime
+  claimedMilestones String   @default("[]") // JSON string of claimed milestone numbers
+  updatedAt         DateTime @updatedAt
+
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// 11. Cryptographic Spin Outcomes
+model SpinHistory {
+  id             String         @id @default(uuid())
+  userId         String
+  milestone      Int
+  rewardType     SpinRewardType
+  rewardAmount   BigInt?
+  rewardBiscuitId String?
+  claimedAt      DateTime       @default(now())
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([claimedAt])
+}
+
+// 12. Referral Program Ledger
+model Referral {
+  id                   String         @id @default(uuid())
+  referrerId           String
+  refereeId            String         @unique
+  rewardPoops          BigInt         @default(2000)
+  commissionPercent    Int            @default(10)
+  totalCommissionPoops BigInt         @default(0)
+  status               ReferralStatus @default(QUALIFIED)
+  createdAt            DateTime       @default(now())
+
+  referrer             User           @relation("ReferrerRel", fields: [referrerId], references: [id], onDelete: Cascade)
+  referee              User           @relation("RefereeRel", fields: [refereeId], references: [id], onDelete: Cascade)
+
+  @@index([referrerId])
+  @@index([refereeId])
+}
+
+// 13. USDT TRC20 Withdrawal Requests
+model Withdrawal {
+  id              String           @id @default(uuid())
+  userId          String
+  walletAddress   String
+  amountPoops     BigInt
+  amountUsdt      Decimal          @db.Decimal(18, 4)
+  network         String           @default("TRC20")
+  status          WithdrawalStatus @default(PENDING)
+  txHash          String?
+  rejectionReason String?
+  reviewedAt      DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// 14. Double-Entry Immutable Balance Audit Ledger
+model LedgerEntry {
+  id             String     @id @default(uuid())
+  userId         String
+  type           LedgerType
+  amount         BigInt     // Positive = Credit, Negative = Debit
+  balanceBefore  BigInt
+  balanceAfter   BigInt
+  referenceId    String?
+  idempotencyKey String?    @unique
+  description    String
+  createdAt      DateTime   @default(now())
+
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([idempotencyKey])
+}
+
+// 15. Dynamic System Configuration
+model SystemSetting {
+  key         String   @id
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+}

@@ -3,22 +3,20 @@
  * 
  * Strict separation of:
  * 1. Server-owned state (Balance, Mining, Inventory, Missions, Withdrawals, User Profile)
- *    -> null or empty when backend not connected. Zero fabricated state.
+ *    -> Live-synced when backend is connected, zero local fabrication when offline.
  * 2. Temporary UI state (active tab, modals, audio toggle, toasts)
  *    -> clean local UI management.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { 
-  SPIN_MILESTONES, 
   INITIAL_MISSIONS, 
   Mission, 
   SpinRewardConfig 
 } from '../config/gameConfig';
 import { 
   SYSTEM_MESSAGES, 
-  isFeatureAvailable, 
-  getFeatureUnavailableMessage 
+  isFeatureAvailable 
 } from '../config/featureConfig';
 import { selectWeightedReward } from '../utils/probability';
 import { sound } from '../utils/sound';
@@ -26,6 +24,14 @@ import { validateWithdrawal } from '../utils/validation';
 import { BackendNoticeModal } from '../components/BackendNoticeModal';
 import { UserProfile } from '../types/user';
 import { WithdrawalRecord } from '../types/payment';
+import { getRawTelegramInitData } from '../utils/telegram';
+import { authService } from '../services/authService';
+import { userService } from '../services/userService';
+import { miningService } from '../services/miningService';
+import { storeService } from '../services/storeService';
+import { spinService } from '../services/spinService';
+import { missionService } from '../services/missionService';
+import { paymentService } from '../services/paymentService';
 
 interface SpinState {
   currentMilestone: 1 | 2 | 3;
@@ -97,26 +103,26 @@ const GameContext = createContext<GameContextType | undefined>(undefined);
 
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Server-owned state defaults to null / empty: No fake user data, no fake balances
-  const [balance] = useState<number | null>(null);
-  const [productionRate] = useState<number | null>(null);
-  const [isAuthenticated] = useState<boolean>(false);
-  const [user] = useState<UserProfile | null>(null);
-  const [biscuitInventory] = useState<Record<string, number> | null>(null);
-  const [biscuitFedCount] = useState<Record<string, number>>(DEFAULT_FED);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [productionRate, setProductionRate] = useState<number | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [biscuitInventory, setBiscuitInventory] = useState<Record<string, number> | null>(null);
+  const [biscuitFedCount, setBiscuitFedCount] = useState<Record<string, number>>(DEFAULT_FED);
 
   // Spin timer milestones (starts with clean 4h 12m target for UI matching reference)
-  const [spinState] = useState<SpinState>(() => ({
+  const [spinState, setSpinState] = useState<SpinState>(() => ({
     currentMilestone: 1,
     targetTimestamp: Date.now() + (4 * 3600 + 12 * 60 + 36) * 1000,
     claimedMilestones: [1, 2], // Node 1 and Node 2 checkmarked visually per reference image
     cycleCount: 1
   }));
 
-  // Clean initial missions catalogue (all in uncompleted 'start' state)
-  const [missions] = useState<Mission[]>(INITIAL_MISSIONS);
+  // Clean initial missions catalogue
+  const [missions, setMissions] = useState<Mission[]>(INITIAL_MISSIONS);
 
-  // Clean empty withdrawals list (no fake past transactions)
-  const [withdrawals] = useState<WithdrawalRecord[]>([]);
+  // Clean empty withdrawals list
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>([]);
 
   // Local UI settings
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
@@ -146,18 +152,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setNoticeModal(prev => ({ ...prev, isOpen: false }));
   }, []);
 
-  // Real-time remaining spin countdown in ms
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const remainingSpinTimeMs = Math.max(0, spinState.targetTimestamp - now);
-  const isSpinReady = remainingSpinTimeMs === 0;
-
   const showToast = useCallback((title: string, message: string, type: 'success' | 'info' | 'reward' | 'error' = 'info') => {
     const id = Date.now().toString();
     setActiveToast({ id, title, message, type });
@@ -170,6 +164,105 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveToast(null);
   }, []);
 
+  // Live Backend Connection & Cryptographic InitData Pipeline
+  useEffect(() => {
+    const rawInitData = getRawTelegramInitData();
+    if (rawInitData && isFeatureAvailable('auth')) {
+      authService.authenticateTelegram(rawInitData).then((authRes) => {
+        if (authRes.success && authRes.data) {
+          setIsAuthenticated(true);
+          setUser({
+            id: authRes.data.userId,
+            telegramId: authRes.data.telegramId,
+            username: authRes.data.username,
+            firstName: authRes.data.firstName,
+            lastName: authRes.data.lastName,
+            level: authRes.data.level,
+            levelTitle: authRes.data.levelTitle,
+            referralCode: authRes.data.referralCode,
+            friendsInvited: 0,
+            referralEarnings: 0,
+            totalMissionsDone: 0,
+            totalBiscuitsFed: 0,
+            createdAt: authRes.data.createdAt,
+          });
+
+          // Fetch Live Balance
+          userService.getBalance().then((bRes) => {
+            if (bRes.success && bRes.data) {
+              setBalance(bRes.data.balancePoops);
+            }
+          });
+
+          // Fetch Live Mining Rate
+          if (isFeatureAvailable('mining')) {
+            miningService.getMiningStatus().then((mRes) => {
+              if (mRes.success && mRes.data) {
+                setProductionRate(mRes.data.totalRatePerHour);
+              }
+            });
+          }
+
+          // Fetch Live Inventory
+          if (isFeatureAvailable('biscuit_purchases')) {
+            storeService.getInventory().then((iRes) => {
+              if (iRes.success && iRes.data) {
+                setBiscuitInventory(iRes.data);
+              }
+            });
+          }
+
+          // Fetch Live Spin Cooldowns
+          if (isFeatureAvailable('spin_rewards')) {
+            spinService.getSpinStatus().then((sRes) => {
+              if (sRes.success && sRes.data) {
+                setSpinState({
+                  currentMilestone: sRes.data.currentMilestone,
+                  targetTimestamp: sRes.data.nextUnlockTimestamp,
+                  claimedMilestones: sRes.data.claimedMilestones,
+                  cycleCount: sRes.data.cycleCount,
+                });
+              }
+            });
+          }
+
+          // Fetch Live Missions
+          missionService.getMissions().then((misRes) => {
+            if (misRes.success && misRes.data && misRes.data.length > 0) {
+              setMissions(
+                misRes.data.map((m) => ({
+                  id: m.id,
+                  title: m.title,
+                  description: m.description,
+                  reward: m.rewardPoops,
+                  category: m.category,
+                  icon: m.icon,
+                  status: m.status,
+                  progress: m.progress,
+                  total: m.total,
+                  badge: m.badge,
+                  actionUrl: m.actionUrl,
+                }))
+              );
+            }
+          });
+        }
+      });
+    }
+  }, []);
+
+  // Real-time remaining spin countdown in ms
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const remainingSpinTimeMs = Math.max(0, spinState.targetTimestamp - now);
+  const isSpinReady = remainingSpinTimeMs === 0;
+
   const toggleSound = () => {
     const next = !soundEnabled;
     setSoundEnabled(next);
@@ -177,101 +270,135 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (next) sound.playTap();
   };
 
-  // Pet the cat: tactile audio and visual hearts, zero fake balance mutation
   const petCat = () => {
     sound.playTap();
   };
 
-  // Feed Tom: Safely disabled without backend
-  const feedTom = (_biscuitId: string, _count: number = 1): boolean => {
+  // Feed Tom
+  const feedTom = (biscuitId: string, count: number = 1): boolean => {
     if (!isFeatureAvailable('biscuit_feeding')) {
-      triggerNotice(
-        'Cat Feeding', 
-        SYSTEM_MESSAGES.FEEDING_UNAVAILABLE, 
-        'Feeding Unavailable'
-      );
+      triggerNotice('Cat Feeding', SYSTEM_MESSAGES.FEEDING_UNAVAILABLE, 'Feeding Unavailable');
       return false;
     }
-    return false;
+
+    storeService.feedBiscuit(biscuitId, count).then((res) => {
+      if (res.success && res.data) {
+        setProductionRate(res.data.newProductionRate);
+        setBiscuitInventory(res.data.newInventory);
+        setBiscuitFedCount((prev) => ({
+          ...prev,
+          [biscuitId]: (prev[biscuitId] || 0) + count,
+        }));
+        showToast('Tom Fed!', `Production increased to +${res.data.newProductionRate}/h!`, 'success');
+      } else {
+        showToast('Feeding Error', res.error?.message || 'Feeding failed', 'error');
+      }
+    });
+
+    return true;
   };
 
-  // Biscuit purchases: Safely disabled without backend
-  const buyBiscuit = (_biscuitId: string, _count: number = 1): boolean => {
+  // Biscuit Purchases
+  const buyBiscuit = (biscuitId: string, count: number = 1): boolean => {
     if (!isFeatureAvailable('biscuit_purchases')) {
-      triggerNotice(
-        'Store Purchase', 
-        SYSTEM_MESSAGES.PURCHASES_UNAVAILABLE, 
-        'Store Unavailable'
-      );
+      triggerNotice('Store Purchase', SYSTEM_MESSAGES.PURCHASES_UNAVAILABLE, 'Store Unavailable');
       return false;
     }
-    return false;
+
+    storeService.purchaseBiscuit({ biscuitId: biscuitId as 'common' | 'silver' | 'gold' | 'diamond', quantity: count }).then((res) => {
+      if (res.success && res.data) {
+        setBalance(res.data.newBalancePoops);
+        setBiscuitInventory(res.data.newInventory);
+        showToast('Purchased!', `Purchased ${count}x ${biscuitId} biscuit!`, 'success');
+      } else {
+        showToast('Purchase Error', res.error?.message || 'Purchase failed', 'error');
+      }
+    });
+
+    return true;
   };
 
-  const buyAndFeedBiscuit = (_biscuitId: string): boolean => {
+  const buyAndFeedBiscuit = (biscuitId: string): boolean => {
     if (!isFeatureAvailable('biscuit_purchases')) {
-      triggerNotice(
-        'Store Purchase', 
-        SYSTEM_MESSAGES.PURCHASES_UNAVAILABLE, 
-        'Store Unavailable'
-      );
+      triggerNotice('Store Purchase', SYSTEM_MESSAGES.PURCHASES_UNAVAILABLE, 'Store Unavailable');
       return false;
     }
-    return false;
+    return buyBiscuit(biscuitId, 1);
   };
 
-  // Spin wheel: Returns wheel sector for visual UI review, claiming is safely locked
+  // Spin Wheel Execution
   const executeSpin = () => {
     return selectWeightedReward();
   };
 
   const claimSpinMilestone = (_reward: SpinRewardConfig) => {
     if (!isFeatureAvailable('spin_rewards')) {
-      triggerNotice(
-        'Spin Rewards', 
-        SYSTEM_MESSAGES.SPIN_UNAVAILABLE, 
-        'Backend Connection Required'
-      );
+      triggerNotice('Spin Rewards', SYSTEM_MESSAGES.SPIN_UNAVAILABLE, 'Backend Connection Required');
       return;
     }
+
+    spinService.claimSpin().then((res) => {
+      if (res.success && res.data) {
+        setBalance(res.data.newBalancePoops);
+        setSpinState((prev) => ({
+          ...prev,
+          currentMilestone: res.data!.nextMilestone,
+          targetTimestamp: res.data!.nextUnlockTimestamp,
+        }));
+        showToast('Reward Claimed!', `You received ${res.data.label}!`, 'reward');
+      } else {
+        showToast('Spin Error', res.error?.message || 'Claim failed', 'error');
+      }
+    });
   };
 
-  // Missions: Safely disabled without backend
-  const startMission = (_missionId: string) => {
+  // Missions
+  const startMission = (missionId: string) => {
     if (!isFeatureAvailable('mission_verification')) {
-      triggerNotice(
-        'Mission Verification', 
-        SYSTEM_MESSAGES.MISSION_VERIFY_UNAVAILABLE, 
-        'Verification Unavailable'
-      );
+      triggerNotice('Mission Verification', SYSTEM_MESSAGES.MISSION_VERIFY_UNAVAILABLE, 'Verification Unavailable');
       return;
     }
+    verifyMission(missionId);
   };
 
-  const verifyMission = (_missionId: string) => {
+  const verifyMission = (missionId: string) => {
     if (!isFeatureAvailable('mission_verification')) {
-      triggerNotice(
-        'Mission Verification', 
-        SYSTEM_MESSAGES.MISSION_VERIFY_UNAVAILABLE, 
-        'Verification Unavailable'
-      );
+      triggerNotice('Mission Verification', SYSTEM_MESSAGES.MISSION_VERIFY_UNAVAILABLE, 'Verification Unavailable');
       return;
     }
+
+    missionService.verifyMission(missionId).then((res) => {
+      if (res.success && res.data) {
+        setMissions((prev) =>
+          prev.map((m) =>
+            m.id === missionId ? { ...m, status: res.data!.verified ? 'completed' : 'verify' } : m
+          )
+        );
+        showToast('Mission Status', res.data.verified ? 'Mission verified! Ready to claim.' : 'Verification pending.', 'info');
+      }
+    });
   };
 
-  const claimMission = (_missionId: string): { success: boolean; reward?: number; title?: string } => {
+  const claimMission = (missionId: string): { success: boolean; reward?: number; title?: string } => {
     if (!isFeatureAvailable('mission_claiming')) {
-      triggerNotice(
-        'Mission Rewards', 
-        SYSTEM_MESSAGES.REWARD_CLAIM_UNAVAILABLE, 
-        'Claiming Unavailable'
-      );
+      triggerNotice('Mission Rewards', SYSTEM_MESSAGES.REWARD_CLAIM_UNAVAILABLE, 'Claiming Unavailable');
       return { success: false };
     }
-    return { success: false };
+
+    missionService.claimMissionReward(missionId).then((res) => {
+      if (res.success && res.data) {
+        setBalance(res.data.newBalance);
+        setMissions((prev) =>
+          prev.map((m) => (m.id === missionId ? { ...m, status: 'claimed' } : m))
+        );
+        showToast('Bounty Claimed!', `+${res.data.rewardPoops.toLocaleString()} Poops credited!`, 'reward');
+      }
+    });
+
+    return { success: true };
   };
 
-  // Withdrawals: Full format validation, safely blocks fake submission
+  // Withdrawals
   const requestWithdrawal = (address: string, amount: number): { success: boolean; error?: string } => {
     const validation = validateWithdrawal(address, amount, balance);
     if (!validation.isValid) {
@@ -286,11 +413,32 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, error: msg };
     }
 
-    return { success: false, error: 'Payment services unavailable' };
+    paymentService.requestWithdrawal({ walletAddress: address, amountPoops: amount, network: 'TRC20' }).then((res) => {
+      if (res.success && res.data) {
+        setWithdrawals((prev) => [
+          {
+            id: res.data!.id,
+            timestamp: res.data!.timestamp,
+            amountPoops: res.data!.amountPoops,
+            amountUsdt: res.data!.amountUsdt,
+            walletAddress: res.data!.walletAddress,
+            network: res.data!.network,
+            status: res.data!.status,
+            txHash: res.data!.txHash,
+          },
+          ...prev,
+        ]);
+        setBalance((prev) => (prev !== null ? prev - amount : 0));
+        showToast('Withdrawal Submitted', 'Your payout request is pending review.', 'success');
+      } else {
+        showToast('Withdrawal Error', res.error?.message || 'Submission failed', 'error');
+      }
+    });
+
+    return { success: true };
   };
 
   const resetDemoData = () => {
-    // Clear any leftover local storage
     try {
       localStorage.clear();
       sessionStorage.clear();
