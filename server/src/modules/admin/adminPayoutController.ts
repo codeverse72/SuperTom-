@@ -449,7 +449,7 @@ export class AdminPayoutController {
           throw new Error('Deposit not found');
         }
 
-        if (deposit.status !== 'PENDING') {
+        if (!['PENDING', 'WAITING_FOR_PAYMENT', 'PAYMENT_DETECTED', 'CONFIRMING'].includes(deposit.status)) {
           throw new Error(`Cannot confirm deposit with status: ${deposit.status}`);
         }
 
@@ -467,13 +467,14 @@ export class AdminPayoutController {
           data: {
             status: 'CONFIRMED',
             txHash: txHash.trim(),
+            confirmedAt: new Date(),
           },
         });
 
         // 1. Credit Poops to user balance via Ledger
         await LedgerService.executeBalanceTransaction(tx, {
           userId: deposit.userId,
-          type: 'ADMIN_ADJUSTMENT',
+          type: 'DEPOSIT_CREDIT',
           amount: deposit.amountPoops,
           referenceId: deposit.id,
           description: `Confirmed deposit of ${deposit.amountUsdt} USDT (${deposit.amountPoops} Poops)`,

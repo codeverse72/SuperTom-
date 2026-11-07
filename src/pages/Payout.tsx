@@ -322,8 +322,8 @@ export const Payout: React.FC = () => {
       setIsVerifyingDeposit(false);
 
       if (res.success) {
-        setDepositStatus('COMPLETED');
-        showToast('Deposit Verified!', res.data?.message || 'Payment confirmed and balance credited!', 'success');
+        setDepositStatus('PAYMENT_DETECTED');
+        showToast('Proof Submitted!', res.data?.message || 'Transaction submitted for Admin verification. Your balance will be credited once confirmed on-chain.', 'info');
         refreshDeposits();
         if (selectedPlanForDeposit) {
           setSelectedPlanForDeposit(null);
@@ -345,8 +345,8 @@ export const Payout: React.FC = () => {
       const res = await submitDeposit(depositAmountUsd, activeDepositCurrency?.name || 'USDT', depositTxHash.trim());
       setIsVerifyingDeposit(false);
       if (res.success) {
-        setDepositStatus('COMPLETED');
-        showToast('Deposit Submitted', 'Deposit received and queued for confirmation!', 'success');
+        setDepositStatus('PAYMENT_DETECTED');
+        showToast('Deposit Submitted', 'Deposit received and queued for Admin approval!', 'info');
         refreshDeposits();
       } else {
         setDepositStatus('WAITING_FOR_PAYMENT');
@@ -640,11 +640,13 @@ export const Payout: React.FC = () => {
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono border ${
               depositStatus === 'COMPLETED'
                 ? 'bg-emerald-950 text-emerald-400 border-emerald-500/40'
+                : depositStatus === 'PAYMENT_DETECTED'
+                ? 'bg-indigo-950 text-indigo-300 border-indigo-500/40 animate-pulse'
                 : depositStatus === 'CONFIRMING'
                 ? 'bg-blue-950 text-blue-300 border-blue-500/40 animate-pulse'
                 : 'bg-amber-950/70 text-amber-300 border-amber-500/40'
             }`}>
-              {depositStatus}
+              {depositStatus === 'PAYMENT_DETECTED' ? 'AWAITING ADMIN REVIEW' : depositStatus}
             </span>
           </div>
 
@@ -655,13 +657,14 @@ export const Payout: React.FC = () => {
             <input
               type="text"
               required
+              disabled={depositStatus === 'PAYMENT_DETECTED'}
               value={depositTxHash}
               onChange={(e) => {
                 setDepositTxHash(e.target.value);
                 setDepositError(null);
               }}
               placeholder="Paste transaction hash / txid here to verify..."
-              className="w-full px-3 py-2 rounded-xl bg-[#050811] border border-cyan-900/70 text-white font-mono text-xs focus:outline-none focus:border-cyan-400"
+              className="w-full px-3 py-2 rounded-xl bg-[#050811] border border-cyan-900/70 text-white font-mono text-xs focus:outline-none focus:border-cyan-400 disabled:opacity-60"
             />
           </div>
 
@@ -672,23 +675,35 @@ export const Payout: React.FC = () => {
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={isVerifyingDeposit || !depositTxHash.trim()}
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider shadow-lg transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {isVerifyingDeposit ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin text-cyan-300" />
-                <span>Checking On-Chain Status...</span>
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                <span>I HAVE SENT PAYMENT / VERIFY ON-CHAIN</span>
-              </>
-            )}
-          </button>
+          {depositStatus === 'PAYMENT_DETECTED' ? (
+            <div className="p-3 rounded-xl bg-indigo-950/70 border border-indigo-500/40 text-center space-y-1">
+              <div className="text-xs font-bold text-indigo-300 flex items-center justify-center gap-1.5">
+                <Clock className="w-4 h-4 text-indigo-400 animate-spin" />
+                <span>Payment Proof Under Review</span>
+              </div>
+              <p className="text-[11px] text-slate-300">
+                Your transaction hash has been sent to the Admin Panel. Your Poops will be credited as soon as an Admin approves the on-chain transfer!
+              </p>
+            </div>
+          ) : (
+            <button
+              type="submit"
+              disabled={isVerifyingDeposit || !depositTxHash.trim()}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider shadow-lg transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isVerifyingDeposit ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin text-cyan-300" />
+                  <span>Submitting Proof to Admin...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                  <span>I HAVE SENT PAYMENT / SUBMIT PROOF</span>
+                </>
+              )}
+            </button>
+          )}
         </form>
       </div>
     );

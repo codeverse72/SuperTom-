@@ -469,7 +469,8 @@ export class PayoutController {
 
   /**
    * POST /api/v1/payouts/deposits/:id/verify
-   * Verify on-chain payment and instantly credit user's real balance
+   * Submit transaction hash for on-chain Admin review and verification.
+   * SECURITY ENFORCEMENT: No user can ever self-credit funds. Balance is ONLY credited upon explicit Admin approval.
    */
   public static async verifyDeposit(req: AuthenticatedRequest, res: Response): Promise<void> {
     const userId = req.user?.userId;
@@ -486,6 +487,7 @@ export class PayoutController {
     }
 
     const { txHash } = parse.data;
+    const cleanTx = txHash.trim();
 
     try {
       const deposit = await prisma.deposit.findUnique({
@@ -497,9 +499,40 @@ export class PayoutController {
         return;
       }
 
-      // Call verification service to finalize & credit balance atomically
-      const outcome = await DepositVerificationService.finalizeVerifiedDeposit(id, txHash);
-      sendSuccess(res, outcome);
+      if (deposit.status === 'COMPLETED' || deposit.status === 'CONFIRMED') {
+        sendError(res, 'This deposit has already been confirmed and credited.', 400, 'ALREADY_COMPLETED');
+        return;
+      }
+
+      // Check transaction hash uniqueness across all other completed/confirmed deposits
+      const existingHash = await prisma.deposit.findFirst({
+        where: {
+          txHash: cleanTx,
+          id: { not: id },
+          status: { in: ['CONFIRMED', 'COMPLETED', 'PAYMENT_DETECTED'] },
+        },
+      });
+
+      if (existingHash) {
+        sendError(res, 'This transaction hash has already been submitted for verification.', 400, 'DUPLICATE_TX_HASH');
+        return;
+      }
+
+      // Update deposit with submitted txHash and set status to PAYMENT_DETECTED for Admin confirmation
+      const updated = await prisma.deposit.update({
+        where: { id },
+        data: {
+          txHash: cleanTx,
+          status: 'PAYMENT_DETECTED',
+          notes: deposit.notes ? `${deposit.notes} | TX submitted by user for Admin review` : 'TX submitted for Admin review',
+        },
+      });
+
+      sendSuccess(res, {
+        success: true,
+        status: updated.status,
+        message: 'Transaction proof submitted successfully! Your deposit is currently pending Admin verification and will be credited once confirmed on-chain.',
+      });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Verification failed';
       sendError(res, msg, 400, 'VERIFICATION_ERROR');
