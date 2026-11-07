@@ -102,10 +102,20 @@ class ApiClient {
         };
       }
 
-      const data = await response.json();
+      const json = await response.json();
+
+      // If backend returns enveloped ApiResponse: { success: true, data: T }
+      if (json && typeof json === 'object' && ('success' in json || 'data' in json)) {
+        return {
+          success: json.success !== undefined ? Boolean(json.success) : true,
+          data: json.data !== undefined ? (json.data as T) : (json as T),
+          error: json.error,
+        };
+      }
+
       return {
         success: true,
-        data,
+        data: json as T,
       };
     } catch (err: unknown) {
       const isAbort = err instanceof Error && err.name === 'AbortError';
