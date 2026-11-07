@@ -143,5 +143,87 @@ export class AdminSpinController {
       sendError(res, 'Failed to update cooldowns', 500, 'SERVER_ERROR');
     }
   }
+
+  /**
+   * POST /api/v1/admin/spin/reset-cooldown
+   */
+  public static async resetSpinCooldown(req: AuthenticatedAdminRequest, res: Response): Promise<void> {
+    const adminId = req.admin?.adminId;
+    if (!adminId) {
+      sendError(res, 'Unauthorized', 401, 'UNAUTHORIZED');
+      return;
+    }
+
+    const { identifier, resetAll } = req.body || {};
+
+    try {
+      if (resetAll) {
+        await prisma.spinState.updateMany({
+          data: { nextUnlockAt: new Date() },
+        });
+
+        await recordAuditLog({
+          adminId,
+          action: 'RESET_ALL_SPIN_COOLDOWNS',
+          targetEntity: 'SpinState',
+          req,
+        });
+
+        sendSuccess(res, { message: 'All users spin cooldowns reset successfully. All users can now spin immediately!' });
+        return;
+      }
+
+      if (!identifier) {
+        sendError(res, 'Player identifier (Telegram ID, username, or User ID) is required', 400, 'VALIDATION_ERROR');
+        return;
+      }
+
+      const clean = String(identifier).replace('@', '').trim();
+      const orConditions: Array<{ id?: string; username?: { equals: string; mode: 'insensitive' }; telegramId?: bigint }> = [
+        { id: clean },
+        { username: { equals: clean, mode: 'insensitive' } },
+      ];
+      if (/^\d+$/.test(clean)) {
+        try {
+          orConditions.push({ telegramId: BigInt(clean) });
+        } catch {}
+      }
+
+      const user = await prisma.user.findFirst({
+        where: { OR: orConditions },
+      });
+
+      if (!user) {
+        sendError(res, `User "${identifier}" not found`, 404, 'NOT_FOUND');
+        return;
+      }
+
+      await prisma.spinState.upsert({
+        where: { userId: user.id },
+        create: {
+          userId: user.id,
+          currentMilestone: 1,
+          cycleCount: 1,
+          nextUnlockAt: new Date(),
+          claimedMilestones: '[]',
+        },
+        update: {
+          nextUnlockAt: new Date(),
+        },
+      });
+
+      await recordAuditLog({
+        adminId,
+        action: 'RESET_USER_SPIN_COOLDOWN',
+        targetEntity: 'SpinState',
+        targetId: user.id,
+        req,
+      });
+
+      sendSuccess(res, { message: `Free spin unlocked immediately for @${user.username || user.telegramId}!` });
+    } catch {
+      sendError(res, 'Failed to reset spin cooldown', 500, 'SERVER_ERROR');
+    }
+  }
 }
 

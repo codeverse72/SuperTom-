@@ -14,6 +14,8 @@ export const SpinPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSavingProb, setIsSavingProb] = useState(false);
   const [isSavingCooldown, setIsSavingCooldown] = useState(false);
+  const [resetIdentifier, setResetIdentifier] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const fetchConfig = async () => {
@@ -80,6 +82,33 @@ export const SpinPage: React.FC = () => {
       fetchConfig();
     } else {
       alert(res.error || 'Failed to update cooldowns');
+    }
+  };
+
+  const handleResetCooldown = async (resetAll: boolean) => {
+    if (!resetAll && !resetIdentifier.trim()) {
+      alert('Please enter a username or Telegram ID to reset.');
+      return;
+    }
+
+    if (resetAll && !confirm('Are you sure you want to unlock free spin immediately for ALL players?')) {
+      return;
+    }
+
+    setIsResetting(true);
+    setSuccessMsg(null);
+    const res = await adminApi.resetSpinCooldown({
+      identifier: resetAll ? undefined : resetIdentifier.trim(),
+      resetAll,
+    });
+    setIsResetting(false);
+
+    if (res.success) {
+      setSuccessMsg(res.data?.message || 'Spin cooldown reset successfully!');
+      setResetIdentifier('');
+      setTimeout(() => setSuccessMsg(null), 4000);
+    } else {
+      alert(res.error || 'Failed to reset cooldown');
     }
   };
 
@@ -244,6 +273,48 @@ export const SpinPage: React.FC = () => {
                 </button>
               )}
             </form>
+
+            {/* Instant Unlock & Cooldown Reset Section */}
+            {hasRole(['SUPER_ADMIN', 'ADMIN']) && (
+              <div className="mt-5 pt-4 border-t border-purple-900/30 space-y-3">
+                <h5 className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Instant Free Spin Unlock</span>
+                </h5>
+                <p className="text-[11px] text-slate-400 leading-tight">
+                  Manually reset the spin timer to zero for test accounts or all players.
+                </p>
+
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    placeholder="Player username or Telegram ID..."
+                    value={resetIdentifier}
+                    onChange={(e) => setResetIdentifier(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-xl bg-[#080413] border border-purple-900/60 text-white text-xs font-mono"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={isResetting || !resetIdentifier.trim()}
+                      onClick={() => handleResetCooldown(false)}
+                      className="flex-1 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-purple-950 font-black text-xs transition-all disabled:opacity-40"
+                    >
+                      {isResetting ? 'Resetting...' : 'Unlock Free Spin'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isResetting}
+                      onClick={() => handleResetCooldown(true)}
+                      className="px-2.5 py-1.5 rounded-xl bg-purple-950 border border-purple-800 text-purple-300 hover:text-white font-bold text-[11px] transition-all"
+                      title="Reset for everyone"
+                    >
+                      Reset All
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="pt-4 border-t border-purple-900/30 text-center">

@@ -1,48 +1,76 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
-import { X, Sparkles, Trophy, CheckCircle2 } from 'lucide-react';
+import { X, Sparkles, Trophy, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { SPIN_REWARDS, SpinRewardConfig } from '../config/gameConfig';
 import { sound } from '../utils/sound';
+import { SpinClaimResultDto } from '../services/types';
 
 export const SpinWheelModal: React.FC = () => {
-  const { isWheelOpen, setIsWheelOpen, executeSpin, claimSpinMilestone } = useGame();
+  const { 
+    isWheelOpen, 
+    setIsWheelOpen, 
+    performSpin, 
+    isSpinReady, 
+    remainingSpinTimeMs 
+  } = useGame();
 
   const [isSpinning, setIsSpinning] = useState(false);
   const [rotationAngle, setRotationAngle] = useState(0);
   const [wonReward, setWonReward] = useState<SpinRewardConfig | null>(null);
+  const [wonClaimData, setWonClaimData] = useState<SpinClaimResultDto | null>(null);
   const [showRewardModal, setShowRewardModal] = useState(false);
+  const [spinError, setSpinError] = useState<string | null>(null);
 
   const numSectors = SPIN_REWARDS.length;
   const sectorAngle = 360 / numSectors;
 
   const currentRotationRef = useRef(0);
 
-  const handleStartSpin = () => {
+  const formatCountdown = (ms: number) => {
+    const totalSec = Math.max(0, Math.ceil(ms / 1000));
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const handleStartSpin = async () => {
     if (isSpinning) return;
+    setSpinError(null);
+
+    if (!isSpinReady) {
+      setSpinError(`Free spin locked. Next spin ready in ${formatCountdown(remainingSpinTimeMs)}`);
+      return;
+    }
 
     sound.playTap();
     setIsSpinning(true);
     setWonReward(null);
+    setWonClaimData(null);
 
-    // 1. Select reward via weighted probability algorithm
-    const { reward, index } = executeSpin();
+    // 1. Immediately request the backend to determine winning reward and credit balance
+    const result = await performSpin();
 
-    // 2. Calculate target angle so pointer at top (12 o'clock / 0 deg) lands exactly on selected sector
-    // Sector i center is at: i * sectorAngle + sectorAngle / 2
-    const sectorCenter = index * sectorAngle + sectorAngle / 2;
+    if (!result.success || !result.reward || result.rewardIndex === undefined || !result.claimData) {
+      setIsSpinning(false);
+      setSpinError(result.error || 'Free spin not ready or claim failed.');
+      return;
+    }
 
-    // Minimum 5 full rotations (1800 deg) + angle to bring sectorCenter to top (360 - sectorCenter)
-    // Add subtle randomized offset within sector bounds (+/- 12 deg) for natural feel
-    const randomJitter = (Math.random() - 0.5) * (sectorAngle * 0.4);
+    const { reward, rewardIndex, claimData } = result;
+
+    // 2. Calculate target rotation so golden pointer at top (12 o'clock) lands precisely on the won sector
+    const sectorCenter = rewardIndex * sectorAngle + sectorAngle / 2;
+    const randomJitter = (Math.random() - 0.5) * (sectorAngle * 0.35);
     const extraRotations = 5 * 360;
     const targetAngle = currentRotationRef.current + extraRotations + (360 - (currentRotationRef.current % 360)) + (360 - sectorCenter) + randomJitter;
 
     currentRotationRef.current = targetAngle;
     setRotationAngle(targetAngle);
 
-    // Periodic tick sounds during rotation
+    // Periodic wheel ticks during rotation
     let tickCount = 0;
     const tickInterval = setInterval(() => {
       sound.playWheelTick();
@@ -50,19 +78,20 @@ export const SpinWheelModal: React.FC = () => {
       if (tickCount > 28) clearInterval(tickInterval);
     }, 140);
 
-    // 3. Wait for spin animation to complete (4.5s)
+    // 3. Complete animation & reveal real reward
     setTimeout(() => {
       clearInterval(tickInterval);
       setIsSpinning(false);
       setWonReward(reward);
+      setWonClaimData(claimData);
       setShowRewardModal(true);
       sound.playWin();
 
       // Trigger Confetti
       try {
         confetti({
-          particleCount: 80,
-          spread: 70,
+          particleCount: 90,
+          spread: 75,
           origin: { y: 0.6 },
           colors: ['#eab308', '#a855f7', '#ec4899', '#3b82f6', '#10b981']
         });
@@ -72,13 +101,12 @@ export const SpinWheelModal: React.FC = () => {
     }, 4500);
   };
 
-  const handleClaimReward = () => {
-    if (wonReward) {
-      claimSpinMilestone(wonReward);
-      setShowRewardModal(false);
-      setIsWheelOpen(false);
-      setWonReward(null);
-    }
+  const handleCloseRewardModal = () => {
+    setShowRewardModal(false);
+    setIsWheelOpen(false);
+    setWonReward(null);
+    setWonClaimData(null);
+    setSpinError(null);
   };
 
   if (!isWheelOpen) return null;
@@ -89,7 +117,10 @@ export const SpinWheelModal: React.FC = () => {
         {/* Top Close Button */}
         <button
           onClick={() => {
-            if (!isSpinning) setIsWheelOpen(false);
+            if (!isSpinning) {
+              setSpinError(null);
+              setIsWheelOpen(false);
+            }
           }}
           disabled={isSpinning}
           className="absolute top-4 right-4 p-1.5 rounded-full text-purple-300 hover:text-white bg-purple-950/60 border border-purple-500/30 transition-colors disabled:opacity-40"
@@ -128,7 +159,7 @@ export const SpinWheelModal: React.FC = () => {
             animate={{ rotate: rotationAngle }}
             transition={{
               duration: 4.5,
-              ease: [0.15, 0.95, 0.25, 1.0] // Realistic natural deceleration curve
+              ease: [0.15, 0.95, 0.25, 1.0]
             }}
             className="w-full h-full rounded-full overflow-hidden shadow-2xl relative border-2 border-amber-400/80 bg-[#14062a]"
           >
@@ -144,7 +175,6 @@ export const SpinWheelModal: React.FC = () => {
                 const startAngle = i * angle;
                 const endAngle = (i + 1) * angle;
 
-                // SVG Arc Path coordinates (center 150, 150, radius 146)
                 const r = 146;
                 const cx = 150;
                 const cy = 150;
@@ -156,8 +186,6 @@ export const SpinWheelModal: React.FC = () => {
                 const y2 = cy + r * Math.sin(rad(endAngle));
 
                 const pathData = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2} Z`;
-
-                // Text angle in the center of sector
                 const midAngle = startAngle + angle / 2;
 
                 return (
@@ -199,17 +227,27 @@ export const SpinWheelModal: React.FC = () => {
 
         {/* Probabilities Note */}
         <div className="w-full mt-2 text-[10px] text-purple-300/70 text-center flex items-center justify-center gap-1">
-          <span>Configured Odds: 100 Poops (99%) · Others (1%)</span>
+          <span>Real-time odds: 100 Poops (99%) · Rare / Biscuits (1%)</span>
         </div>
+
+        {/* Spin Error Banner */}
+        {spinError && (
+          <div className="w-full mt-2 p-2 rounded-xl bg-rose-950/80 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-1.5 animate-in fade-in">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span className="text-[11px] font-semibold">{spinError}</span>
+          </div>
+        )}
 
         {/* Action Button */}
         <div className="w-full mt-3">
           <button
             onClick={handleStartSpin}
-            disabled={isSpinning}
-            className={`w-full py-3 rounded-2xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl ${
+            disabled={isSpinning || !isSpinReady}
+            className={`w-full py-3 rounded-2xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl transition-all ${
               isSpinning
                 ? 'bg-purple-900/50 text-purple-400 cursor-not-allowed border border-purple-500/20'
+                : !isSpinReady
+                ? 'bg-purple-950/80 text-amber-300/80 border border-purple-800/50 cursor-not-allowed'
                 : 'btn-gold-3d cursor-pointer'
             }`}
           >
@@ -217,6 +255,11 @@ export const SpinWheelModal: React.FC = () => {
               <>
                 <Sparkles className="w-4 h-4 animate-spin" />
                 <span>SPINNING WHEEL...</span>
+              </>
+            ) : !isSpinReady ? (
+              <>
+                <Clock className="w-4 h-4 text-amber-400" />
+                <span>FREE SPIN IN {formatCountdown(remainingSpinTimeMs)}</span>
               </>
             ) : (
               <>
@@ -228,9 +271,9 @@ export const SpinWheelModal: React.FC = () => {
         </div>
       </div>
 
-      {/* Reward Reveal Modal */}
+      {/* Reward Reveal Modal (Real, instantly credited reward) */}
       <AnimatePresence>
-        {showRewardModal && wonReward && (
+        {showRewardModal && wonReward && wonClaimData && (
           <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
             <motion.div
               initial={{ scale: 0.8, opacity: 0, y: 20 }}
@@ -242,29 +285,33 @@ export const SpinWheelModal: React.FC = () => {
                 <Trophy className="w-8 h-8 animate-bounce" />
               </div>
 
-              <span className="text-xs font-bold text-amber-300 tracking-widest uppercase">
-                Congratulations!
+              <span className="text-xs font-black text-amber-300 tracking-widest uppercase">
+                🎉 Congratulations!
               </span>
 
               <h3 className="text-2xl font-black text-white font-display mt-1">
-                {wonReward.label}
+                {wonClaimData.label}
               </h3>
 
               <p className="text-xs text-purple-200/90 mt-1.5 leading-relaxed">
-                {wonReward.rewardType === 'poops'
-                  ? `Wheel landed on ${wonReward.label}. Real reward claiming will be verified on backend servers upon official launch.`
-                  : `Wheel landed on ${wonReward.label}. Inventory delivery requires backend connection.`}
+                {wonClaimData.rewardType === 'poops'
+                  ? `Wheel landed on ${wonClaimData.label}! The reward has been directly credited to your live balance.`
+                  : `Wheel landed on ${wonClaimData.label}! Added directly to your biscuit inventory.`}
               </p>
 
-              <div className="w-full mt-3 p-2.5 rounded-xl bg-purple-950/80 border border-purple-500/30 text-[10px] text-amber-300 font-semibold">
-                🛡️ Preview Mode: No fabricated balance changes are made.
+              {/* Verified Account Balance Update Banner */}
+              <div className="w-full mt-3.5 p-2.5 rounded-xl bg-purple-950/90 border border-emerald-500/50 text-[11px] text-emerald-300 font-bold flex items-center justify-center gap-1.5 shadow-md">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>
+                  New Balance: <strong className="font-mono text-amber-300 text-xs">{wonClaimData.newBalancePoops.toLocaleString()} Poops</strong> 💩
+                </span>
               </div>
 
               <button
-                onClick={handleClaimReward}
-                className="w-full mt-4 py-3 rounded-2xl btn-purple-3d font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
+                onClick={handleCloseRewardModal}
+                className="w-full mt-4 py-3 rounded-2xl btn-gold-3d font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-lg"
               >
-                <span>Acknowledge & Close</span>
+                <span>Collect & Continue</span>
               </button>
             </motion.div>
           </div>

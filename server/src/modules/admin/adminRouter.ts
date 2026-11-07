@@ -87,6 +87,11 @@ adminRouter.put(
   requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
   AdminSpinController.updateCooldowns
 );
+adminRouter.post(
+  '/spin/reset-cooldown',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  AdminSpinController.resetSpinCooldown
+);
 
 // Payouts & Deposits Management
 adminRouter.get('/withdrawals', AdminPayoutController.listWithdrawals);

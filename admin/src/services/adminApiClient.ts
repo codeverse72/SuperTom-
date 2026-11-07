@@ -218,6 +218,13 @@ class AdminApiClient {
     });
   }
 
+  public async resetSpinCooldown(data: { identifier?: string; resetAll?: boolean }) {
+    return this.request<{ message: string }>('/spin/reset-cooldown', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   // === Payouts & Deposits ===
   public async getWithdrawals(params: { page?: number; limit?: number; status?: string; search?: string }) {
     const q = new URLSearchParams();

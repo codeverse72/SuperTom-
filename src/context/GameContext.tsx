@@ -32,6 +32,7 @@ import { storeService } from '../services/storeService';
 import { spinService } from '../services/spinService';
 import { missionService } from '../services/missionService';
 import { paymentService } from '../services/paymentService';
+import { SpinClaimResultDto } from '../services/types';
 
 interface SpinState {
   currentMilestone: 1 | 2 | 3;
@@ -97,6 +98,13 @@ interface GameContextType {
   } | null) => void;
   executeSpin: () => { reward: SpinRewardConfig; index: number };
   claimSpinMilestone: (reward: SpinRewardConfig) => void;
+  performSpin: () => Promise<{
+    success: boolean;
+    reward?: SpinRewardConfig;
+    rewardIndex?: number;
+    claimData?: SpinClaimResultDto;
+    error?: string;
+  }>;
   startMission: (missionId: string) => void;
   verifyMission: (missionId: string) => void;
   claimMission: (missionId: string) => { success: boolean; reward?: number; title?: string };
@@ -438,7 +446,73 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Spin Wheel Execution
+  // Spin Wheel Execution (Direct Server-Authoritative)
+  const performSpin = async (): Promise<{
+    success: boolean;
+    reward?: SpinRewardConfig;
+    rewardIndex?: number;
+    claimData?: SpinClaimResultDto;
+    error?: string;
+  }> => {
+    if (!isFeatureAvailable('spin_rewards')) {
+      triggerNotice('Spin Rewards', SYSTEM_MESSAGES.SPIN_UNAVAILABLE, 'Backend Connection Required');
+      return { success: false, error: 'Spin service unavailable' };
+    }
+
+    try {
+      const res = await spinService.claimSpin();
+      if (!res.success || !res.data) {
+        const errorMsg = res.error?.message || 'Free spin not ready or claim failed';
+        showToast('Spin Error', errorMsg, 'error');
+        return { success: false, error: errorMsg };
+      }
+
+      const claimData = res.data;
+
+      // 1. Directly fetch and credit the winning amount to their balance immediately
+      setBalance(claimData.newBalancePoops);
+
+      // 2. Update progressive spin state
+      setSpinState((prev) => {
+        let updatedClaimed = [...(prev.claimedMilestones || [])];
+        if (!updatedClaimed.includes(prev.currentMilestone)) {
+          updatedClaimed.push(prev.currentMilestone);
+        }
+        if (claimData.nextMilestone === 1) {
+          updatedClaimed = [];
+        }
+        return {
+          ...prev,
+          currentMilestone: claimData.nextMilestone,
+          targetTimestamp: claimData.nextUnlockTimestamp,
+          claimedMilestones: updatedClaimed,
+        };
+      });
+
+      // 3. Match with wheel sector configuration
+      let targetIndex = SPIN_REWARDS.findIndex((r) => r.id === claimData.rewardId);
+      if (targetIndex === -1 && claimData.amount) {
+        targetIndex = SPIN_REWARDS.findIndex((r) => r.amount === claimData.amount);
+      }
+      if (targetIndex === -1) {
+        targetIndex = 0;
+      }
+
+      const reward = SPIN_REWARDS[targetIndex] || SPIN_REWARDS[0];
+
+      return {
+        success: true,
+        reward,
+        rewardIndex: targetIndex,
+        claimData,
+      };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error executing spin';
+      showToast('Spin Error', msg, 'error');
+      return { success: false, error: msg };
+    }
+  };
+
   const executeSpin = () => {
     return selectWeightedReward();
   };
@@ -694,6 +768,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         buyAndFeedBiscuit,
         executeSpin,
         claimSpinMilestone,
+        performSpin,
         startMission,
         verifyMission,
         claimMission,

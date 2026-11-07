@@ -42,9 +42,70 @@ const MILESTONE_COOLDOWNS: Record<number, number> = {
 
 export class SpinController {
   /**
-   * Cryptographically secure weighted reward selection.
+   * Helper to fetch dynamic cooldown in ms from DB system settings
    */
-  private static drawReward(): SpinRewardDefinition {
+  public static async getMilestoneCooldownMs(milestone: number): Promise<number> {
+    try {
+      const setting = await prisma.systemSetting.findUnique({
+        where: { key: 'spin_cooldowns_hours' },
+      });
+      if (setting) {
+        const parsed = JSON.parse(setting.value);
+        if (milestone === 1 && typeof parsed.milestone1Hours === 'number') return parsed.milestone1Hours * 3600 * 1000;
+        if (milestone === 2 && typeof parsed.milestone2Hours === 'number') return parsed.milestone2Hours * 3600 * 1000;
+        if (milestone === 3 && typeof parsed.milestone3Hours === 'number') return parsed.milestone3Hours * 3600 * 1000;
+      }
+    } catch {}
+    return MILESTONE_COOLDOWNS[milestone] || 2 * 3600 * 1000;
+  }
+
+  /**
+   * Cryptographically secure weighted reward selection.
+   * Reads active dynamic distribution from SystemSetting if present.
+   */
+  private static async drawReward(): Promise<SpinRewardDefinition> {
+    try {
+      const setting = await prisma.systemSetting.findUnique({
+        where: { key: 'spin_rewards_distribution' },
+      });
+      if (setting) {
+        const rewards: Array<{
+          id: string;
+          label: string;
+          rewardType: 'poops' | 'biscuit';
+          amount?: number;
+          biscuitId?: string;
+          percentage: number;
+        }> = JSON.parse(setting.value);
+        if (Array.isArray(rewards) && rewards.length > 0) {
+          const roll = secureRandomFloat() * 100;
+          let cumulative = 0;
+          for (const r of rewards) {
+            cumulative += Number(r.percentage);
+            if (roll <= cumulative) {
+              return {
+                id: r.id,
+                label: r.label,
+                rewardType: r.rewardType,
+                amount: r.amount,
+                biscuitId: r.biscuitId,
+                cumulativeWeight: 100,
+              };
+            }
+          }
+          const last = rewards[rewards.length - 1];
+          return {
+            id: last.id,
+            label: last.label,
+            rewardType: last.rewardType,
+            amount: last.amount,
+            biscuitId: last.biscuitId,
+            cumulativeWeight: 100,
+          };
+        }
+      }
+    } catch {}
+
     const roll = secureRandomFloat() * 1000;
     for (const reward of SPIN_REWARDS_CUMULATIVE) {
       if (roll < reward.cumulativeWeight) {
@@ -69,19 +130,31 @@ export class SpinController {
         where: { userId },
       });
 
+      const now = Date.now();
+
       if (!state) {
+        // Initial state for brand new users: First spin is ready IMMEDIATELY!
         state = await prisma.spinState.create({
           data: {
             userId,
             currentMilestone: 1,
             cycleCount: 1,
-            nextUnlockAt: new Date(Date.now() + MILESTONE_COOLDOWNS[1]),
+            nextUnlockAt: new Date(now),
             claimedMilestones: '[]',
           },
         });
+      } else {
+        // Self-heal: If user has never claimed any milestone in cycle 1, unlock immediately!
+        let claimed: number[] = [];
+        try { claimed = JSON.parse(state.claimedMilestones); } catch { claimed = []; }
+        if (state.cycleCount === 1 && claimed.length === 0 && state.nextUnlockAt.getTime() > now) {
+          state = await prisma.spinState.update({
+            where: { userId },
+            data: { nextUnlockAt: new Date(now) },
+          });
+        }
       }
 
-      const now = Date.now();
       const nextUnlockTs = state.nextUnlockAt.getTime();
       const canSpin = now >= nextUnlockTs;
 
@@ -116,7 +189,7 @@ export class SpinController {
     }
 
     try {
-      const drawnReward = SpinController.drawReward();
+      const drawnReward = await SpinController.drawReward();
 
       const result = await prisma.$transaction(async (tx) => {
         const state = await tx.spinState.findUnique({
@@ -155,7 +228,8 @@ export class SpinController {
           claimedList = []; // reset for new cycle
         }
 
-        const nextUnlockAt = new Date(now + (MILESTONE_COOLDOWNS[nextM] || MILESTONE_COOLDOWNS[1]));
+        const cooldownMs = await SpinController.getMilestoneCooldownMs(nextM);
+        const nextUnlockAt = new Date(now + cooldownMs);
 
         // 1. Update spin state
         await tx.spinState.update({

@@ -1,22 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { Lock, Check, Info, Clock } from 'lucide-react';
+import React from 'react';
+import { Lock, Check, Info, Clock, Sparkles } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import wheel3dImg from '../assets/dashboard/wheel_3d.png';
 
 export const SpinTimer: React.FC = () => {
-  const { setIsWheelOpen, triggerNotice } = useGame();
+  const { 
+    setIsWheelOpen, 
+    spinState, 
+    remainingSpinTimeMs, 
+    isSpinReady 
+  } = useGame();
 
-  // Reference countdown: 04:12:36 with live second tick down
-  const [secondsLeft, setSecondsLeft] = useState(4 * 3600 + 12 * 60 + 36);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setSecondsLeft(prev => (prev > 0 ? prev - 1 : 4 * 3600 + 12 * 60 + 36));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const formatCountdown = (totalSec: number) => {
+  const formatCountdown = (ms: number) => {
+    const totalSec = Math.max(0, Math.ceil(ms / 1000));
     const h = Math.floor(totalSec / 3600);
     const m = Math.floor((totalSec % 3600) / 60);
     const s = totalSec % 60;
@@ -27,11 +23,16 @@ export const SpinTimer: React.FC = () => {
     setIsWheelOpen(true);
   };
 
+  const isM1Done = spinState.claimedMilestones?.includes(1);
+  const isM2Done = spinState.claimedMilestones?.includes(2);
+  const isM3Done = spinState.claimedMilestones?.includes(3);
+  const isCycleDone = spinState.cycleCount > 1;
+
   return (
     <div className="relative rounded-[26px] p-[2px] bg-gradient-to-r from-[#ff00aa] via-[#a855f7] to-[#ffaa00] shadow-[0_0_24px_rgba(255,0,153,0.3)]">
       <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-b from-[#180a33] via-[#120527] to-[#0c031d] px-3.5 py-3 sm:py-3.5">
         
-        {/* Top Half: 3D Wheel + Info + 04:12:36 Timer + Spin Now Button */}
+        {/* Top Half: 3D Wheel + Info + Timer + Spin Now Button */}
         <div className="flex items-center justify-between gap-2.5">
           {/* Left: 3D Colorful Lucky Wheel */}
           <div 
@@ -47,38 +48,55 @@ export const SpinTimer: React.FC = () => {
             />
           </div>
 
-          {/* Middle: Info Label + Huge 04:12:36 Countdown */}
+          {/* Middle: Info Label + Countdown / Ready */}
           <div className="flex-1 min-w-0">
-            {/* "ⓘ Free Spin Available In" */}
+            {/* "ⓘ Free Spin Status" */}
             <div className="flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-purple-200">
               <Info className="w-3.5 h-3.5 text-purple-300 stroke-[2.2]" />
-              <span>Free Spin Available In</span>
+              <span>{isSpinReady ? 'Free Spin Available!' : 'Free Spin Available In'}</span>
             </div>
 
-            {/* "🕒 04:12:36" */}
+            {/* "🕒 Timer or READY" */}
             <div className="flex items-center gap-1.5 mt-0.5">
-              <Clock className="w-5 h-5 text-[#ffd700] fill-[#ffd700]/20 stroke-[2.5]" />
-              <span className="text-xl sm:text-2xl font-black text-[#ffd700] font-mono tracking-wider drop-shadow-[0_0_12px_rgba(255,215,0,0.7)]">
-                {formatCountdown(secondsLeft)}
-              </span>
+              {isSpinReady ? (
+                <>
+                  <Sparkles className="w-5 h-5 text-amber-300 animate-pulse stroke-[2.5]" />
+                  <span className="text-xl sm:text-2xl font-black text-[#ffd700] font-display tracking-wider drop-shadow-[0_0_12px_rgba(255,215,0,0.8)] animate-pulse">
+                    READY NOW!
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Clock className="w-5 h-5 text-[#ffd700] fill-[#ffd700]/20 stroke-[2.5]" />
+                  <span className="text-xl sm:text-2xl font-black text-[#ffd700] font-mono tracking-wider drop-shadow-[0_0_12px_rgba(255,215,0,0.7)]">
+                    {formatCountdown(remainingSpinTimeMs)}
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
-          {/* Right: "🎁 Spin Now" Button with Red Dot + "Next Spin at 8hr" Tag */}
+          {/* Right: "🎁 Spin Now" Button with Red Dot + Next Milestone Tag */}
           <div className="flex flex-col items-center gap-1 shrink-0">
             <button
               onClick={handleSpinClick}
-              className="relative px-3 sm:px-4 py-1.5 rounded-xl bg-gradient-to-r from-[#2563eb] via-[#7c3aed] to-[#9333ea] hover:brightness-110 active:scale-95 text-white font-black text-xs tracking-tight shadow-[0_4px_14px_rgba(124,58,237,0.5)] flex items-center gap-1 cursor-pointer border border-purple-400/40"
+              className={`relative px-3 sm:px-4 py-1.5 rounded-xl font-black text-xs tracking-tight shadow-lg flex items-center gap-1 cursor-pointer transition-all active:scale-95 border ${
+                isSpinReady
+                  ? 'btn-gold-3d text-purple-950 shadow-[0_4px_14px_rgba(234,179,8,0.5)] border-amber-300'
+                  : 'bg-gradient-to-r from-[#2563eb] via-[#7c3aed] to-[#9333ea] hover:brightness-110 text-white shadow-[0_4px_14px_rgba(124,58,237,0.5)] border-purple-400/40'
+              }`}
             >
               <span>🎁</span>
-              <span>Spin Now</span>
-              {/* Red Notification Dot */}
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 border border-[#180a33] animate-pulse" />
+              <span>{isSpinReady ? 'Spin Free!' : 'Spin Wheel'}</span>
+              {/* Pulsing notification indicator when ready */}
+              {isSpinReady && (
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 border border-[#180a33] animate-ping" />
+              )}
             </button>
 
-            {/* Next Spin at 8hr Tag */}
+            {/* Next Spin / Milestone Tag */}
             <span className="text-[10px] font-bold text-purple-200 bg-[#4c1d95]/70 border border-purple-400/30 px-2 py-0.5 rounded-full whitespace-nowrap">
-              Next Spin at 8hr
+              Milestone {spinState.currentMilestone} of 3
             </span>
           </div>
         </div>
@@ -89,40 +107,62 @@ export const SpinTimer: React.FC = () => {
             
             {/* Connecting Track Line */}
             <div className="absolute left-6 right-8 top-3 h-[3px] bg-purple-900 -z-0">
-              {/* Yellow completed portion (from 2hr through 4hr to mid) */}
-              <div className="h-full bg-gradient-to-r from-[#ffd700] via-[#ffd700] to-purple-800 w-[50%]" />
+              <div 
+                className="h-full bg-gradient-to-r from-[#ffd700] via-[#ffd700] to-purple-800 transition-all duration-500" 
+                style={{
+                  width: isM3Done ? '100%' : isM2Done ? '66%' : isM1Done ? '33%' : '0%'
+                }}
+              />
             </div>
 
-            {/* Node 1: 2hr (Completed ✓) */}
+            {/* Node 1: Milestone 1 */}
             <div className="relative z-10 flex flex-col items-center">
-              <div className="w-6 h-6 rounded-full bg-[#ffd700] text-[#3a1d00] flex items-center justify-center font-black shadow-[0_0_10px_rgba(255,215,0,0.7)]">
-                <Check className="w-3.5 h-3.5 stroke-[3.5]" />
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center font-black transition-all ${
+                isM1Done 
+                  ? 'bg-[#ffd700] text-[#3a1d00] shadow-[0_0_10px_rgba(255,215,0,0.7)]'
+                  : 'bg-[#3b1261] border border-purple-400/50 text-purple-200'
+              }`}>
+                {isM1Done ? <Check className="w-3.5 h-3.5 stroke-[3.5]" /> : <span className="text-[10px]">1</span>}
               </div>
-              <span className="text-[11px] font-black text-[#ffd700] mt-1">2hr</span>
+              <span className={`text-[11px] mt-1 font-bold ${isM1Done ? 'text-[#ffd700]' : 'text-purple-300'}`}>M1</span>
             </div>
 
-            {/* Node 2: 4hr (Completed ✓) */}
+            {/* Node 2: Milestone 2 */}
             <div className="relative z-10 flex flex-col items-center">
-              <div className="w-6 h-6 rounded-full bg-[#ffd700] text-[#3a1d00] flex items-center justify-center font-black shadow-[0_0_10px_rgba(255,215,0,0.7)]">
-                <Check className="w-3.5 h-3.5 stroke-[3.5]" />
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center font-black transition-all ${
+                isM2Done 
+                  ? 'bg-[#ffd700] text-[#3a1d00] shadow-[0_0_10px_rgba(255,215,0,0.7)]'
+                  : 'bg-[#3b1261] border border-purple-400/50 text-purple-200'
+              }`}>
+                {isM2Done ? <Check className="w-3.5 h-3.5 stroke-[3.5]" /> : <span className="text-[10px]">2</span>}
               </div>
-              <span className="text-[11px] font-black text-[#ffd700] mt-1">4hr</span>
+              <span className={`text-[11px] mt-1 font-bold ${isM2Done ? 'text-[#ffd700]' : 'text-purple-300'}`}>M2</span>
             </div>
 
-            {/* Node 3: 8hr (Locked 🔒) */}
+            {/* Node 3: Milestone 3 */}
             <div className="relative z-10 flex flex-col items-center">
-              <div className="w-6 h-6 rounded-full bg-[#3b1261] border border-purple-400/50 text-purple-200 flex items-center justify-center">
-                <Lock className="w-3 h-3 stroke-[2.5]" />
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center font-black transition-all ${
+                isM3Done 
+                  ? 'bg-[#ffd700] text-[#3a1d00] shadow-[0_0_10px_rgba(255,215,0,0.7)]'
+                  : 'bg-[#3b1261] border border-purple-400/50 text-purple-200'
+              }`}>
+                {isM3Done ? <Check className="w-3.5 h-3.5 stroke-[3.5]" /> : <Lock className="w-3 h-3 stroke-[2.5]" />}
               </div>
-              <span className="text-[11px] font-bold text-purple-300 mt-1">8hr</span>
+              <span className={`text-[11px] mt-1 font-bold ${isM3Done ? 'text-[#ffd700]' : 'text-purple-300'}`}>M3</span>
             </div>
 
-            {/* Node 4: Next Cycle (Locked 🔒) */}
+            {/* Node 4: Cycle Tracker */}
             <div className="relative z-10 flex flex-col items-center">
-              <div className="w-6 h-6 rounded-full bg-[#3b1261] border border-purple-400/50 text-purple-200 flex items-center justify-center">
-                <Lock className="w-3 h-3 stroke-[2.5]" />
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center font-black transition-all ${
+                isCycleDone 
+                  ? 'bg-[#ffd700] text-[#3a1d00] shadow-[0_0_10px_rgba(255,215,0,0.7)]'
+                  : 'bg-[#3b1261] border border-purple-400/50 text-purple-200'
+              }`}>
+                {isCycleDone ? <Check className="w-3.5 h-3.5 stroke-[3.5]" /> : <span className="text-[10px]">↻</span>}
               </div>
-              <span className="text-[11px] font-bold text-purple-300 mt-1 whitespace-nowrap">Next Cycle</span>
+              <span className={`text-[11px] mt-1 font-bold whitespace-nowrap ${isCycleDone ? 'text-[#ffd700]' : 'text-purple-300'}`}>
+                Cycle {spinState.cycleCount}
+              </span>
             </div>
 
           </div>
@@ -132,4 +172,3 @@ export const SpinTimer: React.FC = () => {
     </div>
   );
 };
-
