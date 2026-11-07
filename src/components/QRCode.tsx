@@ -40,3 +40,4 @@ export const QRCode: React.FC<QRCodeProps> = ({
     </div>
   );
 };
+

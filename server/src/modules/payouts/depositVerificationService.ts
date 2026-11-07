@@ -198,3 +198,4 @@ Your account balance has been updated immediately!`;
     });
   }
 }
+

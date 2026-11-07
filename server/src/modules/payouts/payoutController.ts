@@ -372,10 +372,10 @@ export class PayoutController {
       const settingsMap: Record<string, string> = {};
       dbSettings.forEach((s) => { settingsMap[s.key] = s.value; });
 
-      const evmAddr = settingsMap['TRUST_WALLET_EVM_ADDRESS'] || process.env.TRUST_WALLET_EVM_ADDRESS || '0x71C8360216Ac3456952771bEc438F5e85d99623C';
-      const tronAddr = settingsMap['TRUST_WALLET_TRON_ADDRESS'] || process.env.TRUST_WALLET_TRON_ADDRESS || 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
-      const tonAddr = settingsMap['TRUST_WALLET_TON_ADDRESS'] || process.env.TRUST_WALLET_TON_ADDRESS || 'EQBvW8Z5huBkMJYdn3PCDKNKKqiqXDjvjjx29JqYpn8SoGSq';
-      const solAddr = settingsMap['TRUST_WALLET_SOL_ADDRESS'] || process.env.TRUST_WALLET_SOL_ADDRESS || '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU';
+      const evmAddr = settingsMap['TRUST_WALLET_EVM_ADDRESS'] || process.env.TREASURY_EVM_ADDRESS || process.env.TRUST_WALLET_EVM_ADDRESS || '0x71C8360216Ac3456952771bEc438F5e85d99623C';
+      const tronAddr = settingsMap['TRUST_WALLET_TRON_ADDRESS'] || process.env.TREASURY_TRON_ADDRESS || process.env.TREASURY_TRON_ADORESS || process.env.TRUST_WALLET_TRON_ADDRESS || 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
+      const tonAddr = settingsMap['TRUST_WALLET_TON_ADDRESS'] || process.env.TREASURY_TON_ADDRESS || process.env.TRUST_WALLET_TON_ADDRESS || 'EQBvW8Z5huBkMJYdn3PCDKNKKqiqXDjvjjx29JqYpn8SoGSq';
+      const solAddr = settingsMap['TRUST_WALLET_SOL_ADDRESS'] || process.env.TREASURY_SOL_ADDRESS || process.env.TRUST_WALLET_SOL_ADDRESS || '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU';
 
       let depositAddress = tronAddr;
       const netUpper = network.toUpperCase();
