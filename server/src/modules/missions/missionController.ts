@@ -4,6 +4,7 @@ import { AuthenticatedRequest } from '../../middleware/auth.js';
 import { sendSuccess, sendError } from '../../utils/apiResponse.js';
 import { LedgerService } from '../ledger/ledgerService.js';
 import { env } from '../../config/env.js';
+import { MissionCategory } from '@prisma/client';
 
 // Default standard missions matching frontend initial catalog
 export const SEED_MISSIONS = [
@@ -12,7 +13,7 @@ export const SEED_MISSIONS = [
     title: 'Join Telegram Channel',
     description: 'Subscribe to official SuperTom announcements',
     rewardPoops: 500n,
-    category: 'social' as const,
+    category: MissionCategory.SOCIAL,
     verificationType: 'TELEGRAM_CHANNEL' as const,
     channelId: '@SuperTomAnnouncements',
     icon: 'Send',
@@ -24,7 +25,7 @@ export const SEED_MISSIONS = [
     title: 'Join Telegram Group',
     description: 'Chat with felines across the globe',
     rewardPoops: 500n,
-    category: 'social' as const,
+    category: MissionCategory.SOCIAL,
     verificationType: 'TELEGRAM_GROUP' as const,
     channelId: '@SuperTomCommunity',
     icon: 'MessageCircle',
@@ -36,7 +37,7 @@ export const SEED_MISSIONS = [
     title: 'Follow SuperTom on X',
     description: 'Follow our official X handle for updates',
     rewardPoops: 1000n,
-    category: 'social' as const,
+    category: MissionCategory.SOCIAL,
     verificationType: 'EXTERNAL_LINK' as const,
     icon: 'Share2',
     badge: 'Twitter / X',
@@ -47,7 +48,7 @@ export const SEED_MISSIONS = [
     title: 'Invite 3 Friends',
     description: 'Bring 3 friends to King Tom’s royal kingdom',
     rewardPoops: 2500n,
-    category: 'daily' as const,
+    category: MissionCategory.DAILY,
     verificationType: 'GAME_ACTION' as const,
     icon: 'Users',
     badge: 'Daily',
@@ -57,7 +58,7 @@ export const SEED_MISSIONS = [
     title: 'Feed Tom 5 Biscuits',
     description: 'Satisfy King Tom’s royal feline cravings',
     rewardPoops: 800n,
-    category: 'daily' as const,
+    category: MissionCategory.DAILY,
     verificationType: 'GAME_ACTION' as const,
     icon: 'Cookie',
     badge: 'Daily',
@@ -67,7 +68,7 @@ export const SEED_MISSIONS = [
     title: 'Reach Player Level 5',
     description: 'Prove your feline royal loyalty to level 5',
     rewardPoops: 5000n,
-    category: 'special' as const,
+    category: MissionCategory.SPECIAL,
     verificationType: 'GAME_ACTION' as const,
     icon: 'Crown',
     badge: 'Milestone',
@@ -86,8 +87,8 @@ export class MissionController {
     try {
       const url = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getChatMember?chat_id=${encodeURIComponent(chatId)}&user_id=${encodeURIComponent(telegramId)}`;
       const res = await fetch(url);
-      const data = await res.json();
-      if (data.ok && data.result) {
+      const data = (await res.json()) as { ok?: boolean; result?: { status?: string } };
+      if (data?.ok && data?.result?.status) {
         const status = data.result.status;
         return ['creator', 'administrator', 'member', 'restricted'].includes(status);
       }
