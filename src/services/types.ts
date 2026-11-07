@@ -126,10 +126,53 @@ export interface DepositDto {
   timestamp: number;
   amountUsdt: number;
   amountPoops: number;
+  currency?: string;
   network: string;
+  depositAddress?: string;
+  paymentReference?: string;
+  expectedCryptoAmount?: number;
   txHash?: string;
-  status: 'Pending' | 'Confirmed' | 'Rejected';
+  status: 'Pending' | 'Confirmed' | 'Completed' | 'Rejected' | 'Confirming' | string;
+  rawStatus?: string;
   notes?: string;
+  confirmedAt?: number;
+}
+
+export interface CreateDepositIntentRequestDto {
+  amountUsdt: number;
+  currency: string;
+  network: string;
+  notes?: string;
+}
+
+export interface CreateDepositIntentResponseDto {
+  id: string;
+  telegramId: string;
+  amountUsdt: number;
+  amountPoops: number;
+  currency: string;
+  network: string;
+  depositAddress: string;
+  paymentReference: string;
+  expectedCryptoAmount: number;
+  minDeposit: number;
+  status: string;
+  expiresAt?: number;
+  createdAt: number;
+}
+
+export interface DepositStatusResponseDto {
+  id: string;
+  status: string;
+  amountUsdt: number;
+  amountPoops: number;
+  currency: string;
+  network: string;
+  depositAddress?: string;
+  paymentReference?: string;
+  txHash?: string;
+  confirmedAt?: number;
+  isCompleted: boolean;
 }
 
 export interface TreasuryWalletsResponseDto {

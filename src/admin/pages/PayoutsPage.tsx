@@ -645,7 +645,12 @@ export const PayoutsPage: React.FC = () => {
                         <td className="py-3 px-4 font-mono text-amber-400">
                           +{d.amountPoops.toLocaleString()} Poops
                         </td>
-                        <td className="py-3 px-4 font-mono text-slate-300">{d.network}</td>
+                        <td className="py-3 px-4 font-mono text-slate-300">
+                          <div>{d.currency ? `${d.currency} (${d.network})` : d.network}</div>
+                          {d.paymentReference && (
+                            <div className="text-[10px] text-amber-400">Memo: {d.paymentReference}</div>
+                          )}
+                        </td>
                         <td className="py-3 px-4 font-mono text-slate-400 text-[11px] truncate max-w-[150px]">
                           {d.txHash || 'Pending on-chain verification'}
                         </td>
@@ -653,7 +658,7 @@ export const PayoutsPage: React.FC = () => {
                           <Badge status={d.status} />
                         </td>
                         <td className="py-3 px-4 text-right">
-                          {d.status === 'PENDING' && hasRole(['SUPER_ADMIN', 'ADMIN']) && (
+                          {['PENDING', 'WAITING_FOR_PAYMENT', 'PAYMENT_DETECTED', 'CONFIRMING'].includes(d.status) && hasRole(['SUPER_ADMIN', 'ADMIN']) && (
                             <button
                               onClick={() => {
                                 setConfirmDepositItem(d);

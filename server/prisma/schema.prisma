@@ -24,6 +24,13 @@ enum AdminRole {
 }
 
 enum DepositStatus {
+  CREATED
+  WAITING_FOR_PAYMENT
+  PAYMENT_DETECTED
+  CONFIRMING
+  COMPLETED
+  EXPIRED
+  FAILED
   PENDING
   CONFIRMED
   REJECTED
@@ -85,6 +92,7 @@ enum LedgerType {
   WITHDRAWAL_RESERVATION
   WITHDRAWAL_REFUND
   WITHDRAWAL_COMPLETED
+  DEPOSIT_CREDIT
   ADMIN_ADJUSTMENT
 }
 
@@ -361,21 +369,29 @@ model SystemSetting {
 
 // 16. Player Deposits
 model Deposit {
-  id          String        @id @default(uuid())
-  userId      String
-  amountUsdt  Decimal       @db.Decimal(18, 4)
-  amountPoops BigInt
-  network     String        @default("TRC20")
-  txHash      String?       @unique
-  status      DepositStatus @default(PENDING)
-  notes       String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id                   String        @id @default(uuid())
+  userId               String
+  amountUsdt           Decimal       @db.Decimal(18, 4)
+  amountPoops          BigInt
+  currency             String        @default("USDT")
+  network              String        @default("TRC20")
+  depositAddress       String?
+  paymentReference     String?       // Memo or Telegram ID for auto-credit
+  expectedCryptoAmount Decimal?      @db.Decimal(28, 8)
+  receivedCryptoAmount Decimal?      @db.Decimal(28, 8)
+  txHash               String?       @unique
+  status               DepositStatus @default(WAITING_FOR_PAYMENT)
+  notes                String?
+  confirmedAt          DateTime?
+  expiresAt            DateTime?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
 
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([status])
+  @@index([paymentReference])
   @@index([createdAt])
 }
 

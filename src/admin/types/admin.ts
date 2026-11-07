@@ -215,8 +215,12 @@ export interface DepositItem {
   amountPoops: number;
   amountUsdt: number;
   network: string;
+  currency?: string | null;
+  depositAddress?: string | null;
+  paymentReference?: string | null;
+  expectedCryptoAmount?: number | null;
   txHash?: string | null;
-  status: 'PENDING' | 'CONFIRMED' | 'REJECTED';
+  status: string;
   notes?: string | null;
   createdAt: string;
 }

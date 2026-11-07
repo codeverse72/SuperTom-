@@ -15,3 +15,6 @@ payoutRouter.post('/wallets', requireAuth, PayoutController.saveWallet);
 payoutRouter.get('/treasury-wallets', requireAuth, PayoutController.getTreasuryWallets);
 payoutRouter.get('/deposits', requireAuth, PayoutController.getDeposits);
 payoutRouter.post('/deposits', requireAuth, depositLimiter, PayoutController.submitDeposit);
+payoutRouter.post('/deposits/create', requireAuth, depositLimiter, PayoutController.createDeposit);
+payoutRouter.get('/deposits/:id/status', requireAuth, PayoutController.getDepositStatus);
+payoutRouter.post('/deposits/:id/verify', requireAuth, depositLimiter, PayoutController.verifyDeposit);

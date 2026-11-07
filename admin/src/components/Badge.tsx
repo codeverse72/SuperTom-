@@ -12,15 +12,15 @@ export const Badge: React.FC<BadgeProps> = ({ status, className = '' }) => {
 
   if (s === 'ACTIVE' || s === 'COMPLETED' || s === 'CONFIRMED' || s === 'SUPER_ADMIN') {
     styles = 'bg-emerald-950/70 text-emerald-300 border-emerald-500/40 shadow-emerald-500/10';
-  } else if (s === 'PENDING' || s === 'IN_PROGRESS' || s === 'ADMIN') {
+  } else if (s === 'PENDING' || s === 'WAITING_FOR_PAYMENT' || s === 'CREATED' || s === 'IN_PROGRESS' || s === 'ADMIN') {
     styles = 'bg-amber-950/70 text-amber-300 border-amber-500/40 shadow-amber-500/10';
-  } else if (s === 'APPROVED') {
+  } else if (s === 'APPROVED' || s === 'CONFIRMING' || s === 'PAYMENT_DETECTED') {
     styles = 'bg-sky-950/70 text-sky-300 border-sky-500/40 shadow-sky-500/10';
   } else if (s === 'PROCESSING') {
     styles = 'bg-indigo-950/70 text-indigo-300 border-indigo-500/40 shadow-indigo-500/10';
   } else if (s === 'SUSPENDED' || s === 'VERIFY' || s === 'SUPPORT') {
     styles = 'bg-purple-950/70 text-purple-300 border-purple-500/40 shadow-purple-500/10';
-  } else if (s === 'BANNED' || s === 'REJECTED') {
+  } else if (s === 'BANNED' || s === 'REJECTED' || s === 'EXPIRED' || s === 'FAILED') {
     styles = 'bg-rose-950/70 text-rose-300 border-rose-500/40 shadow-rose-500/10';
   }
 

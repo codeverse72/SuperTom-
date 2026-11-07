@@ -6,6 +6,7 @@ import { sendSuccess, sendError } from '../../utils/apiResponse.js';
 import { validateNetworkAddress } from '../../utils/crypto.js';
 import { LedgerService } from '../ledger/ledgerService.js';
 import { env } from '../../config/env.js';
+import { DepositVerificationService } from './depositVerificationService.js';
 
 const withdrawalRequestSchema = z.object({
   walletAddress: z.string().min(10, 'Wallet address is required'),
@@ -16,6 +17,17 @@ const withdrawalRequestSchema = z.object({
 const saveWalletSchema = z.object({
   walletAddress: z.string().min(10, 'Wallet address is required'),
   network: z.string().min(2).default('TRC20'),
+});
+
+const createDepositSchema = z.object({
+  amountUsdt: z.number().min(0.5, 'Minimum deposit is $0.50 USDT'),
+  currency: z.string().min(2),
+  network: z.string().min(2),
+  notes: z.string().optional(),
+});
+
+const verifyDepositSchema = z.object({
+  txHash: z.string().min(6, 'Valid transaction hash is required'),
 });
 
 const submitDepositSchema = z.object({
@@ -285,25 +297,212 @@ export class PayoutController {
       });
 
       const response = records.map((d) => {
-        let statusTitle: 'Pending' | 'Confirmed' | 'Rejected' = 'Pending';
-        if (d.status === 'CONFIRMED') statusTitle = 'Confirmed';
-        else if (d.status === 'REJECTED') statusTitle = 'Rejected';
+        let statusTitle: string = d.status;
+        if (d.status === 'CONFIRMED' || d.status === 'COMPLETED') statusTitle = 'Completed';
+        else if (d.status === 'REJECTED' || d.status === 'FAILED') statusTitle = 'Rejected';
+        else if (d.status === 'CONFIRMING' || d.status === 'PAYMENT_DETECTED') statusTitle = 'Confirming';
+        else statusTitle = 'Pending';
 
         return {
           id: d.id,
           timestamp: d.createdAt.getTime(),
           amountUsdt: Number(d.amountUsdt),
           amountPoops: Number(d.amountPoops),
+          currency: d.currency,
           network: d.network,
+          depositAddress: d.depositAddress || undefined,
+          paymentReference: d.paymentReference || undefined,
+          expectedCryptoAmount: d.expectedCryptoAmount ? Number(d.expectedCryptoAmount) : undefined,
           txHash: d.txHash || undefined,
           status: statusTitle,
+          rawStatus: d.status,
           notes: d.notes || undefined,
+          confirmedAt: d.confirmedAt?.getTime() || undefined,
         };
       });
 
       sendSuccess(res, response);
     } catch {
       sendError(res, 'Failed to fetch deposits', 500, 'DEPOSITS_FETCH_ERROR');
+    }
+  }
+
+  /**
+   * POST /api/v1/payouts/deposits/create
+   * Creates a formal deposit intent matching Reference Image 1 with paymentReference (Telegram ID)
+   */
+  public static async createDeposit(req: AuthenticatedRequest, res: Response): Promise<void> {
+    const userId = req.user?.userId;
+    if (!userId) {
+      sendError(res, 'Unauthorized', 401, 'UNAUTHORIZED');
+      return;
+    }
+
+    const parse = createDepositSchema.safeParse(req.body);
+    if (!parse.success) {
+      sendError(res, 'Validation failed', 422, 'VALIDATION_ERROR', parse.error.format());
+      return;
+    }
+
+    const { amountUsdt, currency, network, notes } = parse.data;
+
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        sendError(res, 'User not found', 404, 'NOT_FOUND');
+        return;
+      }
+
+      // 1. Resolve Treasury Receiving Address
+      const dbSettings = await prisma.systemSetting.findMany({
+        where: {
+          key: {
+            in: [
+              'TRUST_WALLET_EVM_ADDRESS',
+              'TRUST_WALLET_TRON_ADDRESS',
+              'TRUST_WALLET_TON_ADDRESS',
+              'TRUST_WALLET_SOL_ADDRESS',
+            ],
+          },
+        },
+      });
+      const settingsMap: Record<string, string> = {};
+      dbSettings.forEach((s) => { settingsMap[s.key] = s.value; });
+
+      const evmAddr = settingsMap['TRUST_WALLET_EVM_ADDRESS'] || process.env.TRUST_WALLET_EVM_ADDRESS || '0x71C8360216Ac3456952771bEc438F5e85d99623C';
+      const tronAddr = settingsMap['TRUST_WALLET_TRON_ADDRESS'] || process.env.TRUST_WALLET_TRON_ADDRESS || 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
+      const tonAddr = settingsMap['TRUST_WALLET_TON_ADDRESS'] || process.env.TRUST_WALLET_TON_ADDRESS || 'EQBvW8Z5huBkMJYdn3PCDKNKKqiqXDjvjjx29JqYpn8SoGSq';
+      const solAddr = settingsMap['TRUST_WALLET_SOL_ADDRESS'] || process.env.TRUST_WALLET_SOL_ADDRESS || '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU';
+
+      let depositAddress = tronAddr;
+      const netUpper = network.toUpperCase();
+      if (netUpper.includes('TON')) depositAddress = tonAddr;
+      else if (netUpper.includes('BNB') || netUpper.includes('BEP20') || netUpper.includes('BASE') || netUpper.includes('ETH')) depositAddress = evmAddr;
+      else if (netUpper.includes('SOL')) depositAddress = solAddr;
+
+      // 2. Expected crypto amount
+      const expectedCrypto = await DepositVerificationService.calculateCryptoAmount(amountUsdt, currency);
+      const amountPoops = BigInt(Math.round(amountUsdt * env.POOPS_PER_USDT));
+
+      // 3. Payment reference (User Telegram ID for instant auto-credit matching Reference Image 1)
+      const paymentReference = user.telegramId.toString();
+
+      // 4. Create deposit record with WAITING_FOR_PAYMENT status
+      const deposit = await prisma.deposit.create({
+        data: {
+          userId,
+          amountUsdt,
+          amountPoops,
+          currency,
+          network,
+          depositAddress,
+          paymentReference,
+          expectedCryptoAmount: expectedCrypto,
+          status: 'WAITING_FOR_PAYMENT',
+          notes: notes ? notes.trim() : `Deposit intent for ${amountUsdt} USDT (${expectedCrypto} ${currency})`,
+          expiresAt: new Date(Date.now() + 24 * 3600 * 1000), // 24 hours
+        },
+      });
+
+      sendSuccess(res, {
+        id: deposit.id,
+        telegramId: user.telegramId.toString(),
+        amountUsdt: Number(deposit.amountUsdt),
+        amountPoops: Number(deposit.amountPoops),
+        currency: deposit.currency,
+        network: deposit.network,
+        depositAddress: deposit.depositAddress,
+        paymentReference: deposit.paymentReference,
+        expectedCryptoAmount: Number(deposit.expectedCryptoAmount),
+        minDeposit: 1.0,
+        status: deposit.status,
+        expiresAt: deposit.expiresAt?.getTime(),
+        createdAt: deposit.createdAt.getTime(),
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to create deposit';
+      sendError(res, msg, 500, 'DEPOSIT_CREATE_ERROR');
+    }
+  }
+
+  /**
+   * GET /api/v1/payouts/deposits/:id/status
+   */
+  public static async getDepositStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
+    const userId = req.user?.userId;
+    const { id } = req.params;
+    if (!userId) {
+      sendError(res, 'Unauthorized', 401, 'UNAUTHORIZED');
+      return;
+    }
+
+    try {
+      const deposit = await prisma.deposit.findUnique({
+        where: { id },
+      });
+
+      if (!deposit || deposit.userId !== userId) {
+        sendError(res, 'Deposit record not found', 404, 'NOT_FOUND');
+        return;
+      }
+
+      sendSuccess(res, {
+        id: deposit.id,
+        status: deposit.status,
+        amountUsdt: Number(deposit.amountUsdt),
+        amountPoops: Number(deposit.amountPoops),
+        currency: deposit.currency,
+        network: deposit.network,
+        depositAddress: deposit.depositAddress,
+        paymentReference: deposit.paymentReference,
+        txHash: deposit.txHash || undefined,
+        confirmedAt: deposit.confirmedAt?.getTime() || undefined,
+        isCompleted: deposit.status === 'COMPLETED' || deposit.status === 'CONFIRMED',
+      });
+    } catch {
+      sendError(res, 'Failed to fetch deposit status', 500, 'SERVER_ERROR');
+    }
+  }
+
+  /**
+   * POST /api/v1/payouts/deposits/:id/verify
+   * Verify on-chain payment and instantly credit user's real balance
+   */
+  public static async verifyDeposit(req: AuthenticatedRequest, res: Response): Promise<void> {
+    const userId = req.user?.userId;
+    const { id } = req.params;
+    if (!userId) {
+      sendError(res, 'Unauthorized', 401, 'UNAUTHORIZED');
+      return;
+    }
+
+    const parse = verifyDepositSchema.safeParse(req.body);
+    if (!parse.success) {
+      sendError(res, 'Invalid verification request', 422, 'VALIDATION_ERROR', parse.error.format());
+      return;
+    }
+
+    const { txHash } = parse.data;
+
+    try {
+      const deposit = await prisma.deposit.findUnique({
+        where: { id },
+      });
+
+      if (!deposit || deposit.userId !== userId) {
+        sendError(res, 'Deposit record not found', 404, 'NOT_FOUND');
+        return;
+      }
+
+      // Call verification service to finalize & credit balance atomically
+      const outcome = await DepositVerificationService.finalizeVerifiedDeposit(id, txHash);
+      sendSuccess(res, outcome);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Verification failed';
+      sendError(res, msg, 400, 'VERIFICATION_ERROR');
     }
   }
 

@@ -11,7 +11,10 @@ import {
   TransactionDto, 
   DepositDto, 
   DepositRequestDto,
-  TreasuryWalletsResponseDto
+  TreasuryWalletsResponseDto,
+  CreateDepositIntentRequestDto,
+  CreateDepositIntentResponseDto,
+  DepositStatusResponseDto
 } from './types';
 
 export const paymentService = {
@@ -33,5 +36,17 @@ export const paymentService = {
 
   submitDeposit: async (data: DepositRequestDto): Promise<ApiResponse<DepositDto>> => {
     return apiClient.post<DepositDto>('/payouts/deposits', data);
+  },
+
+  createDepositIntent: async (data: CreateDepositIntentRequestDto): Promise<ApiResponse<CreateDepositIntentResponseDto>> => {
+    return apiClient.post<CreateDepositIntentResponseDto>('/payouts/deposits/create', data);
+  },
+
+  getDepositStatus: async (depositId: string): Promise<ApiResponse<DepositStatusResponseDto>> => {
+    return apiClient.get<DepositStatusResponseDto>(`/payouts/deposits/${depositId}/status`);
+  },
+
+  verifyDeposit: async (depositId: string, txHash: string): Promise<ApiResponse<{ success: boolean; message: string; newBalance?: number }>> => {
+    return apiClient.post<{ success: boolean; message: string; newBalance?: number }>(`/payouts/deposits/${depositId}/verify`, { txHash });
   },
 };
