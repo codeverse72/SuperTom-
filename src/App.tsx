@@ -10,7 +10,32 @@ import { Payout } from './pages/Payout';
 import { Profile } from './pages/Profile';
 import { useTelegram } from './hooks/useTelegram';
 
+// Lazy-load AdminApp so Telegram Mini App users do not download any admin bundle assets
+const AdminApp = React.lazy(() =>
+  import('./admin/AdminApp').then((m) => ({ default: m.AdminApp }))
+);
+
 export default function App() {
+  const [isAdminRoute, setIsAdminRoute] = useState(() => {
+    return (
+      window.location.pathname.startsWith('/admin') ||
+      window.location.hash.startsWith('#/admin') ||
+      window.location.search.includes('admin=true')
+    );
+  });
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setIsAdminRoute(
+        window.location.pathname.startsWith('/admin') ||
+        window.location.hash.startsWith('#/admin') ||
+        window.location.search.includes('admin=true')
+      );
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const [activeTab, setActiveTab] = useState<NavTab>('home');
   const { showBack, hideBack, hapticSelection } = useTelegram();
 
@@ -18,6 +43,7 @@ export default function App() {
   // Shows native BackButton on secondary tabs, returns to Home dashboard on click.
   // Hides BackButton when user is on the main Home screen.
   useEffect(() => {
+    if (isAdminRoute) return;
     if (activeTab !== 'home') {
       showBack(() => {
         hapticSelection();
@@ -26,7 +52,24 @@ export default function App() {
     } else {
       hideBack();
     }
-  }, [activeTab, showBack, hideBack, hapticSelection]);
+  }, [isAdminRoute, activeTab, showBack, hideBack, hapticSelection]);
+
+  // If user navigates to /admin, render the SuperTom Command Center
+  if (isAdminRoute) {
+    return (
+      <React.Suspense
+        fallback={
+          <div className="min-h-screen w-full flex items-center justify-center bg-[#07040D] text-white">
+            <span className="font-display font-bold text-amber-400 animate-pulse tracking-widest text-sm uppercase">
+              Loading SuperTom Control Center...
+            </span>
+          </div>
+        }
+      >
+        <AdminApp />
+      </React.Suspense>
+    );
+  }
 
   const handleTabChange = (tab: NavTab) => {
     if (tab !== activeTab) {
