@@ -121,3 +121,4 @@ adminRouter.get('/referrals', AdminReferralController.getReferralStats);
 
 // Audit Trail Logs
 adminRouter.get('/audit-logs', AdminAuditLogController.listLogs);
+

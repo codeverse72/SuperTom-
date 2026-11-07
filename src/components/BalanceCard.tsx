@@ -16,16 +16,16 @@ export const BalanceCard: React.FC = () => {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_50%,rgba(168,85,247,0.18),transparent_60%)] pointer-events-none" />
 
         {/* Left: 3D Smiling Poop Character Mascot */}
-        <div className="relative shrink-0 w-16 h-16 sm:w-18 sm:h-18 flex items-center justify-center">
+        <div className="relative shrink-0 w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center">
           <img
             src="/assets/dashboard/poop_character.png"
             alt="Poop Mascot"
-            className="w-full h-full object-contain filter drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)]"
+            className="w-full h-full object-contain filter drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)] drop-shadow-[0_0_12px_rgba(255,140,0,0.4)] select-none transition-transform hover:scale-105"
           />
         </div>
 
         {/* Center: "Your Poops" + Big Balance + Green Tether Conversion */}
-        <div className="flex-1 min-w-0 px-2 sm:px-3">
+        <div className="flex-1 min-w-0 px-3 sm:px-4">
           <p className="text-xs sm:text-sm font-semibold text-purple-200/90 tracking-wide">
             Your Poops
           </p>
@@ -44,11 +44,11 @@ export const BalanceCard: React.FC = () => {
         </div>
 
         {/* Right: 3D Glowing Purple Treasure Chest */}
-        <div className="relative shrink-0 w-20 h-16 sm:w-24 sm:h-18 flex items-center justify-center">
+        <div className="relative shrink-0 w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center">
           <img
             src="/assets/dashboard/chest_purple.png"
             alt="Treasure Chest"
-            className="w-full h-full object-contain filter drop-shadow-[0_4px_16px_rgba(255,170,0,0.4)] hover:scale-105 transition-transform"
+            className="w-full h-full object-contain filter drop-shadow-[0_4px_14px_rgba(0,0,0,0.6)] drop-shadow-[0_0_14px_rgba(168,85,247,0.45)] hover:scale-105 active:scale-95 transition-transform select-none cursor-pointer"
           />
         </div>
       </div>

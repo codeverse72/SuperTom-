@@ -197,3 +197,4 @@ export const AuditLogsPage: React.FC = () => {
     </div>
   );
 };
+

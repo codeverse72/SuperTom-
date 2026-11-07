@@ -52,3 +52,4 @@ describe('Admin Authentication & Security Suite', () => {
     assert.equal(Math.abs(invalidSum - 100) < 0.001, false);
   });
 });
+

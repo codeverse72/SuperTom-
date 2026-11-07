@@ -256,3 +256,4 @@ export const SpinPage: React.FC = () => {
     </div>
   );
 };
+

@@ -160,3 +160,4 @@ export const MiningPage: React.FC = () => {
     </div>
   );
 };
+
