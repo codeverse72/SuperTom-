@@ -29,29 +29,21 @@ export const Home: React.FC<HomeProps> = ({ onNavigateToStore }) => {
       <ProductionCard onOpenFeeding={() => setIsFeedingModalOpen(true)} />
 
       {/* 5. Large Golden 3D "Feed Tom" Button */}
-      <div className="pt-1 pb-2">
+      <div className="pt-1 pb-2 flex justify-center">
         <button
           onClick={() => setIsFeedingModalOpen(true)}
-          className="relative w-full h-[62px] sm:h-[66px] rounded-full p-[2px] bg-gradient-to-r from-[#ffd700] via-[#ff9900] to-[#ff6600] shadow-[0_0_28px_rgba(255,165,0,0.55)] hover:scale-[1.01] active:scale-[0.98] transition-all cursor-pointer group"
+          className="relative w-full max-w-[390px] cursor-pointer active:scale-[0.97] hover:scale-[1.01] transition-transform select-none group focus:outline-hidden"
+          aria-label="Feed Tom biscuits to boost mining production"
         >
-          <div className="relative w-full h-full rounded-full bg-gradient-to-b from-[#ffe066] via-[#f59e0b] to-[#d97706] flex items-center justify-center gap-3 px-6 overflow-hidden border border-amber-200/60">
-            {/* Top Glossy Specular Glass Reflection */}
-            <div className="absolute top-0 left-0 right-0 h-[45%] bg-gradient-to-b from-white/40 to-transparent rounded-t-full pointer-events-none" />
+          {/* Ambient Warm Golden Glow behind button */}
+          <div className="absolute inset-x-6 top-1/2 -translate-y-1/2 h-12 bg-radial from-amber-500/40 via-orange-500/25 to-transparent blur-xl pointer-events-none group-hover:from-amber-400/50 transition-all" />
 
-            {/* Left: 3D Biscuit Icon */}
-            <div className="relative shrink-0 w-11 h-8 sm:w-12 sm:h-9 flex items-center justify-center">
-              <img
-                src="/assets/dashboard/biscuit_3d.png"
-                alt="Biscuit"
-                className="w-full h-full object-contain filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] group-hover:rotate-6 transition-transform"
-              />
-            </div>
-
-            {/* Text: "Feed Tom" in Dark Bold Brown */}
-            <span className="text-xl sm:text-2xl font-black text-[#301600] tracking-tight drop-shadow-[0_1px_1px_rgba(255,255,255,0.4)]">
-              Feed Tom
-            </span>
-          </div>
+          {/* High-Resolution 3D Rendered Feed Tom Pill Button */}
+          <img
+            src="/assets/dashboard/feed_tom_button_3d.png"
+            alt="Feed Tom"
+            className="w-full h-auto object-contain filter drop-shadow-[0_8px_18px_rgba(0,0,0,0.65)] drop-shadow-[0_0_15px_rgba(245,158,11,0.35)] transition-all group-hover:brightness-105"
+          />
         </button>
       </div>
 
