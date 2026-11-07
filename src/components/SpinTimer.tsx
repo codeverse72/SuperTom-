@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Lock, Check, Info, Clock } from 'lucide-react';
 import { useGame } from '../context/GameContext';
+import wheel3dImg from '../assets/dashboard/wheel_3d.png';
 
 export const SpinTimer: React.FC = () => {
   const { setIsWheelOpen, triggerNotice } = useGame();
@@ -35,12 +36,14 @@ export const SpinTimer: React.FC = () => {
           {/* Left: 3D Colorful Lucky Wheel */}
           <div 
             onClick={handleSpinClick}
-            className="relative shrink-0 w-16 h-16 sm:w-18 sm:h-18 cursor-pointer hover:rotate-12 transition-transform duration-300"
+            className="relative shrink-0 w-16 h-18 sm:w-20 sm:h-22 cursor-pointer hover:scale-105 active:scale-95 transition-transform duration-200 select-none flex items-center justify-center group"
           >
+            {/* Ambient golden glow behind wheel */}
+            <div className="absolute inset-0 bg-radial from-amber-500/25 via-purple-600/15 to-transparent blur-md pointer-events-none group-hover:from-amber-400/35 transition-all" />
             <img
-              src="/assets/dashboard/wheel_3d.png"
+              src={wheel3dImg}
               alt="Lucky Spin Wheel"
-              className="w-full h-full object-contain filter drop-shadow-[0_4px_12px_rgba(168,85,247,0.5)]"
+              className="w-full h-full object-contain filter drop-shadow-[0_4px_14px_rgba(0,0,0,0.65)] drop-shadow-[0_0_14px_rgba(255,170,0,0.4)]"
             />
           </div>
 
