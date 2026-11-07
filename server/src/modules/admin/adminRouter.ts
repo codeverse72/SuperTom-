@@ -96,6 +96,11 @@ adminRouter.post(
   AdminPayoutController.approveWithdrawal
 );
 adminRouter.post(
+  '/withdrawals/:id/processing',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  AdminPayoutController.markProcessing
+);
+adminRouter.post(
   '/withdrawals/:id/reject',
   requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
   AdminPayoutController.rejectWithdrawal
@@ -111,6 +116,11 @@ adminRouter.post(
   '/deposits/:id/confirm',
   requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
   AdminPayoutController.confirmDeposit
+);
+adminRouter.post(
+  '/deposits/manual-credit',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  AdminPayoutController.manualCreditDeposit
 );
 
 // Ledger & Transaction Management

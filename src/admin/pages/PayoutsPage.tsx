@@ -50,6 +50,15 @@ export const PayoutsPage: React.FC = () => {
   const [depositTxHash, setDepositTxHash] = useState('');
   const [isConfirmingDeposit, setIsConfirmingDeposit] = useState(false);
 
+  // Manual Deposit / Balance Credit Modal
+  const [showManualDepositModal, setShowManualDepositModal] = useState(false);
+  const [manualDepositUser, setManualDepositUser] = useState('');
+  const [manualDepositAmount, setManualDepositAmount] = useState('');
+  const [manualDepositNetwork, setManualDepositNetwork] = useState('TRC20');
+  const [manualDepositTxHash, setManualDepositTxHash] = useState('');
+  const [manualDepositNotes, setManualDepositNotes] = useState('');
+  const [isSubmittingDeposit, setIsSubmittingDeposit] = useState(false);
+
   const fetchWithdrawals = useCallback(async () => {
     setIsLoading(true);
     const res = await adminApi.getWithdrawals({
@@ -96,6 +105,49 @@ export const PayoutsPage: React.FC = () => {
       fetchWithdrawals();
     } else {
       alert(res.error || 'Failed to approve');
+    }
+  };
+
+  const handleMarkProcessing = async (id: string) => {
+    if (!confirm('Mark this withdrawal as PROCESSING (funds currently being dispatched)?')) return;
+    const res = await adminApi.markWithdrawalProcessing(id);
+    if (res.success) {
+      fetchWithdrawals();
+    } else {
+      alert(res.error || 'Failed to update status');
+    }
+  };
+
+  const handleManualDepositSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const usdtNum = parseFloat(manualDepositAmount);
+    if (isNaN(usdtNum) || usdtNum <= 0) {
+      alert('Please enter a valid positive USDT amount');
+      return;
+    }
+    if (!manualDepositUser.trim()) {
+      alert('Please enter a target username or Telegram ID');
+      return;
+    }
+    setIsSubmittingDeposit(true);
+    const res = await adminApi.manualCreditDeposit({
+      identifier: manualDepositUser.trim(),
+      amountUsdt: usdtNum,
+      network: manualDepositNetwork,
+      txHash: manualDepositTxHash.trim() || undefined,
+      notes: manualDepositNotes.trim() || 'Admin manual balance deposit',
+    });
+    setIsSubmittingDeposit(false);
+    if (res.success) {
+      alert(res.data?.message || 'Deposit balance credited successfully!');
+      setShowManualDepositModal(false);
+      setManualDepositUser('');
+      setManualDepositAmount('');
+      setManualDepositTxHash('');
+      setManualDepositNotes('');
+      fetchDeposits();
+    } else {
+      alert(res.error || 'Failed to credit deposit');
     }
   };
 
@@ -200,7 +252,7 @@ export const PayoutsPage: React.FC = () => {
               />
             </div>
             <div className="flex items-center gap-1.5">
-              {['', 'PENDING', 'APPROVED', 'COMPLETED', 'REJECTED'].map((st) => (
+              {['', 'PENDING', 'APPROVED', 'PROCESSING', 'COMPLETED', 'REJECTED'].map((st) => (
                 <button
                   key={st}
                   onClick={() => {
@@ -227,7 +279,7 @@ export const PayoutsPage: React.FC = () => {
                     <th className="py-3 px-4">Player</th>
                     <th className="py-3 px-4">Requested USDT</th>
                     <th className="py-3 px-4">Poops Deducted</th>
-                    <th className="py-3 px-4">TRON TRC20 Wallet</th>
+                    <th className="py-3 px-4">Network & Wallet Address</th>
                     <th className="py-3 px-4">Status</th>
                     <th className="py-3 px-4">Date</th>
                     <th className="py-3 px-4 text-right">Review Action</th>
@@ -247,11 +299,21 @@ export const PayoutsPage: React.FC = () => {
                         <td className="py-3 px-4 font-mono text-amber-400">
                           {w.amountPoops.toLocaleString()} Poops
                         </td>
-                        <td className="py-3 px-4 font-mono text-slate-300 max-w-[200px] truncate">
-                          {w.walletAddress}
+                        <td className="py-3 px-4 font-mono text-slate-300 max-w-[220px]">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <span className="px-1.5 py-0.5 rounded bg-purple-900/70 border border-purple-500/40 text-[10px] font-bold text-purple-200">
+                              {w.network || 'TRC20'}
+                            </span>
+                          </div>
+                          <p className="truncate text-[11px]" title={w.walletAddress}>{w.walletAddress}</p>
                         </td>
                         <td className="py-3 px-4">
                           <Badge status={w.status} />
+                          {w.rejectionReason && (
+                            <p className="text-[10px] text-rose-400/90 mt-1 max-w-[150px] truncate" title={w.rejectionReason}>
+                              Reason: {w.rejectionReason}
+                            </p>
+                          )}
                         </td>
                         <td className="py-3 px-4 font-mono text-slate-500 text-[11px]">
                           {new Date(w.createdAt).toLocaleString()}
@@ -269,6 +331,13 @@ export const PayoutsPage: React.FC = () => {
                                     Approve
                                   </button>
                                   <button
+                                    onClick={() => handleMarkProcessing(w.id)}
+                                    title="Mark processing"
+                                    className="px-2 py-1 rounded-lg bg-indigo-950 border border-indigo-500/40 text-indigo-300 font-bold hover:bg-indigo-900/60 transition-all text-[11px]"
+                                  >
+                                    Process
+                                  </button>
+                                  <button
                                     onClick={() => {
                                       setRejectModalItem(w);
                                       setRejectReason('');
@@ -282,22 +351,67 @@ export const PayoutsPage: React.FC = () => {
                               )}
 
                               {w.status === 'APPROVED' && (
-                                <button
-                                  onClick={() => {
-                                    setCompleteModalItem(w);
-                                    setCompleteTxHash('');
-                                  }}
-                                  title="Enter Blockchain Transaction Hash"
-                                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all text-[11px] shadow-sm flex items-center gap-1"
-                                >
-                                  <CheckCircle2 className="w-3 h-3" />
-                                  <span>Mark Paid</span>
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => handleMarkProcessing(w.id)}
+                                    title="Mark processing"
+                                    className="px-2 py-1 rounded-lg bg-indigo-950 border border-indigo-500/40 text-indigo-300 font-bold hover:bg-indigo-900/60 transition-all text-[11px]"
+                                  >
+                                    Process
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setCompleteModalItem(w);
+                                      setCompleteTxHash('');
+                                    }}
+                                    title="Enter Blockchain Transaction Hash"
+                                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all text-[11px] shadow-sm flex items-center gap-1"
+                                  >
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    <span>Mark Paid</span>
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setRejectModalItem(w);
+                                      setRejectReason('');
+                                    }}
+                                    title="Reject & refund"
+                                    className="px-2 py-1 rounded-lg bg-rose-950 border border-rose-500/40 text-rose-300 font-bold hover:bg-rose-900/60 transition-all text-[11px]"
+                                  >
+                                    Reject
+                                  </button>
+                                </>
+                              )}
+
+                              {w.status === 'PROCESSING' && (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      setCompleteModalItem(w);
+                                      setCompleteTxHash('');
+                                    }}
+                                    title="Enter Blockchain Transaction Hash"
+                                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all text-[11px] shadow-sm flex items-center gap-1"
+                                  >
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    <span>Mark Paid</span>
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setRejectModalItem(w);
+                                      setRejectReason('');
+                                    }}
+                                    title="Reject & refund"
+                                    className="px-2 py-1 rounded-lg bg-rose-950 border border-rose-500/40 text-rose-300 font-bold hover:bg-rose-900/60 transition-all text-[11px]"
+                                  >
+                                    Reject
+                                  </button>
+                                </>
                               )}
 
                               {w.status === 'COMPLETED' && w.txHash && (
-                                <span className="font-mono text-[10px] text-slate-500 truncate max-w-[100px] block" title={w.txHash}>
-                                  Tx: {w.txHash.substring(0, 8)}...
+                                <span className="font-mono text-[10px] text-emerald-400 truncate max-w-[120px] block" title={w.txHash}>
+                                  Tx: {w.txHash.substring(0, 10)}...
                                 </span>
                               )}
                             </div>
@@ -343,6 +457,20 @@ export const PayoutsPage: React.FC = () => {
       {/* DEPOSITS VIEW */}
       {activeSubTab === 'deposits' && (
         <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#0C061A] p-3 rounded-2xl border border-purple-900/30">
+            <div>
+              <p className="text-xs font-bold text-white">Player Deposits & Balance Credits</p>
+              <p className="text-[11px] text-slate-400">Manage verified on-chain payments and manual deposit adjustments</p>
+            </div>
+            {hasRole(['SUPER_ADMIN', 'ADMIN']) && (
+              <button
+                onClick={() => setShowManualDepositModal(true)}
+                className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+              >
+                <span>+ Credit Manual Deposit</span>
+              </button>
+            )}
+          </div>
           <div className="rounded-2xl bg-gradient-to-b from-[#120A25] to-[#090414] border border-purple-900/30 overflow-hidden shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
@@ -532,6 +660,113 @@ export const PayoutsPage: React.FC = () => {
               className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all disabled:opacity-50"
             >
               {isConfirmingDeposit ? 'Processing...' : 'Confirm & Credit Poops'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Manual Deposit / Credit Balance Modal */}
+      <Modal
+        isOpen={showManualDepositModal}
+        onClose={() => setShowManualDepositModal(false)}
+        title="Credit Player Deposit Balance"
+        subtitle="Credits USDT/Poops directly to player account with mandatory audit record"
+        maxWidth="md"
+      >
+        <form onSubmit={handleManualDepositSubmit} className="space-y-4 text-xs">
+          <div>
+            <label className="block font-bold text-slate-300 uppercase mb-1">
+              Player Telegram ID or Username
+            </label>
+            <input
+              type="text"
+              required
+              value={manualDepositUser}
+              onChange={(e) => setManualDepositUser(e.target.value)}
+              placeholder="e.g. @kingtom or 987654321"
+              className="w-full px-3 py-2 rounded-xl bg-[#090415] border border-purple-900/60 text-white focus:outline-hidden"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block font-bold text-slate-300 uppercase mb-1">
+                Deposit Amount (USDT)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.1"
+                required
+                value={manualDepositAmount}
+                onChange={(e) => setManualDepositAmount(e.target.value)}
+                placeholder="e.g. 5.00"
+                className="w-full px-3 py-2 rounded-xl bg-[#090415] border border-purple-900/60 text-white font-mono focus:outline-hidden"
+              />
+              {parseFloat(manualDepositAmount) > 0 && (
+                <p className="text-[10px] text-amber-400 mt-1 font-mono">
+                  ≈ +{(parseFloat(manualDepositAmount) * 2000).toLocaleString()} Poops credited
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-300 uppercase mb-1">
+                Blockchain Network
+              </label>
+              <select
+                value={manualDepositNetwork}
+                onChange={(e) => setManualDepositNetwork(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-[#090415] border border-purple-900/60 text-white focus:outline-hidden"
+              >
+                <option value="TRC20">TRON (TRC20)</option>
+                <option value="TON">The Open Network (TON)</option>
+                <option value="BEP20">Binance Smart Chain (BEP20)</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-300 uppercase mb-1">
+              On-Chain Transaction Hash (Optional)
+            </label>
+            <input
+              type="text"
+              value={manualDepositTxHash}
+              onChange={(e) => setManualDepositTxHash(e.target.value)}
+              placeholder="Paste blockchain TXID if payment verified on-chain..."
+              className="w-full px-3 py-2 rounded-xl bg-[#090415] border border-purple-900/60 text-white font-mono focus:outline-hidden"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-300 uppercase mb-1">
+              Audit Notes / Reason (Required)
+            </label>
+            <textarea
+              required
+              rows={2}
+              value={manualDepositNotes}
+              onChange={(e) => setManualDepositNotes(e.target.value)}
+              placeholder="e.g. Confirmed on-chain USDT deposit received in treasury wallet"
+              className="w-full px-3 py-2 rounded-xl bg-[#090415] border border-purple-900/60 text-white focus:outline-hidden"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3">
+            <button
+              type="button"
+              onClick={() => setShowManualDepositModal(false)}
+              className="px-4 py-2 rounded-xl text-slate-400 font-semibold hover:text-white"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmittingDeposit || !manualDepositUser || !manualDepositAmount}
+              className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold transition-all disabled:opacity-50"
+            >
+              {isSubmittingDeposit ? 'Crediting...' : 'Confirm Deposit Credit'}
             </button>
           </div>
         </form>

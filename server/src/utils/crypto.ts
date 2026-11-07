@@ -75,6 +75,55 @@ export function isValidTronAddress(address: string): boolean {
   return tronRegex.test(trimmed);
 }
 
+/**
+ * Validates TON (The Open Network) Wallet Address format.
+ * Standard user-friendly addresses start with EQ or UQ and are 48 base64/base64url characters,
+ * or raw format (-1:hex or 0:hex).
+ */
+export function isValidTonAddress(address: string): boolean {
+  if (!address || typeof address !== 'string') return false;
+  const trimmed = address.trim();
+  const tonRegex = /^(EQ|UQ)[a-zA-Z0-9_-]{46}$|^(-1|0):[0-9a-fA-F]{64}$/;
+  return tonRegex.test(trimmed);
+}
+
+/**
+ * Validates BEP20 (Binance Smart Chain) / EVM Wallet Address format.
+ * Starts with 0x followed by 40 hex characters.
+ */
+export function isValidBscAddress(address: string): boolean {
+  if (!address || typeof address !== 'string') return false;
+  const trimmed = address.trim();
+  const bscRegex = /^0x[a-fA-F0-9]{40}$/;
+  return bscRegex.test(trimmed);
+}
+
+/**
+ * Validates wallet address according to the chosen blockchain network.
+ */
+export function validateNetworkAddress(network: string, address: string): { isValid: boolean; error?: string } {
+  if (!address || typeof address !== 'string') {
+    return { isValid: false, error: 'Wallet address is required' };
+  }
+  const trimmed = address.trim();
+  if (network === 'TRC20') {
+    if (!isValidTronAddress(trimmed)) {
+      return { isValid: false, error: 'Invalid TRC20 address. TRON addresses start with "T" and contain 34 characters.' };
+    }
+  } else if (network === 'TON') {
+    if (!isValidTonAddress(trimmed)) {
+      return { isValid: false, error: 'Invalid TON address. Must be a valid 48-character user-friendly TON address starting with EQ or UQ.' };
+    }
+  } else if (network === 'BEP20') {
+    if (!isValidBscAddress(trimmed)) {
+      return { isValid: false, error: 'Invalid BEP20 (BSC) address. Must be a valid 42-character address starting with 0x.' };
+    }
+  } else {
+    return { isValid: false, error: `Unsupported network: ${network}. Supported networks are TRC20, TON, BEP20.` };
+  }
+  return { isValid: true };
+}
+
 export interface AdminTokenPayload {
   adminId: string;
   email: string;

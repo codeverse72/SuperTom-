@@ -89,14 +89,62 @@ export function validateWithdrawalAmount(
 }
 
 /**
+ * Validates a TON (The Open Network) address format.
+ * - Standard user-friendly addresses start with EQ or UQ, 48 characters
+ * - Or raw hex address (-1:hex or 0:hex)
+ */
+export function validateTonAddress(address: string): { isValid: boolean; error?: string } {
+  if (!address || typeof address !== 'string') {
+    return { isValid: false, error: 'TON address is required.' };
+  }
+  const trimmed = address.trim();
+  const tonRegex = /^(EQ|UQ)[a-zA-Z0-9_-]{46}$|^(-1|0):[0-9a-fA-F]{64}$/;
+  if (!tonRegex.test(trimmed)) {
+    return { isValid: false, error: 'Invalid TON address. Must be a valid 48-character address starting with EQ or UQ.' };
+  }
+  return { isValid: true };
+}
+
+/**
+ * Validates a BEP20 (Binance Smart Chain / EVM) address format.
+ * - Starts with 0x
+ * - 42 hexadecimal characters
+ */
+export function validateBscAddress(address: string): { isValid: boolean; error?: string } {
+  if (!address || typeof address !== 'string') {
+    return { isValid: false, error: 'BEP20 address is required.' };
+  }
+  const trimmed = address.trim();
+  const bscRegex = /^0x[a-fA-F0-9]{40}$/;
+  if (!bscRegex.test(trimmed)) {
+    return { isValid: false, error: 'Invalid BEP20 address. Must be a valid 42-character address starting with 0x.' };
+  }
+  return { isValid: true };
+}
+
+/**
+ * Validates address according to selected network
+ */
+export function validateNetworkAddress(
+  network: 'TRC20' | 'TON' | 'BEP20' | string,
+  address: string
+): { isValid: boolean; error?: string } {
+  if (network === 'TRC20') return validateTronAddress(address);
+  if (network === 'TON') return validateTonAddress(address);
+  if (network === 'BEP20') return validateBscAddress(address);
+  return { isValid: false, error: `Unsupported network: ${network}` };
+}
+
+/**
  * Comprehensive withdrawal validation bundle
  */
 export function validateWithdrawal(
   address: string,
   amountInput: string | number,
-  currentBalance: number | null
+  currentBalance: number | null,
+  network: 'TRC20' | 'TON' | 'BEP20' = 'TRC20'
 ): WithdrawalValidationResult {
-  const addressCheck = validateTronAddress(address);
+  const addressCheck = validateNetworkAddress(network, address);
   const amountCheck = validateWithdrawalAmount(amountInput, currentBalance);
 
   return {

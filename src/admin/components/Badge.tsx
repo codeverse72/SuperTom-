@@ -16,6 +16,8 @@ export const Badge: React.FC<BadgeProps> = ({ status, className = '' }) => {
     styles = 'bg-amber-950/70 text-amber-300 border-amber-500/40 shadow-amber-500/10';
   } else if (s === 'APPROVED') {
     styles = 'bg-sky-950/70 text-sky-300 border-sky-500/40 shadow-sky-500/10';
+  } else if (s === 'PROCESSING') {
+    styles = 'bg-indigo-950/70 text-indigo-300 border-indigo-500/40 shadow-indigo-500/10';
   } else if (s === 'SUSPENDED' || s === 'VERIFY' || s === 'SUPPORT') {
     styles = 'bg-purple-950/70 text-purple-300 border-purple-500/40 shadow-purple-500/10';
   } else if (s === 'BANNED' || s === 'REJECTED') {

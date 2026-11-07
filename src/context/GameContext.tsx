@@ -84,7 +84,8 @@ interface GameContextType {
   startMission: (missionId: string) => void;
   verifyMission: (missionId: string) => void;
   claimMission: (missionId: string) => { success: boolean; reward?: number; title?: string };
-  requestWithdrawal: (address: string, amount: number) => { success: boolean; error?: string };
+  requestWithdrawal: (address: string, amount: number, network?: 'TRC20' | 'TON' | 'BEP20') => Promise<{ success: boolean; error?: string }>;
+  refreshWithdrawals: () => Promise<void>;
   toggleSound: () => void;
   petCat: () => void;
   showToast: (title: string, message: string, type?: 'success' | 'info' | 'reward' | 'error') => void;
@@ -246,6 +247,25 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
               );
             }
           });
+
+          // Fetch Live Withdrawals
+          paymentService.getHistory().then((wRes) => {
+            if (wRes.success && wRes.data) {
+              setWithdrawals(
+                wRes.data.map((w) => ({
+                  id: w.id,
+                  timestamp: w.timestamp,
+                  amountPoops: w.amountPoops,
+                  amountUsdt: w.amountUsdt,
+                  walletAddress: w.walletAddress,
+                  network: w.network,
+                  status: w.status,
+                  txHash: w.txHash,
+                  rejectionReason: w.rejectionReason,
+                }))
+              );
+            }
+          });
         }
       });
     }
@@ -399,43 +419,74 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Withdrawals
-  const requestWithdrawal = (address: string, amount: number): { success: boolean; error?: string } => {
-    const validation = validateWithdrawal(address, amount, balance);
+  const refreshWithdrawals = useCallback(async (): Promise<void> => {
+    try {
+      const res = await paymentService.getHistory();
+      if (res.success && res.data) {
+        setWithdrawals(
+          res.data.map((w) => ({
+            id: w.id,
+            timestamp: w.timestamp,
+            amountPoops: w.amountPoops,
+            amountUsdt: w.amountUsdt,
+            walletAddress: w.walletAddress,
+            network: w.network,
+            status: w.status,
+            txHash: w.txHash,
+            rejectionReason: w.rejectionReason,
+          }))
+        );
+      }
+    } catch {
+      // non-blocking
+    }
+  }, []);
+
+  const requestWithdrawal = async (
+    address: string,
+    amount: number,
+    network: 'TRC20' | 'TON' | 'BEP20' = 'TRC20'
+  ): Promise<{ success: boolean; error?: string }> => {
+    const validation = validateWithdrawal(address, amount, balance, network);
     if (!validation.isValid) {
       const err = validation.errors.address || validation.errors.amount || validation.errors.balance || 'Validation error';
       showToast('Validation Error', err, 'error');
       return { success: false, error: err };
     }
 
-    if (!isFeatureAvailable('withdrawals')) {
-      const msg = SYSTEM_MESSAGES.WITHDRAWALS_UNAVAILABLE;
-      triggerNotice('Payouts & Withdrawals', msg, 'Payment Gateway Offline');
-      return { success: false, error: msg };
-    }
+    try {
+      const res = await paymentService.requestWithdrawal({
+        walletAddress: address,
+        amountPoops: amount,
+        network,
+      });
 
-    paymentService.requestWithdrawal({ walletAddress: address, amountPoops: amount, network: 'TRC20' }).then((res) => {
       if (res.success && res.data) {
-        setWithdrawals((prev) => [
-          {
-            id: res.data!.id,
-            timestamp: res.data!.timestamp,
-            amountPoops: res.data!.amountPoops,
-            amountUsdt: res.data!.amountUsdt,
-            walletAddress: res.data!.walletAddress,
-            network: res.data!.network,
-            status: res.data!.status,
-            txHash: res.data!.txHash,
-          },
-          ...prev,
-        ]);
-        setBalance((prev) => (prev !== null ? prev - amount : 0));
-        showToast('Withdrawal Submitted', 'Your payout request is pending review.', 'success');
+        const record: WithdrawalRecord = {
+          id: res.data.id,
+          timestamp: res.data.timestamp,
+          amountPoops: res.data.amountPoops,
+          amountUsdt: res.data.amountUsdt,
+          walletAddress: res.data.walletAddress,
+          network: res.data.network,
+          status: res.data.status,
+          txHash: res.data.txHash,
+          rejectionReason: res.data.rejectionReason,
+        };
+        setWithdrawals((prev) => [record, ...prev]);
+        setBalance((prev) => (prev !== null ? Math.max(0, prev - amount) : 0));
+        showToast('Withdrawal Submitted', 'Your payout request is pending manual admin approval.', 'success');
+        return { success: true };
       } else {
-        showToast('Withdrawal Error', res.error?.message || 'Submission failed', 'error');
+        const msg = res.error?.message || 'Submission failed';
+        showToast('Withdrawal Error', msg, 'error');
+        return { success: false, error: msg };
       }
-    });
-
-    return { success: true };
+    } catch (e: any) {
+      const err = e?.message || 'Failed to submit withdrawal request';
+      showToast('Withdrawal Failed', err, 'error');
+      return { success: false, error: err };
+    }
   };
 
   const resetDemoData = () => {
@@ -478,6 +529,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         verifyMission,
         claimMission,
         requestWithdrawal,
+        refreshWithdrawals,
         toggleSound,
         petCat,
         showToast,

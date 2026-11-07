@@ -70,6 +70,7 @@ enum ReferralStatus {
 enum WithdrawalStatus {
   PENDING
   APPROVED
+  PROCESSING
   COMPLETED
   REJECTED
 }
@@ -120,6 +121,7 @@ model User {
   withdrawals     Withdrawal[]
   deposits        Deposit[]
   ledgerEntries   LedgerEntry[]
+  wallets         UserWallet[]
 
   @@index([telegramId])
   @@index([referralCode])
@@ -304,7 +306,7 @@ model Referral {
   @@index([refereeId])
 }
 
-// 13. USDT TRC20 Withdrawal Requests
+// 13. USDT TRC20/TON/BEP20 Withdrawal Requests
 model Withdrawal {
   id              String           @id @default(uuid())
   userId          String
@@ -316,6 +318,8 @@ model Withdrawal {
   txHash          String?
   rejectionReason String?
   reviewedAt      DateTime?
+  reviewedBy      String?
+  adminNotes      String?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -412,6 +416,22 @@ model AdminAuditLog {
   @@index([action])
   @@index([targetEntity])
   @@index([createdAt])
+}
+
+// 19. User Saved Receiving Wallets
+model UserWallet {
+  id            String   @id @default(uuid())
+  userId        String
+  network       String   @default("TRC20")
+  walletAddress String
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, network, walletAddress])
+  @@index([userId])
 }
 
 

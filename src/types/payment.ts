@@ -2,7 +2,7 @@
  * Payout and Payment System Types
  */
 
-export type TransactionStatus = 'Pending' | 'Approved' | 'Completed' | 'Rejected';
+export type TransactionStatus = 'Pending' | 'Approved' | 'Processing' | 'Completed' | 'Rejected';
 
 export interface WithdrawalRecord {
   id: string;
@@ -10,7 +10,7 @@ export interface WithdrawalRecord {
   amountPoops: number;
   amountUsdt: number;
   walletAddress: string;
-  network: 'TRC20';
+  network: 'TRC20' | 'TON' | 'BEP20';
   status: TransactionStatus;
   txHash?: string;
   rejectionReason?: string;

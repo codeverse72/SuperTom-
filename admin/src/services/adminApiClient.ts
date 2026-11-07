@@ -240,6 +240,12 @@ class AdminApiClient {
     });
   }
 
+  public async markWithdrawalProcessing(id: string) {
+    return this.request<{ id: string; status: string }>(`/withdrawals/${id}/processing`, {
+      method: 'POST',
+    });
+  }
+
   public async rejectWithdrawal(id: string, rejectionReason: string) {
     return this.request<{ message: string }>(`/withdrawals/${id}/reject`, {
       method: 'POST',
@@ -272,6 +278,23 @@ class AdminApiClient {
     return this.request<{ message: string }>(`/deposits/${id}/confirm`, {
       method: 'POST',
       body: JSON.stringify({ txHash }),
+    });
+  }
+
+  public async manualCreditDeposit(data: {
+    identifier: string;
+    amountUsdt: number;
+    network?: string;
+    txHash?: string;
+    notes: string;
+  }) {
+    return this.request<{
+      deposit: DepositItem;
+      user: { id: string; telegramId: string; username?: string; newBalance: number };
+      message: string;
+    }>('/deposits/manual-credit', {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   }
 

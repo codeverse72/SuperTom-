@@ -2,7 +2,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { verifyTelegramInitData } from '../dist/utils/telegramAuth.js';
-import { isValidTronAddress, secureRandomFloat, signAccessToken, verifyAccessToken } from '../dist/utils/crypto.js';
+import { isValidTronAddress, isValidTonAddress, isValidBscAddress, validateNetworkAddress, secureRandomFloat, signAccessToken, verifyAccessToken } from '../dist/utils/crypto.js';
 
 describe('1. Telegram Cryptographic Authentication Suite', () => {
   const testBotToken = '123456789:ABCdefGHIjklMNOpqrSTUvwxYZ';
@@ -62,20 +62,35 @@ describe('1. Telegram Cryptographic Authentication Suite', () => {
   });
 });
 
-describe('2. TRON TRC20 Address Validation Suite', () => {
+describe('2. Multi-Network Address Validation Suite', () => {
   test('should accept valid TRON TRC20 wallet addresses', () => {
     const validTron1 = 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf';
     const validTron2 = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'; // Official Tether USDT contract
     assert.equal(isValidTronAddress(validTron1), true);
     assert.equal(isValidTronAddress(validTron2), true);
+    assert.equal(validateNetworkAddress('TRC20', validTron1).isValid, true);
   });
 
-  test('should reject invalid or malicious TRON addresses', () => {
+  test('should accept valid TON wallet addresses', () => {
+    const validTon = 'EQBvW8Z5huBkMJYdn3PCDKNKKqiqXDjvjjx29JqYpn8SoGSq';
+    assert.equal(isValidTonAddress(validTon), true);
+    assert.equal(validateNetworkAddress('TON', validTon).isValid, true);
+  });
+
+  test('should accept valid BEP20 (BSC) wallet addresses', () => {
+    const validBsc = '0x55d398326f99059fF775485246999027B3197955'; // Official USDT on BSC
+    assert.equal(isValidBscAddress(validBsc), true);
+    assert.equal(validateNetworkAddress('BEP20', validBsc).isValid, true);
+  });
+
+  test('should reject invalid or malicious addresses across networks', () => {
     assert.equal(isValidTronAddress('0x71C...'), false); // Ethereum style
     assert.equal(isValidTronAddress('bc1q...'), false); // Bitcoin SegWit
     assert.equal(isValidTronAddress('TShort'), false); // Too short
     assert.equal(isValidTronAddress(''), false);
-    assert.equal(isValidTronAddress('TLongAddressWithTooManyCharactersThanThirtyFour12345'), false);
+    assert.equal(validateNetworkAddress('TRC20', 'invalidAddress').isValid, false);
+    assert.equal(validateNetworkAddress('TON', 'invalidTon').isValid, false);
+    assert.equal(validateNetworkAddress('BEP20', 'notAnEthAddress').isValid, false);
   });
 });
 

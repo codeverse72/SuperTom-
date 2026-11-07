@@ -200,7 +200,7 @@ export interface WithdrawalItem {
   amountUsdt: number;
   walletAddress: string;
   network: string;
-  status: 'PENDING' | 'APPROVED' | 'COMPLETED' | 'REJECTED';
+  status: 'PENDING' | 'APPROVED' | 'PROCESSING' | 'COMPLETED' | 'REJECTED';
   txHash?: string | null;
   rejectionReason?: string | null;
   reviewedAt?: string | null;

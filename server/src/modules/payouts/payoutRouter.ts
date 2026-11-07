@@ -9,4 +9,6 @@ const withdrawalLimiter = createRateLimiter(60000, 3); // Max 3 withdrawal attem
 
 payoutRouter.get('/history', requireAuth, PayoutController.getHistory);
 payoutRouter.post('/request', requireAuth, withdrawalLimiter, PayoutController.requestWithdrawal);
+payoutRouter.get('/wallets', requireAuth, PayoutController.getWallets);
+payoutRouter.post('/wallets', requireAuth, PayoutController.saveWallet);
 

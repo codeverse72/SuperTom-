@@ -99,7 +99,7 @@ export interface PurchaseBiscuitResponse {
 export interface WithdrawalRequestDto {
   walletAddress: string;
   amountPoops: number;
-  network: 'TRC20';
+  network: 'TRC20' | 'TON' | 'BEP20';
 }
 
 export interface TransactionDto {
@@ -108,9 +108,10 @@ export interface TransactionDto {
   amountPoops: number;
   amountUsdt: number;
   walletAddress: string;
-  network: 'TRC20';
-  status: 'Pending' | 'Approved' | 'Completed' | 'Rejected';
+  network: 'TRC20' | 'TON' | 'BEP20';
+  status: 'Pending' | 'Approved' | 'Processing' | 'Completed' | 'Rejected';
   txHash?: string;
+  rejectionReason?: string;
 }
 
 export interface ReferralStatsDto {
