@@ -54,7 +54,7 @@ export class AdminPayoutController {
         ];
       }
 
-      const [total, withdrawals] = await Promise.all([
+      const [total, withdrawals, completedStats, pendingCount, processingCount] = await Promise.all([
         prisma.withdrawal.count({ where }),
         prisma.withdrawal.findMany({
           where,
@@ -73,6 +73,12 @@ export class AdminPayoutController {
             },
           },
         }),
+        prisma.withdrawal.aggregate({
+          where: { status: 'COMPLETED' },
+          _sum: { amountUsdt: true, amountPoops: true },
+        }),
+        prisma.withdrawal.count({ where: { status: 'PENDING' } }),
+        prisma.withdrawal.count({ where: { status: 'PROCESSING' } }),
       ]);
 
       sendSuccess(res, {
@@ -80,6 +86,12 @@ export class AdminPayoutController {
         page,
         limit,
         totalPages: Math.ceil(total / limit),
+        stats: {
+          totalCompletedUsdt: Number(completedStats._sum.amountUsdt || 0),
+          totalCompletedPoops: Number(completedStats._sum.amountPoops || 0),
+          pendingCount,
+          processingCount,
+        },
         withdrawals: withdrawals.map((w) => ({
           id: w.id,
           userId: w.userId,
@@ -356,7 +368,7 @@ export class AdminPayoutController {
         where.status = status;
       }
 
-      const [total, deposits] = await Promise.all([
+      const [total, deposits, confirmedStats, pendingCount] = await Promise.all([
         prisma.deposit.count({ where }),
         prisma.deposit.findMany({
           where,
@@ -369,6 +381,11 @@ export class AdminPayoutController {
             },
           },
         }),
+        prisma.deposit.aggregate({
+          where: { status: 'CONFIRMED' },
+          _sum: { amountUsdt: true, amountPoops: true },
+        }),
+        prisma.deposit.count({ where: { status: 'PENDING' } }),
       ]);
 
       sendSuccess(res, {
@@ -376,6 +393,11 @@ export class AdminPayoutController {
         page,
         limit,
         totalPages: Math.ceil(total / limit),
+        stats: {
+          totalConfirmedUsdt: Number(confirmedStats._sum.amountUsdt || 0),
+          totalConfirmedPoops: Number(confirmedStats._sum.amountPoops || 0),
+          pendingCount,
+        },
         deposits: deposits.map((d) => ({
           id: d.id,
           userId: d.userId,

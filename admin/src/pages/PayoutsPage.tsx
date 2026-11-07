@@ -3,6 +3,7 @@ import { adminApi } from '../services/adminApiClient';
 import { WithdrawalItem, DepositItem } from '../types/admin';
 import { Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
+import { StatCard } from '../components/StatCard';
 import { useAdminAuth } from '../context/AdminAuthContext';
 import {
   ArrowDownRight,
@@ -14,6 +15,10 @@ import {
   ChevronRight,
   RefreshCw,
   Search,
+  DollarSign,
+  Coins,
+  Clock,
+  AlertTriangle,
 } from 'lucide-react';
 
 export const PayoutsPage: React.FC = () => {
@@ -27,6 +32,12 @@ export const PayoutsPage: React.FC = () => {
   const [withdrawalTotalPages, setWithdrawalTotalPages] = useState(1);
   const [withdrawalStatus, setWithdrawalStatus] = useState<string>('');
   const [withdrawalSearch, setWithdrawalSearch] = useState('');
+  const [withdrawalStats, setWithdrawalStats] = useState<{
+    totalCompletedUsdt: number;
+    totalCompletedPoops: number;
+    pendingCount: number;
+    processingCount: number;
+  } | null>(null);
 
   // Deposits state
   const [deposits, setDeposits] = useState<DepositItem[]>([]);
@@ -34,6 +45,11 @@ export const PayoutsPage: React.FC = () => {
   const [depositPage, setDepositPage] = useState(1);
   const [depositTotalPages, setDepositTotalPages] = useState(1);
   const [depositStatus, setDepositStatus] = useState<string>('');
+  const [depositStats, setDepositStats] = useState<{
+    totalConfirmedUsdt: number;
+    totalConfirmedPoops: number;
+    pendingCount: number;
+  } | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -71,6 +87,9 @@ export const PayoutsPage: React.FC = () => {
       setWithdrawals(res.data.withdrawals);
       setTotalWithdrawals(res.data.total);
       setWithdrawalTotalPages(res.data.totalPages);
+      if (res.data.stats) {
+        setWithdrawalStats(res.data.stats);
+      }
     }
     setIsLoading(false);
   }, [withdrawalPage, withdrawalStatus, withdrawalSearch]);
@@ -86,6 +105,9 @@ export const PayoutsPage: React.FC = () => {
       setDeposits(res.data.deposits);
       setTotalDeposits(res.data.total);
       setDepositTotalPages(res.data.totalPages);
+      if (res.data.stats) {
+        setDepositStats(res.data.stats);
+      }
     }
     setIsLoading(false);
   }, [depositPage, depositStatus]);
@@ -237,6 +259,38 @@ export const PayoutsPage: React.FC = () => {
       {/* WITHDRAWALS VIEW */}
       {activeSubTab === 'withdrawals' && (
         <div className="space-y-4">
+          {/* Withdrawal Volume & Queue Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <StatCard
+              title="Pending Review"
+              value={withdrawalStats ? withdrawalStats.pendingCount : 0}
+              subtitle="Withdrawals awaiting approval"
+              icon={AlertTriangle}
+              variant={withdrawalStats && withdrawalStats.pendingCount > 0 ? 'rose' : 'purple'}
+            />
+            <StatCard
+              title="In Processing Queue"
+              value={withdrawalStats ? withdrawalStats.processingCount : 0}
+              subtitle="Funds being dispatched"
+              icon={Clock}
+              variant="gold"
+            />
+            <StatCard
+              title="Total Paid USDT"
+              value={withdrawalStats ? `$${withdrawalStats.totalCompletedUsdt.toFixed(2)}` : '$0.00'}
+              subtitle="Completed on-chain payouts"
+              icon={DollarSign}
+              variant="emerald"
+            />
+            <StatCard
+              title="Total Requests"
+              value={totalWithdrawals}
+              subtitle="All historical requests"
+              icon={ArrowDownRight}
+              variant="sky"
+            />
+          </div>
+
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-[#0C061A] p-3 rounded-2xl border border-purple-900/30">
             <div className="relative w-full sm:w-80">
               <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -457,6 +511,38 @@ export const PayoutsPage: React.FC = () => {
       {/* DEPOSITS VIEW */}
       {activeSubTab === 'deposits' && (
         <div className="space-y-4">
+          {/* Deposit Balance & Volume Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <StatCard
+              title="Verified Deposit Volume"
+              value={depositStats ? `$${depositStats.totalConfirmedUsdt.toFixed(2)} USDT` : '$0.00 USDT'}
+              subtitle="Total verified deposits"
+              icon={DollarSign}
+              variant="emerald"
+            />
+            <StatCard
+              title="Total Poops Credited"
+              value={depositStats ? `+${depositStats.totalConfirmedPoops.toLocaleString()}` : '0'}
+              subtitle="Credited to player balances"
+              icon={Coins}
+              variant="gold"
+            />
+            <StatCard
+              title="Pending Review"
+              value={depositStats ? depositStats.pendingCount : 0}
+              subtitle="Awaiting on-chain confirmation"
+              icon={Clock}
+              variant={depositStats && depositStats.pendingCount > 0 ? 'rose' : 'purple'}
+            />
+            <StatCard
+              title="Total Deposit Submissions"
+              value={totalDeposits}
+              subtitle="Historical deposit submissions"
+              icon={ArrowUpRight}
+              variant="sky"
+            />
+          </div>
+
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#0C061A] p-3 rounded-2xl border border-purple-900/30">
             <div>
               <p className="text-xs font-bold text-white">Player Deposits & Balance Credits</p>

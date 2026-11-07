@@ -6,9 +6,12 @@ import { createRateLimiter } from '../../middleware/rateLimiter.js';
 export const payoutRouter = Router();
 
 const withdrawalLimiter = createRateLimiter(60000, 3); // Max 3 withdrawal attempts per minute
+const depositLimiter = createRateLimiter(60000, 5); // Max 5 deposit submissions per minute
 
 payoutRouter.get('/history', requireAuth, PayoutController.getHistory);
 payoutRouter.post('/request', requireAuth, withdrawalLimiter, PayoutController.requestWithdrawal);
 payoutRouter.get('/wallets', requireAuth, PayoutController.getWallets);
 payoutRouter.post('/wallets', requireAuth, PayoutController.saveWallet);
-
+payoutRouter.get('/treasury-wallets', requireAuth, PayoutController.getTreasuryWallets);
+payoutRouter.get('/deposits', requireAuth, PayoutController.getDeposits);
+payoutRouter.post('/deposits', requireAuth, depositLimiter, PayoutController.submitDeposit);

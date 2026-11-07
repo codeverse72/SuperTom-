@@ -230,6 +230,12 @@ class AdminApiClient {
       page: number;
       limit: number;
       totalPages: number;
+      stats?: {
+        totalCompletedUsdt: number;
+        totalCompletedPoops: number;
+        pendingCount: number;
+        processingCount: number;
+      };
       withdrawals: WithdrawalItem[];
     }>(`/withdrawals?${q.toString()}`);
   }
@@ -270,6 +276,11 @@ class AdminApiClient {
       page: number;
       limit: number;
       totalPages: number;
+      stats?: {
+        totalConfirmedUsdt: number;
+        totalConfirmedPoops: number;
+        pendingCount: number;
+      };
       deposits: DepositItem[];
     }>(`/deposits?${q.toString()}`);
   }

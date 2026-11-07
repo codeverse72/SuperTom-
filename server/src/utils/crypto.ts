@@ -99,29 +99,64 @@ export function isValidBscAddress(address: string): boolean {
 }
 
 /**
- * Validates wallet address according to the chosen blockchain network.
+ * Validates Solana Wallet Address format.
+ * Base58 string between 32 and 44 characters long.
  */
-export function validateNetworkAddress(network: string, address: string): { isValid: boolean; error?: string } {
+export function isValidSolanaAddress(address: string): boolean {
+  if (!address || typeof address !== 'string') return false;
+  const trimmed = address.trim();
+  const solRegex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+  return solRegex.test(trimmed);
+}
+
+/**
+ * Validates wallet address according to the chosen blockchain network or currency.
+ */
+export function validateNetworkAddress(networkOrCurrency: string, address: string): { isValid: boolean; error?: string } {
   if (!address || typeof address !== 'string') {
     return { isValid: false, error: 'Wallet address is required' };
   }
   const trimmed = address.trim();
-  if (network === 'TRC20') {
+  const norm = networkOrCurrency.toUpperCase();
+
+  // TRON-based (TRC20, TRX)
+  if (norm === 'TRC20' || norm === 'TRON' || norm === 'TRX' || norm.includes('TRC20')) {
     if (!isValidTronAddress(trimmed)) {
-      return { isValid: false, error: 'Invalid TRC20 address. TRON addresses start with "T" and contain 34 characters.' };
+      return { isValid: false, error: 'Invalid TRON address. TRON addresses start with "T" and contain 34 characters.' };
     }
-  } else if (network === 'TON') {
-    if (!isValidTonAddress(trimmed)) {
-      return { isValid: false, error: 'Invalid TON address. Must be a valid 48-character user-friendly TON address starting with EQ or UQ.' };
-    }
-  } else if (network === 'BEP20') {
-    if (!isValidBscAddress(trimmed)) {
-      return { isValid: false, error: 'Invalid BEP20 (BSC) address. Must be a valid 42-character address starting with 0x.' };
-    }
-  } else {
-    return { isValid: false, error: `Unsupported network: ${network}. Supported networks are TRC20, TON, BEP20.` };
+    return { isValid: true };
   }
-  return { isValid: true };
+
+  // TON-based (TON, GRAM)
+  if (norm === 'TON' || norm === 'GRAM' || norm.includes('TON')) {
+    if (!isValidTonAddress(trimmed)) {
+      return { isValid: false, error: 'Invalid TON address. Must be a valid 48-character TON address starting with EQ or UQ.' };
+    }
+    return { isValid: true };
+  }
+
+  // EVM-based (BEP20, BNB, BASE, ETH, USDC)
+  if (norm === 'BEP20' || norm === 'BNB' || norm === 'BASE' || norm.includes('BEP20') || norm.includes('BASE')) {
+    if (!isValidBscAddress(trimmed)) {
+      return { isValid: false, error: `Invalid ${networkOrCurrency} address. Must be a valid 42-character address starting with 0x.` };
+    }
+    return { isValid: true };
+  }
+
+  // Solana-based (SOL)
+  if (norm === 'SOL' || norm === 'SOLANA' || norm.includes('SOL')) {
+    if (!isValidSolanaAddress(trimmed)) {
+      return { isValid: false, error: 'Invalid Solana address. Must be a valid 32-44 character Base58 address.' };
+    }
+    return { isValid: true };
+  }
+
+  // Default fallback check (accepts any valid address among the 4 families)
+  if (isValidTronAddress(trimmed) || isValidTonAddress(trimmed) || isValidBscAddress(trimmed) || isValidSolanaAddress(trimmed)) {
+    return { isValid: true };
+  }
+
+  return { isValid: false, error: `Invalid wallet address for ${networkOrCurrency}.` };
 }
 
 export interface AdminTokenPayload {

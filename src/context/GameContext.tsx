@@ -23,7 +23,7 @@ import { sound } from '../utils/sound';
 import { validateWithdrawal } from '../utils/validation';
 import { BackendNoticeModal } from '../components/BackendNoticeModal';
 import { UserProfile } from '../types/user';
-import { WithdrawalRecord } from '../types/payment';
+import { WithdrawalRecord, DepositRecord } from '../types/payment';
 import { getRawTelegramInitData } from '../utils/telegram';
 import { authService } from '../services/authService';
 import { userService } from '../services/userService';
@@ -68,6 +68,7 @@ interface GameContextType {
   isEating: boolean;
   missions: Mission[];
   withdrawals: WithdrawalRecord[];
+  deposits: DepositRecord[];
   user: UserProfile | null;
   soundEnabled: boolean;
   activeToast: ToastMessage | null;
@@ -84,8 +85,10 @@ interface GameContextType {
   startMission: (missionId: string) => void;
   verifyMission: (missionId: string) => void;
   claimMission: (missionId: string) => { success: boolean; reward?: number; title?: string };
-  requestWithdrawal: (address: string, amount: number, network?: 'TRC20' | 'TON' | 'BEP20') => Promise<{ success: boolean; error?: string }>;
+  requestWithdrawal: (address: string, amount: number, network?: string) => Promise<{ success: boolean; error?: string }>;
   refreshWithdrawals: () => Promise<void>;
+  submitDeposit: (amountUsdt: number, network: string, txHash: string, notes?: string) => Promise<{ success: boolean; error?: string }>;
+  refreshDeposits: () => Promise<void>;
   toggleSound: () => void;
   petCat: () => void;
   showToast: (title: string, message: string, type?: 'success' | 'info' | 'reward' | 'error') => void;
@@ -122,8 +125,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Clean initial missions catalogue
   const [missions, setMissions] = useState<Mission[]>(INITIAL_MISSIONS);
 
-  // Clean empty withdrawals list
+  // Clean empty withdrawals and deposits list
   const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>([]);
+  const [deposits, setDeposits] = useState<DepositRecord[]>([]);
 
   // Local UI settings
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
@@ -262,6 +266,24 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   status: w.status,
                   txHash: w.txHash,
                   rejectionReason: w.rejectionReason,
+                }))
+              );
+            }
+          });
+
+          // Fetch Live Deposits
+          paymentService.getDeposits().then((dRes) => {
+            if (dRes.success && dRes.data) {
+              setDeposits(
+                dRes.data.map((d) => ({
+                  id: d.id,
+                  timestamp: d.timestamp,
+                  amountUsdt: d.amountUsdt,
+                  amountPoops: d.amountPoops,
+                  network: d.network,
+                  status: d.status,
+                  txHash: d.txHash,
+                  notes: d.notes,
                 }))
               );
             }
@@ -442,12 +464,85 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  const refreshDeposits = useCallback(async (): Promise<void> => {
+    try {
+      const res = await paymentService.getDeposits();
+      if (res.success && res.data) {
+        setDeposits(
+          res.data.map((d) => ({
+            id: d.id,
+            timestamp: d.timestamp,
+            amountUsdt: d.amountUsdt,
+            amountPoops: d.amountPoops,
+            network: d.network,
+            status: d.status,
+            txHash: d.txHash,
+            notes: d.notes,
+          }))
+        );
+      }
+    } catch {
+      // non-blocking
+    }
+  }, []);
+
+  const submitDeposit = async (
+    amountUsdt: number,
+    network: string,
+    txHash: string,
+    notes?: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    if (amountUsdt <= 0) {
+      const err = 'Deposit amount must be greater than zero.';
+      showToast('Validation Error', err, 'error');
+      return { success: false, error: err };
+    }
+    if (!txHash.trim()) {
+      const err = 'Transaction hash is required.';
+      showToast('Validation Error', err, 'error');
+      return { success: false, error: err };
+    }
+
+    try {
+      const res = await paymentService.submitDeposit({
+        amountUsdt,
+        network,
+        txHash: txHash.trim(),
+        notes,
+      });
+
+      if (res.success && res.data) {
+        const record: DepositRecord = {
+          id: res.data.id,
+          timestamp: res.data.timestamp,
+          amountUsdt: res.data.amountUsdt,
+          amountPoops: res.data.amountPoops,
+          network: res.data.network,
+          status: res.data.status,
+          txHash: res.data.txHash,
+          notes: res.data.notes,
+        };
+        setDeposits((prev) => [record, ...prev]);
+        showToast('Deposit Submitted', 'Your deposit has been submitted for on-chain verification.', 'success');
+        return { success: true };
+      } else {
+        const msg = res.error?.message || 'Deposit submission failed';
+        showToast('Deposit Error', msg, 'error');
+        return { success: false, error: msg };
+      }
+    } catch (e: any) {
+      const err = e?.message || 'Failed to submit deposit';
+      showToast('Deposit Failed', err, 'error');
+      return { success: false, error: err };
+    }
+  };
+
   const requestWithdrawal = async (
     address: string,
     amount: number,
-    network: 'TRC20' | 'TON' | 'BEP20' = 'TRC20'
+    network: string = 'TRC20'
   ): Promise<{ success: boolean; error?: string }> => {
-    const validation = validateWithdrawal(address, amount, balance, network);
+    const validation = validateWithdrawal(address, amount, balance, network as any);
     if (!validation.isValid) {
       const err = validation.errors.address || validation.errors.amount || validation.errors.balance || 'Validation error';
       showToast('Validation Error', err, 'error');
@@ -516,6 +611,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isEating,
         missions,
         withdrawals,
+        deposits,
         user,
         soundEnabled,
         activeToast,
@@ -530,6 +626,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         claimMission,
         requestWithdrawal,
         refreshWithdrawals,
+        submitDeposit,
+        refreshDeposits,
         toggleSound,
         petCat,
         showToast,

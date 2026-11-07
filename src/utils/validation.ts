@@ -123,16 +123,52 @@ export function validateBscAddress(address: string): { isValid: boolean; error?:
 }
 
 /**
- * Validates address according to selected network
+ * Validates a Solana address format (Base58, 32-44 characters).
+ */
+export function validateSolanaAddress(address: string): { isValid: boolean; error?: string } {
+  if (!address || typeof address !== 'string') {
+    return { isValid: false, error: 'Solana address is required.' };
+  }
+  const trimmed = address.trim();
+  const solRegex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+  if (!solRegex.test(trimmed)) {
+    return { isValid: false, error: 'Invalid Solana address. Must be a valid 32-44 character Base58 address.' };
+  }
+  return { isValid: true };
+}
+
+/**
+ * Validates address according to selected network or currency
  */
 export function validateNetworkAddress(
-  network: 'TRC20' | 'TON' | 'BEP20' | string,
+  network: string,
   address: string
 ): { isValid: boolean; error?: string } {
-  if (network === 'TRC20') return validateTronAddress(address);
-  if (network === 'TON') return validateTonAddress(address);
-  if (network === 'BEP20') return validateBscAddress(address);
-  return { isValid: false, error: `Unsupported network: ${network}` };
+  if (!address || typeof address !== 'string') {
+    return { isValid: false, error: 'Wallet address is required.' };
+  }
+  const trimmed = address.trim();
+  const norm = network.toUpperCase();
+
+  if (norm === 'TRC20' || norm === 'TRON' || norm === 'TRX' || norm.includes('TRC20')) {
+    return validateTronAddress(trimmed);
+  }
+  if (norm === 'TON' || norm === 'GRAM' || norm.includes('TON')) {
+    return validateTonAddress(trimmed);
+  }
+  if (norm === 'BEP20' || norm === 'BNB' || norm === 'BASE' || norm.includes('BEP20') || norm.includes('BASE')) {
+    return validateBscAddress(trimmed);
+  }
+  if (norm === 'SOL' || norm === 'SOLANA' || norm.includes('SOL')) {
+    return validateSolanaAddress(trimmed);
+  }
+
+  // Fallback
+  if (validateTronAddress(trimmed).isValid || validateTonAddress(trimmed).isValid || validateBscAddress(trimmed).isValid || validateSolanaAddress(trimmed).isValid) {
+    return { isValid: true };
+  }
+
+  return { isValid: false, error: `Invalid wallet address for ${network}` };
 }
 
 /**

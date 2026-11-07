@@ -99,7 +99,7 @@ export interface PurchaseBiscuitResponse {
 export interface WithdrawalRequestDto {
   walletAddress: string;
   amountPoops: number;
-  network: 'TRC20' | 'TON' | 'BEP20';
+  network: string;
 }
 
 export interface TransactionDto {
@@ -108,10 +108,41 @@ export interface TransactionDto {
   amountPoops: number;
   amountUsdt: number;
   walletAddress: string;
-  network: 'TRC20' | 'TON' | 'BEP20';
+  network: string;
   status: 'Pending' | 'Approved' | 'Processing' | 'Completed' | 'Rejected';
   txHash?: string;
   rejectionReason?: string;
+}
+
+export interface DepositRequestDto {
+  amountUsdt: number;
+  network: string;
+  txHash: string;
+  notes?: string;
+}
+
+export interface DepositDto {
+  id: string;
+  timestamp: number;
+  amountUsdt: number;
+  amountPoops: number;
+  network: string;
+  txHash?: string;
+  status: 'Pending' | 'Confirmed' | 'Rejected';
+  notes?: string;
+}
+
+export interface TreasuryWalletsResponseDto {
+  wallets: Record<string, {
+    currency: string;
+    network: string;
+    address: string;
+    hint: string;
+  }>;
+  rate: {
+    poopsPerUsdt: number;
+    minWithdrawalPoops: number;
+  };
 }
 
 export interface ReferralStatsDto {
