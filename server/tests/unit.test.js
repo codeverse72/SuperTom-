@@ -1,8 +1,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { verifyTelegramInitData } from '../src/utils/telegramAuth.ts';
-import { isValidTronAddress, secureRandomFloat, signAccessToken, verifyAccessToken } from '../src/utils/crypto.ts';
+import { verifyTelegramInitData } from '../dist/utils/telegramAuth.js';
+import { isValidTronAddress, secureRandomFloat, signAccessToken, verifyAccessToken } from '../dist/utils/crypto.js';
 
 describe('1. Telegram Cryptographic Authentication Suite', () => {
   const testBotToken = '123456789:ABCdefGHIjklMNOpqrSTUvwxYZ';

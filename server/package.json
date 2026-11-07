@@ -12,6 +12,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:push": "prisma db push",
+    "seed:admin": "tsx prisma/seedAdmin.ts",
     "test": "node --test tests/**/*.test.js"
   },
   "dependencies": {

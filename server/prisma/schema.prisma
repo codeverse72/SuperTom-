@@ -17,6 +17,18 @@ enum AccountStatus {
   BANNED
 }
 
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  SUPPORT
+}
+
+enum DepositStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
 enum CurrencyType {
   POOPS
   USDT_TRC20
@@ -106,6 +118,7 @@ model User {
   sentReferrals   Referral[]     @relation("ReferrerRel")
   receivedReferral Referral?     @relation("RefereeRel")
   withdrawals     Withdrawal[]
+  deposits        Deposit[]
   ledgerEntries   LedgerEntry[]
 
   @@index([telegramId])
@@ -341,4 +354,64 @@ model SystemSetting {
   description String?
   updatedAt   DateTime @updatedAt
 }
+
+// 16. Player Deposits
+model Deposit {
+  id          String        @id @default(uuid())
+  userId      String
+  amountUsdt  Decimal       @db.Decimal(18, 4)
+  amountPoops BigInt
+  network     String        @default("TRC20")
+  txHash      String?       @unique
+  status      DepositStatus @default(PENDING)
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// 17. Authenticated Administrative Staff
+model AdminUser {
+  id           String         @id @default(uuid())
+  email        String         @unique
+  passwordHash String
+  name         String
+  role         AdminRole      @default(ADMIN)
+  isActive     Boolean        @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  auditLogs    AdminAuditLog[]
+
+  @@index([email])
+  @@index([role])
+}
+
+// 18. Administrative Immutable Audit Trail
+model AdminAuditLog {
+  id           String      @id @default(uuid())
+  adminId      String
+  action       String
+  targetEntity String
+  targetId     String?
+  previousValue String?    @db.Text
+  newValue     String?     @db.Text
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime    @default(now())
+
+  admin        AdminUser   @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([action])
+  @@index([targetEntity])
+  @@index([createdAt])
+}
+
 

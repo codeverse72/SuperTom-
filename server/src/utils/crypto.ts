@@ -75,3 +75,58 @@ export function isValidTronAddress(address: string): boolean {
   return tronRegex.test(trimmed);
 }
 
+export interface AdminTokenPayload {
+  adminId: string;
+  email: string;
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'SUPPORT';
+}
+
+/**
+ * Hashes a plain-text password using PBKDF2 with a random salt.
+ * Returns salt:hash format.
+ */
+export function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+  return `${salt}:${hash}`;
+}
+
+/**
+ * Verifies a plain-text password against a stored salt:hash string.
+ */
+export function verifyPassword(password: string, storedHash: string): boolean {
+  try {
+    const [salt, originalHash] = storedHash.split(':');
+    if (!salt || !originalHash) return false;
+    const computedHash = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+    return crypto.timingSafeEqual(Buffer.from(computedHash, 'hex'), Buffer.from(originalHash, 'hex'));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Signs an Admin JWT token.
+ */
+export function signAdminToken(payload: AdminTokenPayload): string {
+  return jwt.sign(payload, env.JWT_SECRET, {
+    expiresIn: '24h',
+  });
+}
+
+/**
+ * Verifies an Admin JWT token.
+ */
+export function verifyAdminToken(token: string): AdminTokenPayload | null {
+  try {
+    const decoded = jwt.verify(token, env.JWT_SECRET) as AdminTokenPayload;
+    if (decoded && decoded.adminId && decoded.role) {
+      return decoded;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+
