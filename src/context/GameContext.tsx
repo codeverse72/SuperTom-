@@ -61,6 +61,10 @@ interface NoticeModalState {
 interface GameContextType {
   balance: number | null;
   productionRate: number | null;
+  unclaimedPoops: number;
+  isClaimingMining: boolean;
+  claimMiningEarnings: () => Promise<boolean>;
+  refreshMiningStatus: () => Promise<void>;
   isAuthenticated: boolean;
   biscuitCatalog: BiscuitConfig[];
   biscuitInventory: Record<string, number> | null;
@@ -216,6 +220,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     usdtAmount: number;
   } | null>(null);
 
+  // Mining unclaimed earnings & claiming state
+  const [unclaimedPoops, setUnclaimedPoops] = useState<number>(0);
+  const [isClaimingMining, setIsClaimingMining] = useState<boolean>(false);
+
   // Local UI settings
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [isWheelOpen, setIsWheelOpen] = useState<boolean>(false);
@@ -284,6 +292,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setBalance(authRes.data.initialState.balancePoops);
             if (authRes.data.initialState.mining) {
               setProductionRate(authRes.data.initialState.mining.totalRatePerHour);
+              setUnclaimedPoops(authRes.data.initialState.mining.unclaimedPoops || 0);
             }
             if (authRes.data.initialState.spinState) {
               setSpinState({
@@ -304,6 +313,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
               miningService.getMiningStatus().then((mRes) => {
                 if (mRes.success && mRes.data) {
                   setProductionRate(mRes.data.totalRatePerHour);
+                  setUnclaimedPoops(mRes.data.unclaimedMiningPoops || 0);
                 }
               });
             }
@@ -385,6 +395,55 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const remainingSpinTimeMs = Math.max(0, spinState.targetTimestamp - now);
   const isSpinReady = remainingSpinTimeMs === 0;
 
+  // Live real-time ticker for accrued mining poops
+  useEffect(() => {
+    if (!productionRate || productionRate <= 0) return;
+    const timer = setInterval(() => {
+      setUnclaimedPoops((prev) => {
+        const addPerSec = productionRate / 3600;
+        return prev + addPerSec;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [productionRate]);
+
+  const refreshMiningStatus = useCallback(async (): Promise<void> => {
+    try {
+      const res = await miningService.getMiningStatus();
+      if (res.success && res.data) {
+        setProductionRate(res.data.totalRatePerHour);
+        setUnclaimedPoops(res.data.unclaimedMiningPoops || 0);
+      }
+    } catch {
+      // Ignore
+    }
+  }, [setProductionRate]);
+
+  const claimMiningEarnings = useCallback(async (): Promise<boolean> => {
+    if (isClaimingMining) return false;
+    setIsClaimingMining(true);
+    try {
+      const res = await miningService.claimMiningEarnings();
+      if (res.success && res.data) {
+        const { claimedAmount, newBalance } = res.data;
+        setBalance(newBalance);
+        setUnclaimedPoops(0);
+        sound.playCoin();
+        showToast('Poops Harvested!', `+${claimedAmount.toLocaleString()} Poops claimed to your Main Balance!`, 'reward');
+        return true;
+      } else {
+        showToast('Mining Farm', res.error?.message || 'No unclaimed Poops available at this time.', 'info');
+        return false;
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to claim mining earnings';
+      showToast('Claim Error', msg, 'error');
+      return false;
+    } finally {
+      setIsClaimingMining(false);
+    }
+  }, [isClaimingMining, setBalance, showToast]);
+
   const toggleSound = () => {
     const next = !soundEnabled;
     setSoundEnabled(next);
@@ -412,6 +471,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           [biscuitId]: (prev[biscuitId] || 0) + count,
         }));
         showToast('Tom Fed!', `Production increased to +${res.data.newProductionRate}/h!`, 'success');
+        refreshMiningStatus();
       } else {
         showToast('Feeding Error', res.error?.message || 'Feeding failed', 'error');
       }
@@ -739,6 +799,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         balance,
         productionRate,
+        unclaimedPoops,
+        isClaimingMining,
+        claimMiningEarnings,
+        refreshMiningStatus,
         isAuthenticated,
         biscuitCatalog,
         biscuitInventory,
