@@ -873,12 +873,18 @@ export const Payout: React.FC = () => {
         />
       )}
 
-      {/* 5. Live Payout Proofs Banner matching Screenshot 2, 3, 4 */}
+      {/* 5. Live Payout Proofs Banner */}
       <a
-        href="https://t.me"
+        href="https://t.me/+W9ypwO2_Pm0xZTJl"
         target="_blank"
         rel="noopener noreferrer"
-        className="block rounded-2xl p-2.5 bg-[#091515] border border-emerald-500/30 hover:border-emerald-500/60 transition-all shadow-md"
+        onClick={(e) => {
+          if (window.Telegram?.WebApp?.openTelegramLink) {
+            e.preventDefault();
+            window.Telegram.WebApp.openTelegramLink('https://t.me/+W9ypwO2_Pm0xZTJl');
+          }
+        }}
+        className="block rounded-2xl p-2.5 bg-[#091515] border border-emerald-500/30 hover:border-emerald-500/60 transition-all shadow-md cursor-pointer active:scale-[0.99]"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -891,7 +897,7 @@ export const Payout: React.FC = () => {
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               </span>
               <p className="text-[11px] text-emerald-400 font-medium font-sans">
-                View verified receipts on @SuperTomPayouts
+                View verified receipts on Telegram
               </p>
             </div>
           </div>
