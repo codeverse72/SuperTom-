@@ -167,10 +167,23 @@ class AdminApiClient {
     return this.request<BiscuitItem[]>('/biscuits');
   }
 
+  public async createBiscuit(payload: Partial<BiscuitItem> & { id: string; name: string; costPoops: number; productionBoostPerHour: number }) {
+    return this.request<BiscuitItem>('/biscuits', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
   public async updateBiscuit(id: string, payload: Partial<BiscuitItem>) {
     return this.request<BiscuitItem>(`/biscuits/${id}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
+    });
+  }
+
+  public async deleteBiscuit(id: string) {
+    return this.request<{ message: string; deleted?: boolean; deactivated?: boolean }>(`/biscuits/${id}`, {
+      method: 'DELETE',
     });
   }
 

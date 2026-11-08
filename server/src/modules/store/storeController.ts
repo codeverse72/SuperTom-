@@ -1,35 +1,39 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../config/database.js';
 import { AuthenticatedRequest } from '../../middleware/auth.js';
 import { sendSuccess, sendError } from '../../utils/apiResponse.js';
 import { LedgerService } from '../ledger/ledgerService.js';
 
-// Server-authoritative biscuit catalog rules
+// Default static fallback catalog rules
 export const BISCUIT_CATALOG = {
-  common: { id: 'common', name: 'Common Biscuit', costPoops: 10n, boostPerHour: 10 },
-  silver: { id: 'silver', name: 'Silver Biscuit', costPoops: 50n, boostPerHour: 50 },
-  gold: { id: 'gold', name: 'Gold Biscuit', costPoops: 200n, boostPerHour: 200 },
-  diamond: { id: 'diamond', name: 'Diamond Biscuit', costPoops: 1000n, boostPerHour: 1000 },
+  common: { id: 'common', name: 'Common Biscuit', costPoops: 200n, boostPerHour: 100 },
+  silver: { id: 'silver', name: 'Silver Biscuit', costPoops: 500n, boostPerHour: 300 },
+  gold: { id: 'gold', name: 'Gold Biscuit', costPoops: 1200n, boostPerHour: 800 },
+  diamond: { id: 'diamond', name: 'Diamond Biscuit', costPoops: 3000n, boostPerHour: 1200 },
 } as const;
 
 type BiscuitType = keyof typeof BISCUIT_CATALOG;
 
 const purchaseSchema = z.object({
-  biscuitId: z.enum(['common', 'silver', 'gold', 'diamond']),
+  biscuitId: z.string().min(1),
   quantity: z.number().int().positive().default(1),
 });
 
 const feedSchema = z.object({
-  biscuitId: z.enum(['common', 'silver', 'gold', 'diamond']),
+  biscuitId: z.string().min(1),
   count: z.number().int().positive().default(1),
 });
 
 export class StoreController {
   /**
-   * Helper to fetch normalized user inventory DTO.
+   * Helper to fetch normalized user inventory DTO across all active catalog products.
    */
   private static async getInventoryDto(userId: string) {
+    const products = await prisma.biscuitProduct.findMany({
+      select: { id: true },
+    });
+
     const inventories = await prisma.userInventory.findMany({
       where: { userId },
     });
@@ -41,13 +45,47 @@ export class StoreController {
       diamond: 0,
     };
 
+    for (const p of products) {
+      inventoryMap[p.id] = 0;
+    }
+
     for (const item of inventories) {
-      if (item.biscuitId in inventoryMap) {
-        inventoryMap[item.biscuitId] = item.quantity;
-      }
+      inventoryMap[item.biscuitId] = item.quantity;
     }
 
     return inventoryMap;
+  }
+
+  /**
+   * GET /api/v1/store/biscuits
+   * Public endpoint returning all active biscuits for game store & feeding catalog.
+   */
+  public static async listBiscuits(_req: Request, res: Response): Promise<void> {
+    try {
+      const biscuits = await prisma.biscuitProduct.findMany({
+        where: { isActive: true },
+        orderBy: { costPoops: 'asc' },
+      });
+
+      sendSuccess(
+        res,
+        biscuits.map((b) => ({
+          id: b.id,
+          name: b.name,
+          costPoops: Number(b.costPoops),
+          productionBoostPerHour: b.productionBoostPerHour,
+          currencyType: b.currencyType,
+          badge: b.badge,
+          color: b.color,
+          borderColor: b.borderColor,
+          glowColor: b.glowColor,
+          description: b.description,
+          isActive: b.isActive,
+        }))
+      );
+    } catch {
+      sendError(res, 'Failed to fetch biscuit catalogue', 500, 'CATALOG_FETCH_ERROR');
+    }
   }
 
   /**
@@ -87,12 +125,19 @@ export class StoreController {
     }
 
     const { biscuitId, quantity } = parseResult.data;
-    const biscuit = BISCUIT_CATALOG[biscuitId as BiscuitType];
-    const totalCost = biscuit.costPoops * BigInt(quantity);
 
     try {
+      // 1. Fetch dynamic biscuit from database
+      const biscuit = await prisma.biscuitProduct.findUnique({ where: { id: biscuitId } });
+      if (!biscuit || !biscuit.isActive) {
+        sendError(res, 'Biscuit is not available in store', 404, 'BISCUIT_NOT_AVAILABLE');
+        return;
+      }
+
+      const totalCost = biscuit.costPoops * BigInt(quantity);
+
       const result = await prisma.$transaction(async (tx) => {
-        // 1. Deduct cost from Poops balance via LedgerService
+        // 2. Deduct cost from Poops balance via LedgerService
         const { balanceAfter } = await LedgerService.executeBalanceTransaction(tx, {
           userId,
           type: 'BISCUIT_PURCHASE',
@@ -101,14 +146,14 @@ export class StoreController {
           idempotencyKey: `purchase_${userId}_${biscuitId}_${Date.now()}`,
         });
 
-        // 2. Increment user inventory
+        // 3. Increment user inventory
         await tx.userInventory.upsert({
           where: { userId_biscuitId: { userId, biscuitId } },
           create: { userId, biscuitId, quantity },
           update: { quantity: { increment: quantity } },
         });
 
-        // 3. Get current production rate
+        // 4. Get current production rate
         const settlement = await tx.miningSettlement.findUnique({
           where: { userId },
           select: { totalRatePerHour: true },
@@ -155,12 +200,19 @@ export class StoreController {
     }
 
     const { biscuitId, count } = parseResult.data;
-    const biscuit = BISCUIT_CATALOG[biscuitId as BiscuitType];
-    const totalBoost = biscuit.boostPerHour * count;
 
     try {
+      // 1. Fetch dynamic biscuit from database
+      const biscuit = await prisma.biscuitProduct.findUnique({ where: { id: biscuitId } });
+      if (!biscuit) {
+        sendError(res, 'Biscuit product not found', 404, 'BISCUIT_NOT_FOUND');
+        return;
+      }
+
+      const totalBoost = biscuit.productionBoostPerHour * count;
+
       const result = await prisma.$transaction(async (tx) => {
-        // 1. Verify user has enough biscuits
+        // 2. Verify user has enough biscuits
         const inv = await tx.userInventory.findUnique({
           where: { userId_biscuitId: { userId, biscuitId } },
         });
@@ -169,13 +221,13 @@ export class StoreController {
           throw new Error(`Insufficient ${biscuit.name} in inventory (Required: ${count}, Available: ${inv?.quantity ?? 0})`);
         }
 
-        // 2. Deduct biscuits from inventory
+        // 3. Deduct biscuits from inventory
         await tx.userInventory.update({
           where: { userId_biscuitId: { userId, biscuitId } },
           data: { quantity: { decrement: count } },
         });
 
-        // 3. Update mining settlement production boost permanently
+        // 4. Update mining settlement production boost permanently
         const updatedSettlement = await tx.miningSettlement.update({
           where: { userId },
           data: {
@@ -184,7 +236,7 @@ export class StoreController {
           },
         });
 
-        // 4. Log feeding event
+        // 5. Log feeding event
         await tx.feedingEvent.create({
           data: {
             userId,

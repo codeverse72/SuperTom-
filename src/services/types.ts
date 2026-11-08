@@ -98,8 +98,22 @@ export interface BiscuitInventoryDto {
   [key: string]: number;
 }
 
+export interface BiscuitProductDto {
+  id: string;
+  name: string;
+  costPoops: number;
+  productionBoostPerHour: number;
+  currencyType: string;
+  badge: string;
+  color: string;
+  borderColor: string;
+  glowColor: string;
+  description: string;
+  isActive: boolean;
+}
+
 export interface PurchaseBiscuitRequest {
-  biscuitId: 'common' | 'silver' | 'gold' | 'diamond';
+  biscuitId: string;
   quantity: number;
 }
 

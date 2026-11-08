@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Sparkles, Cookie, ArrowRight, ServerOff } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { BISCUIT_CONFIGS } from '../config/gameConfig';
+import { BiscuitSvg } from './BiscuitSvg';
 import { SYSTEM_MESSAGES } from '../config/featureConfig';
 
 interface FeedingModalProps {
@@ -11,12 +12,12 @@ interface FeedingModalProps {
 }
 
 export const FeedingModal: React.FC<FeedingModalProps> = ({ isOpen, onClose, onNavigateToStore }) => {
-  const { biscuitInventory, feedTom, showToast } = useGame();
+  const { biscuitCatalog, biscuitInventory, feedTom, showToast } = useGame();
   const [selectedBiscuitId, setSelectedBiscuitId] = useState<string>('common');
 
   if (!isOpen) return null;
 
-  const currentConfig = BISCUIT_CONFIGS[selectedBiscuitId];
+  const currentConfig = biscuitCatalog.find(b => b.id === selectedBiscuitId) || BISCUIT_CONFIGS[selectedBiscuitId] || biscuitCatalog[0] || BISCUIT_CONFIGS.common;
   const ownedCount = biscuitInventory !== null ? (biscuitInventory[selectedBiscuitId] ?? 0) : 0;
 
   const handleFeed = () => {
@@ -65,42 +66,49 @@ export const FeedingModal: React.FC<FeedingModalProps> = ({ isOpen, onClose, onN
           </button>
         </div>
 
-        {/* 4 Biscuit Categories Selector Grid */}
-        <div className="grid grid-cols-2 gap-2.5 my-4">
-          {Object.values(BISCUIT_CONFIGS).map((biscuit) => {
+        {/* Biscuit Categories Selector Grid */}
+        <div className="grid grid-cols-2 gap-2.5 my-4 max-h-56 overflow-y-auto pr-1">
+          {biscuitCatalog.map((biscuit) => {
             const isSelected = selectedBiscuitId === biscuit.id;
-            const count = biscuitInventory !== null ? (biscuitInventory[biscuit.id] ?? 0) : '--';
+            const count = biscuitInventory !== null ? (biscuitInventory[biscuit.id] ?? 0) : 0;
 
             return (
               <button
                 key={biscuit.id}
                 onClick={() => setSelectedBiscuitId(biscuit.id)}
-                className={`relative rounded-2xl p-3 text-left transition-all flex flex-col justify-between min-h-[96px] cursor-pointer ${
+                className={`relative rounded-2xl p-2.5 text-left transition-all flex flex-col justify-between min-h-[96px] cursor-pointer ${
                   isSelected
                     ? 'bg-purple-800/40 border-2 border-amber-400 shadow-[0_0_15px_rgba(234,179,8,0.3)] scale-[1.02]'
                     : 'bg-purple-950/40 border border-purple-500/20 hover:border-purple-400/40'
                 }`}
               >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-900/60 text-purple-200 border border-purple-400/20">
-                      {biscuit.badge}
-                    </span>
-                    <h4 className="text-xs font-bold text-white mt-1 font-display">
-                      {biscuit.name}
-                    </h4>
+                <div className="flex items-start justify-between gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <BiscuitSvg
+                      biscuitId={biscuit.id}
+                      color={biscuit.color?.startsWith('#') ? biscuit.color : undefined}
+                      size={28}
+                    />
+                    <div>
+                      <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-purple-900/60 text-purple-200 border border-purple-400/20">
+                        {biscuit.badge}
+                      </span>
+                      <h4 className="text-xs font-bold text-white mt-0.5 font-display truncate max-w-[85px]">
+                        {biscuit.name}
+                      </h4>
+                    </div>
                   </div>
 
-                  <span className="text-xs font-mono font-bold text-amber-300">
+                  <span className="text-[11px] font-mono font-bold text-amber-300 shrink-0">
                     +{biscuit.productionBoost}/h
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-purple-500/20 text-[11px]">
                   <span className="text-purple-300/70">
-                    Owned: <strong className="text-white">{count}</strong>
+                    Owned: <strong className={count > 0 ? 'text-amber-400' : 'text-slate-400'}>{count}</strong>
                   </span>
-                  <span className="text-amber-400 font-bold">
+                  <span className="text-amber-400 font-bold font-mono text-[10px]">
                     {biscuit.cost} 💩
                   </span>
                 </div>

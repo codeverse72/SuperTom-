@@ -51,10 +51,20 @@ adminRouter.put(
 
 // Biscuit Store Management
 adminRouter.get('/biscuits', AdminBiscuitController.listBiscuits);
+adminRouter.post(
+  '/biscuits',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  AdminBiscuitController.createBiscuit
+);
 adminRouter.put(
   '/biscuits/:id',
   requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
   AdminBiscuitController.updateBiscuit
+);
+adminRouter.delete(
+  '/biscuits/:id',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  AdminBiscuitController.deleteBiscuit
 );
 
 // Missions Management

@@ -12,6 +12,7 @@ import {
 import { useGame } from '../context/GameContext';
 import { BISCUIT_CONFIGS, BiscuitConfig } from '../config/gameConfig';
 import { formatNumber } from '../utils/probability';
+import { BiscuitSvg } from '../components/BiscuitSvg';
 
 interface StoreProps {
   onNavigateToDeposit?: () => void;
@@ -27,6 +28,7 @@ export const PLAN_USDT_RATES: Record<string, number> = {
 export const Store: React.FC<StoreProps> = ({ onNavigateToDeposit }) => {
   const { 
     balance, 
+    biscuitCatalog,
     biscuitInventory, 
     productionRate, 
     setSelectedPlanForDeposit, 
@@ -127,18 +129,18 @@ export const Store: React.FC<StoreProps> = ({ onNavigateToDeposit }) => {
         </div>
       </div>
 
-      {/* 4 Mining Plan Cards Grid */}
+      {/* Mining Plan Cards Grid (All Active Biscuits) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {Object.values(BISCUIT_CONFIGS).map((biscuit) => {
+        {biscuitCatalog.map((biscuit) => {
           const owned = biscuitInventory !== null ? (biscuitInventory[biscuit.id] ?? 0) : 0;
-          const planUsdt = PLAN_USDT_RATES[biscuit.id] || 5.0;
+          const planUsdt = PLAN_USDT_RATES[biscuit.id] || Math.max(1, Number((biscuit.cost / 200).toFixed(1)));
           const hasEnoughPoops = balance !== null && balance >= biscuit.cost;
           const isLoading = loadingPlanId === biscuit.id;
 
           return (
             <div
               key={biscuit.id}
-              className={`rounded-3xl p-4 glass-panel border transition-all duration-200 flex flex-col justify-between ${biscuit.borderColor} shadow-xl hover:shadow-2xl relative overflow-hidden bg-gradient-to-b from-[#14062a] to-[#090214]`}
+              className={`rounded-3xl p-4 glass-panel border transition-all duration-200 flex flex-col justify-between ${biscuit.borderColor || 'border-purple-500/40'} shadow-xl hover:shadow-2xl relative overflow-hidden bg-gradient-to-b from-[#14062a] to-[#090214]`}
             >
               {/* Top Row: Badge & Boost */}
               <div>
@@ -153,8 +155,12 @@ export const Store: React.FC<StoreProps> = ({ onNavigateToDeposit }) => {
                 </div>
 
                 <div className="flex items-center gap-3 mt-3">
-                  <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${biscuit.color} border border-white/30 flex items-center justify-center text-white shadow-lg shrink-0`}>
-                    <Cookie className="w-6 h-6 drop-shadow-md" />
+                  <div className="w-14 h-14 rounded-2xl bg-purple-950/80 border border-purple-500/30 flex items-center justify-center shadow-lg shrink-0">
+                    <BiscuitSvg
+                      biscuitId={biscuit.id}
+                      color={biscuit.color?.startsWith('#') ? biscuit.color : undefined}
+                      size={46}
+                    />
                   </div>
 
                   <div>

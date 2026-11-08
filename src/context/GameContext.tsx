@@ -13,7 +13,9 @@ import {
   INITIAL_MISSIONS, 
   Mission, 
   SPIN_REWARDS,
-  SpinRewardConfig 
+  SpinRewardConfig,
+  BiscuitConfig,
+  BISCUIT_CONFIGS
 } from '../config/gameConfig';
 import { 
   SYSTEM_MESSAGES, 
@@ -60,6 +62,7 @@ interface GameContextType {
   balance: number | null;
   productionRate: number | null;
   isAuthenticated: boolean;
+  biscuitCatalog: BiscuitConfig[];
   biscuitInventory: Record<string, number> | null;
   biscuitFedCount: Record<string, number>;
   spinState: SpinState;
@@ -141,6 +144,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [biscuitCatalog, setBiscuitCatalog] = useState<BiscuitConfig[]>(() => {
+    try {
+      const cached = localStorage.getItem('supertom_cache_biscuits');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return Object.values(BISCUIT_CONFIGS);
+  });
   const [biscuitInventory, setBiscuitInventory] = useState<Record<string, number> | null>(null);
   const [biscuitFedCount, setBiscuitFedCount] = useState<Record<string, number>>(DEFAULT_FED);
 
@@ -311,11 +321,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           }
 
-          // 2. PARALLEL SECONDARY DATA (Inventory & Missions in one parallel promise)
+          // 2. PARALLEL SECONDARY DATA (Inventory, Missions, & Biscuits Catalogue)
           Promise.allSettled([
             isFeatureAvailable('biscuit_purchases') ? storeService.getInventory() : Promise.resolve(null),
             missionService.getMissions(),
-          ]).then(([invRes, misRes]) => {
+            storeService.getBiscuits(),
+          ]).then(([invRes, misRes, bisRes]) => {
             if (invRes.status === 'fulfilled' && invRes.value && 'data' in invRes.value && invRes.value.data) {
               setBiscuitInventory(invRes.value.data as Record<string, number>);
             }
@@ -335,6 +346,26 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   actionUrl: m.actionUrl,
                 }))
               );
+            }
+            if (bisRes.status === 'fulfilled' && bisRes.value && 'data' in bisRes.value && bisRes.value.data && (bisRes.value.data as any[]).length > 0) {
+              const mapped: BiscuitConfig[] = (bisRes.value.data as any[]).map((b: any) => {
+                const staticConf = BISCUIT_CONFIGS[b.id];
+                return {
+                  id: b.id,
+                  name: b.name,
+                  cost: b.costPoops,
+                  productionBoost: b.productionBoostPerHour,
+                  color: b.color || staticConf?.color || 'from-purple-600 to-pink-600',
+                  borderColor: b.borderColor || staticConf?.borderColor || 'border-purple-500/40',
+                  glowColor: b.glowColor || staticConf?.glowColor || 'rgba(168, 85, 247, 0.4)',
+                  description: b.description || staticConf?.description || 'Royal feline snack.',
+                  badge: b.badge || staticConf?.badge || 'Treat',
+                };
+              });
+              setBiscuitCatalog(mapped);
+              try {
+                localStorage.setItem('supertom_cache_biscuits', JSON.stringify(mapped));
+              } catch {}
             }
           });
         }
@@ -396,7 +427,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     }
 
-    storeService.purchaseBiscuit({ biscuitId: biscuitId as 'common' | 'silver' | 'gold' | 'diamond', quantity: count }).then((res) => {
+    storeService.purchaseBiscuit({ biscuitId, quantity: count }).then((res) => {
       if (res.success && res.data) {
         setBalance(res.data.newBalancePoops);
         setBiscuitInventory(res.data.newInventory);
@@ -762,6 +793,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         balance,
         productionRate,
         isAuthenticated,
+        biscuitCatalog,
         biscuitInventory,
         biscuitFedCount,
         spinState,

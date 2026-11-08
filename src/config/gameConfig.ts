@@ -3,7 +3,7 @@
  */
 
 export interface BiscuitConfig {
-  id: 'common' | 'silver' | 'gold' | 'diamond';
+  id: string;
   name: string;
   cost: number;
   productionBoost: number; // Poops/hr

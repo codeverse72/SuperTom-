@@ -3,9 +3,12 @@
  */
 
 import { apiClient } from './apiClient';
-import { ApiResponse, BiscuitInventoryDto, PurchaseBiscuitRequest, PurchaseBiscuitResponse } from './types';
+import { ApiResponse, BiscuitInventoryDto, BiscuitProductDto, PurchaseBiscuitRequest, PurchaseBiscuitResponse } from './types';
 
 export const storeService = {
+  getBiscuits: async (): Promise<ApiResponse<BiscuitProductDto[]>> => {
+    return apiClient.get<BiscuitProductDto[]>('/store/biscuits');
+  },
   getInventory: async (): Promise<ApiResponse<BiscuitInventoryDto>> => {
     return apiClient.get<BiscuitInventoryDto>('/store/inventory');
   },
