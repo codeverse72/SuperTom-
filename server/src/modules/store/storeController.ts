@@ -108,8 +108,8 @@ export class StoreController {
 
   /**
    * POST /api/v1/store/purchase
-   * Validates user has enough Poops balance, deducts cost atomically,
-   * credits inventory, and writes immutable audit ledger entry.
+   * Policy enforcement: Biscuits are paid products. Purchasing biscuits using
+   * mined Poops balance is disabled; biscuits must be acquired via USDT deposit or wheel spins.
    */
   public static async purchaseBiscuit(req: AuthenticatedRequest, res: Response): Promise<void> {
     const userId = req.user?.userId;
@@ -118,67 +118,12 @@ export class StoreController {
       return;
     }
 
-    const parseResult = purchaseSchema.safeParse(req.body);
-    if (!parseResult.success) {
-      sendError(res, 'Invalid purchase request', 422, 'VALIDATION_ERROR', parseResult.error.format());
-      return;
-    }
-
-    const { biscuitId, quantity } = parseResult.data;
-
-    try {
-      // 1. Fetch dynamic biscuit from database
-      const biscuit = await prisma.biscuitProduct.findUnique({ where: { id: biscuitId } });
-      if (!biscuit || !biscuit.isActive) {
-        sendError(res, 'Biscuit is not available in store', 404, 'BISCUIT_NOT_AVAILABLE');
-        return;
-      }
-
-      const totalCost = biscuit.costPoops * BigInt(quantity);
-
-      const result = await prisma.$transaction(async (tx) => {
-        // 2. Deduct cost from Poops balance via LedgerService
-        const { balanceAfter } = await LedgerService.executeBalanceTransaction(tx, {
-          userId,
-          type: 'BISCUIT_PURCHASE',
-          amount: -totalCost,
-          description: `Purchased ${quantity}x ${biscuit.name} for ${totalCost} Poops`,
-          idempotencyKey: `purchase_${userId}_${biscuitId}_${Date.now()}`,
-        });
-
-        // 3. Increment user inventory
-        await tx.userInventory.upsert({
-          where: { userId_biscuitId: { userId, biscuitId } },
-          create: { userId, biscuitId, quantity },
-          update: { quantity: { increment: quantity } },
-        });
-
-        // 4. Get current production rate
-        const settlement = await tx.miningSettlement.findUnique({
-          where: { userId },
-          select: { totalRatePerHour: true },
-        });
-
-        return {
-          newBalance: Number(balanceAfter),
-          rate: settlement?.totalRatePerHour ?? 10,
-        };
-      });
-
-      const newInventory = await StoreController.getInventoryDto(userId);
-
-      sendSuccess(res, {
-        biscuitId,
-        quantityPurchased: quantity,
-        totalCostPoops: Number(totalCost),
-        newBalancePoops: result.newBalance,
-        newInventory,
-        newProductionRate: result.rate,
-      });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Purchase failed';
-      sendError(res, msg, 400, 'PURCHASE_FAILED');
-    }
+    sendError(
+      res,
+      'Direct purchase with Poops balance is disabled. Biscuits must be purchased via verified USDT deposit.',
+      403,
+      'POOPS_PURCHASE_DISABLED'
+    );
   }
 
   /**

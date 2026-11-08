@@ -420,78 +420,25 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return true;
   };
 
-  // Biscuit Purchases
-  const buyBiscuit = (biscuitId: string, count: number = 1): boolean => {
-    if (!isFeatureAvailable('biscuit_purchases')) {
-      triggerNotice('Store Purchase', SYSTEM_MESSAGES.PURCHASES_UNAVAILABLE, 'Store Unavailable');
-      return false;
-    }
-
-    storeService.purchaseBiscuit({ biscuitId, quantity: count }).then((res) => {
-      if (res.success && res.data) {
-        setBalance(res.data.newBalancePoops);
-        setBiscuitInventory(res.data.newInventory);
-        showToast('Purchased!', `Purchased ${count}x ${biscuitId} biscuit!`, 'success');
-      } else {
-        showToast('Purchase Error', res.error?.message || 'Purchase failed', 'error');
-      }
-    });
-
-    return true;
+  // Biscuit Purchases (Paid Only via USDT Deposit)
+  const buyBiscuit = (_biscuitId: string, _count: number = 1): boolean => {
+    showToast('Paid Plans Only', 'Biscuits can only be purchased via verified USDT deposit.', 'info');
+    return false;
   };
 
   const buyAndFeedBiscuit = (biscuitId: string): boolean => {
-    if (!isFeatureAvailable('biscuit_purchases')) {
-      triggerNotice('Store Purchase', SYSTEM_MESSAGES.PURCHASES_UNAVAILABLE, 'Store Unavailable');
-      return false;
-    }
     return buyBiscuit(biscuitId, 1);
   };
 
   /**
-   * Buys a mining booster pack with Poops and immediately activates it to boost mining speed.
+   * Policy enforcement: Biscuits are paid plans. Purchasing biscuits using
+   * mined Poops balance is disabled; biscuits must be purchased via verified USDT deposit.
    */
   const buyAndActivatePlan = async (
-    biscuitId: string
+    _biscuitId: string
   ): Promise<{ success: boolean; newRate?: number; error?: string }> => {
-    try {
-      // 1. Purchase
-      const buyRes = await storeService.purchaseBiscuit({ biscuitId: biscuitId as any, quantity: 1 });
-      if (!buyRes.success || !buyRes.data) {
-        const err = buyRes.error?.message || 'Purchase failed';
-        showToast('Purchase Failed', err, 'error');
-        return { success: false, error: err };
-      }
-
-      setBalance(buyRes.data.newBalancePoops);
-      setBiscuitInventory(buyRes.data.newInventory);
-
-      // 2. Feed immediately to adjust mining speed
-      const feedRes = await storeService.feedBiscuit(biscuitId, 1);
-      if (feedRes.success && feedRes.data) {
-        setProductionRate(feedRes.data.newProductionRate);
-        setBiscuitInventory(feedRes.data.newInventory);
-        setBiscuitFedCount((prev) => ({
-          ...prev,
-          [biscuitId]: (prev[biscuitId] || 0) + 1,
-        }));
-
-        sound.playMunch();
-        showToast(
-          'Mining Speed Boosted!',
-          `Plan activated! Hourly mining speed increased to +${feedRes.data.newProductionRate} Poops/hr 🚀`,
-          'reward'
-        );
-        return { success: true, newRate: feedRes.data.newProductionRate };
-      } else {
-        setProductionRate(buyRes.data.newProductionRate);
-        return { success: true, newRate: buyRes.data.newProductionRate };
-      }
-    } catch (e: any) {
-      const err = e?.message || 'Failed to activate plan';
-      showToast('Activation Failed', err, 'error');
-      return { success: false, error: err };
-    }
+    showToast('Paid Plans Only', 'Biscuits can only be purchased via verified USDT deposit.', 'info');
+    return { success: false, error: 'Biscuits can only be purchased via USDT deposit.' };
   };
 
   // Spin Wheel Execution (Direct Server-Authoritative)

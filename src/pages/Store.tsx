@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   ShoppingBag, 
   Sparkles, 
@@ -6,8 +6,7 @@ import {
   ArrowRight, 
   ShieldCheck, 
   Zap, 
-  Check, 
-  RefreshCw 
+  Check 
 } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { BISCUIT_CONFIGS, BiscuitConfig } from '../config/gameConfig';
@@ -32,12 +31,9 @@ export const Store: React.FC<StoreProps> = ({ onNavigateToDeposit }) => {
     biscuitInventory, 
     productionRate, 
     setSelectedPlanForDeposit, 
-    buyAndActivatePlan, 
     feedTom,
     showToast 
   } = useGame();
-
-  const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
 
   const handleBuyWithDeposit = (biscuit: BiscuitConfig) => {
     const biscuitPriceUsdt = PLAN_USDT_RATES[biscuit.id] ?? Math.max(1, Number((biscuit.cost / 200).toFixed(2)));
@@ -58,18 +54,6 @@ export const Store: React.FC<StoreProps> = ({ onNavigateToDeposit }) => {
     if (onNavigateToDeposit) {
       onNavigateToDeposit();
     }
-  };
-
-  const handleInstantActivateWithPoops = async (biscuit: BiscuitConfig) => {
-    if (balance === null || balance < biscuit.cost) {
-      // If user lacks balance, navigate directly to Deposit
-      handleBuyWithDeposit(biscuit);
-      return;
-    }
-
-    setLoadingPlanId(biscuit.id);
-    await buyAndActivatePlan(biscuit.id);
-    setLoadingPlanId(null);
   };
 
   const handleFeedOwned = (biscuit: BiscuitConfig) => {
@@ -172,10 +156,6 @@ export const Store: React.FC<StoreProps> = ({ onNavigateToDeposit }) => {
                       <span className="text-xs font-black text-amber-400 font-mono">
                         ${planUsdt.toFixed(2)} USDT
                       </span>
-                      <span className="text-purple-400">·</span>
-                      <span className="text-[11px] text-purple-200/80 font-mono">
-                        {biscuit.cost} Poops
-                      </span>
                     </div>
                   </div>
                 </div>
@@ -192,9 +172,9 @@ export const Store: React.FC<StoreProps> = ({ onNavigateToDeposit }) => {
                 )}
               </div>
 
-              {/* Action Buttons: Buy Plan (Deposit) & Activate with Poops */}
+              {/* Action Buttons: Buy Biscuit (Paid via Deposit) & Feed if Owned */}
               <div className="mt-4 pt-3 border-t border-purple-500/20 space-y-2">
-                {/* Primary Button: Buy Plan (Moves to Deposit Section) */}
+                {/* Primary Button: Buy Biscuit (Moves to Deposit Section with exact price) */}
                 <button
                   type="button"
                   onClick={() => handleBuyWithDeposit(biscuit)}
@@ -205,8 +185,8 @@ export const Store: React.FC<StoreProps> = ({ onNavigateToDeposit }) => {
                   <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
                 </button>
 
-                {/* Secondary Button: Instant Activate with Balance (if user has Poops) or Feed if Owned */}
-                {owned > 0 ? (
+                {/* Feed King Tom (Only available when user owns biscuits) */}
+                {owned > 0 && (
                   <button
                     type="button"
                     onClick={() => handleFeedOwned(biscuit)}
@@ -214,28 +194,6 @@ export const Store: React.FC<StoreProps> = ({ onNavigateToDeposit }) => {
                   >
                     <Cookie className="w-3 h-3" />
                     <span>Feed King Tom (+{biscuit.productionBoost}/hr)</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={isLoading}
-                    onClick={() => handleInstantActivateWithPoops(biscuit)}
-                    className={`w-full py-2 px-3 rounded-xl font-semibold text-xs tracking-wide flex items-center justify-center gap-1 transition-all border cursor-pointer active:scale-95 ${
-                      hasEnoughPoops
-                        ? 'bg-purple-900/50 hover:bg-purple-800 text-amber-300 border-amber-400/40'
-                        : 'bg-purple-950/40 hover:bg-purple-900/40 text-purple-300/80 border-purple-500/20'
-                    }`}
-                  >
-                    {isLoading ? (
-                      <RefreshCw className="w-3 h-3 animate-spin text-amber-400" />
-                    ) : (
-                      <Sparkles className="w-3 h-3 text-amber-400" />
-                    )}
-                    <span>
-                      {hasEnoughPoops 
-                        ? `Instant Activate (${biscuit.cost} 💩)`
-                        : `Activate with ${biscuit.cost} Poops`}
-                    </span>
                   </button>
                 )}
               </div>
