@@ -192,6 +192,16 @@ adminRouter.post(
   requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
   PayoutAutomationController.verifyDestinationChannel
 );
+adminRouter.get(
+  '/payout-automation/detect-channels',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  PayoutAutomationController.detectBotChannels
+);
+adminRouter.post(
+  '/payout-automation/sync-reflect',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  PayoutAutomationController.syncAndReflect
+);
 adminRouter.get('/payout-automation/templates', PayoutAutomationController.listTemplates);
 adminRouter.post(
   '/payout-automation/templates',

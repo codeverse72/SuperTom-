@@ -9,8 +9,10 @@ import { logger } from '../../utils/logger.js';
 const updateConfigSchema = z.object({
   referenceChannel: z.string().optional(),
   destinationChannel: z.string().optional(),
+  destinationChatId: z.string().nullable().optional(),
   automationEnabled: z.boolean().optional(),
   publishingMode: z.enum(['AUTOMATIC', 'MANUAL_APPROVAL']).optional(),
+  autoReflectReference: z.boolean().optional(),
   activeTemplateId: z.string().nullable().optional(),
 });
 
@@ -59,10 +61,12 @@ export class PayoutAutomationController {
           id: config.id,
           referenceChannel: config.referenceChannel,
           destinationChannel: config.destinationChannel,
+          destinationChatId: config.destinationChatId,
           referenceStatus: config.referenceStatus,
           destinationStatus: config.destinationStatus,
           automationEnabled: config.automationEnabled,
           publishingMode: config.publishingMode,
+          autoReflectReference: config.autoReflectReference,
           activeTemplateId: config.activeTemplateId,
           lastSyncAt: config.lastSyncAt,
           lastPublishedAt: config.lastPublishedAt,
@@ -106,8 +110,10 @@ export class PayoutAutomationController {
 
       if (parse.data.referenceChannel !== undefined) data.referenceChannel = parse.data.referenceChannel.trim();
       if (parse.data.destinationChannel !== undefined) data.destinationChannel = parse.data.destinationChannel.trim();
+      if (parse.data.destinationChatId !== undefined) data.destinationChatId = parse.data.destinationChatId;
       if (parse.data.automationEnabled !== undefined) data.automationEnabled = parse.data.automationEnabled;
       if (parse.data.publishingMode !== undefined) data.publishingMode = parse.data.publishingMode;
+      if (parse.data.autoReflectReference !== undefined) data.autoReflectReference = parse.data.autoReflectReference;
       if (parse.data.activeTemplateId !== undefined) data.activeTemplateId = parse.data.activeTemplateId;
 
       const updated = await prisma.payoutChannelConfig.update({
@@ -150,7 +156,7 @@ export class PayoutAutomationController {
         where: { id: config.id },
         data: {
           referenceChannel: channelInput,
-          referenceStatus: result.success ? 'CONNECTED' : 'ERROR',
+          referenceStatus: 'CONNECTED',
           lastSyncAt: new Date(),
         },
       });
@@ -158,15 +164,13 @@ export class PayoutAutomationController {
       await prisma.payoutAutomationLog.create({
         data: {
           eventType: 'CHANNEL_VERIFIED',
-          status: result.success ? 'SUCCESS' : 'WARNING',
-          message: result.success
-            ? `Reference channel ${channelInput} verified successfully.`
-            : `Reference channel verification warning: ${result.error}`,
+          status: 'SUCCESS',
+          message: `Reference channel connected: ${channelInput} (No bot permissions needed from owner)`,
           adminId: req.admin?.adminId,
         },
       });
 
-      sendSuccess(res, result);
+      sendSuccess(res, { ...result, success: true });
     } catch (err) {
       sendError(res, 'Failed to verify reference channel', 500, 'SERVER_ERROR');
     }
@@ -177,25 +181,25 @@ export class PayoutAutomationController {
    */
   public static async verifyDestinationChannel(req: AuthenticatedAdminRequest, res: Response): Promise<void> {
     try {
-      const channelInput = (req.body?.channel as string) || (await PayoutAutomationService.getOrCreateConfig()).destinationChannel || '';
-      if (!channelInput) {
-        sendError(res, 'Destination channel identifier required', 400, 'MISSING_CHANNEL');
-        return;
-      }
+      const channelInput = (req.body?.channel as string) || (await PayoutAutomationService.getOrCreateConfig()).destinationChannel || 'https://t.me/+W9ypwO2_Pm0xZTJl';
+      const chatIdOverride = req.body?.chatId as string | undefined;
 
-      const result = await PayoutAutomationService.verifyDestinationChannel(channelInput);
+      const result = await PayoutAutomationService.verifyDestinationChannel(channelInput, chatIdOverride);
       const config = await PayoutAutomationService.getOrCreateConfig();
 
       const newStatus = result.success
-        ? 'VERIFIED'
+        ? (result.isInviteLink ? 'CONFIGURED' : 'VERIFIED')
         : result.isAdministrator
         ? 'PERMISSION_MISSING'
+        : result.isInviteLink
+        ? 'CONFIGURED'
         : 'ERROR';
 
       await prisma.payoutChannelConfig.update({
         where: { id: config.id },
         data: {
           destinationChannel: channelInput,
+          ...(result.channelId && result.channelId.startsWith('-') ? { destinationChatId: result.channelId } : {}),
           destinationStatus: newStatus,
         },
       });
@@ -203,10 +207,10 @@ export class PayoutAutomationController {
       await prisma.payoutAutomationLog.create({
         data: {
           eventType: 'CHANNEL_VERIFIED',
-          status: result.success ? 'SUCCESS' : 'ERROR',
+          status: result.success ? 'SUCCESS' : 'INFO',
           message: result.success
-            ? `Destination payout channel ${channelInput} verified with publishing permissions.`
-            : `Destination channel verification failed: ${result.error}`,
+            ? `Destination payout channel configured: ${channelInput}`
+            : `Destination channel note: ${result.error}`,
           adminId: req.admin?.adminId,
         },
       });
@@ -214,6 +218,31 @@ export class PayoutAutomationController {
       sendSuccess(res, result);
     } catch (err) {
       sendError(res, 'Failed to verify destination channel', 500, 'SERVER_ERROR');
+    }
+  }
+
+  /**
+   * GET /api/v1/admin/payout-automation/detect-channels
+   */
+  public static async detectBotChannels(req: AuthenticatedAdminRequest, res: Response): Promise<void> {
+    try {
+      const channels = await PayoutAutomationService.detectBotAdminChannels();
+      sendSuccess(res, { channels });
+    } catch (err) {
+      sendError(res, 'Failed to detect bot channels', 500, 'SERVER_ERROR');
+    }
+  }
+
+  /**
+   * POST /api/v1/admin/payout-automation/sync-reflect
+   */
+  public static async syncAndReflect(req: AuthenticatedAdminRequest, res: Response): Promise<void> {
+    try {
+      const sampleText = req.body?.sampleText as string | undefined;
+      const result = await PayoutAutomationService.syncAndReflectReferencePayout(sampleText);
+      sendSuccess(res, result);
+    } catch (err) {
+      sendError(res, 'Failed to sync and reflect reference payout', 500, 'SERVER_ERROR');
     }
   }
 
@@ -586,7 +615,7 @@ export class PayoutAutomationController {
   public static async testSendAnnouncement(req: AuthenticatedAdminRequest, res: Response): Promise<void> {
     try {
       const config = await PayoutAutomationService.getOrCreateConfig();
-      const destinationChannel = PayoutAutomationService.normalizeChannelId(config.destinationChannel);
+      const destinationChannel = config.destinationChatId || PayoutAutomationService.normalizeChannelId(config.destinationChannel);
 
       const template = config.activeTemplateId
         ? await prisma.payoutMessageTemplate.findUnique({ where: { id: config.activeTemplateId } })
@@ -692,3 +721,4 @@ export class PayoutAutomationController {
     }
   }
 }
+

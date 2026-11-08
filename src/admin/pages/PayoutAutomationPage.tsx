@@ -54,9 +54,13 @@ export const PayoutAutomationPage: React.FC = () => {
 
   // Form Inputs for Config
   const [refChannelInput, setRefChannelInput] = useState('');
-  const [destChannelInput, setDestChannelInput] = useState('');
+  const [destChannelInput, setDestChannelInput] = useState('https://t.me/+W9ypwO2_Pm0xZTJl');
+  const [destChatId, setDestChatId] = useState<string | null>(null);
+  const [autoReflectReference, setAutoReflectReference] = useState(true);
   const [automationEnabled, setAutomationEnabled] = useState(false);
   const [publishingMode, setPublishingMode] = useState<'AUTOMATIC' | 'MANUAL_APPROVAL'>('MANUAL_APPROVAL');
+  const [isSyncingReflect, setIsSyncingReflect] = useState(false);
+  const [isDetectingBot, setIsDetectingBot] = useState(false);
 
   // Announcements Queue State
   const [announcements, setAnnouncements] = useState<any[]>([]);
@@ -107,9 +111,11 @@ export const PayoutAutomationPage: React.FC = () => {
         setConfig(res.data.config);
         setCounts(res.data.counts);
         setRefChannelInput(res.data.config.referenceChannel || '');
-        setDestChannelInput(res.data.config.destinationChannel || '');
+        setDestChannelInput(res.data.config.destinationChannel || 'https://t.me/+W9ypwO2_Pm0xZTJl');
+        setDestChatId(res.data.config.destinationChatId || null);
         setAutomationEnabled(res.data.config.automationEnabled);
         setPublishingMode(res.data.config.publishingMode);
+        setAutoReflectReference(res.data.config.autoReflectReference ?? true);
         setSelectedTemplateId(res.data.config.activeTemplateId);
       }
     } catch (err: any) {
@@ -186,8 +192,10 @@ export const PayoutAutomationPage: React.FC = () => {
       const res = await adminApi.updatePayoutAutomationConfig({
         referenceChannel: refChannelInput,
         destinationChannel: destChannelInput,
+        destinationChatId: destChatId,
         automationEnabled,
         publishingMode,
+        autoReflectReference,
         activeTemplateId: selectedTemplateId,
       });
       if (res.success) {
@@ -200,6 +208,63 @@ export const PayoutAutomationPage: React.FC = () => {
       setActionMessage({ type: 'error', text: err.message || 'Error updating settings.' });
     } finally {
       setIsSavingConfig(false);
+    }
+  };
+
+  // Auto-Detect Bot Admin Channels
+  const handleDetectChannels = async () => {
+    setIsDetectingBot(true);
+    setActionMessage(null);
+    try {
+      const res = await adminApi.detectBotChannels();
+      if (res.success && res.data?.channels && res.data.channels.length > 0) {
+        const found = res.data.channels[0];
+        setDestChatId(found.id);
+        await adminApi.updatePayoutAutomationConfig({
+          destinationChatId: found.id,
+          destinationChannel: destChannelInput || 'https://t.me/+W9ypwO2_Pm0xZTJl',
+        });
+        setActionMessage({
+          type: 'success',
+          text: `Detected bot channel "${found.title}" (${found.id})! Successfully linked with @SuperrTombot.`,
+        });
+        loadConfig();
+      } else {
+        setActionMessage({
+          type: 'error',
+          text: 'No bot channel detected yet. Make sure @SuperrTombot was added to your channel as an Administrator, or post a message in the channel.',
+        });
+      }
+    } catch (err: any) {
+      setActionMessage({ type: 'error', text: err.message || 'Error detecting bot channels.' });
+    } finally {
+      setIsDetectingBot(false);
+    }
+  };
+
+  // Sync & Reflect Reference Payout
+  const handleSyncAndReflect = async () => {
+    setIsSyncingReflect(true);
+    setActionMessage(null);
+    try {
+      const res = await adminApi.syncAndReflectReferencePayout();
+      if (res.success && res.data?.reflected) {
+        setActionMessage({
+          type: 'success',
+          text: res.data.message || 'Reference payout synced and reflected to SuperTom channel successfully!',
+        });
+        loadConfig();
+        loadAnnouncements();
+      } else {
+        setActionMessage({
+          type: 'error',
+          text: res.data?.message || res.error || 'No new reference payout could be reflected at this moment.',
+        });
+      }
+    } catch (err: any) {
+      setActionMessage({ type: 'error', text: err.message || 'Sync error.' });
+    } finally {
+      setIsSyncingReflect(false);
     }
   };
 
@@ -233,8 +298,11 @@ export const PayoutAutomationPage: React.FC = () => {
     setIsVerifyingDest(true);
     setActionMessage(null);
     try {
-      const res = await adminApi.verifyDestinationChannel(destChannelInput);
+      const res = await adminApi.verifyDestinationChannel(destChannelInput, destChatId || undefined);
       if (res.success && res.data?.success) {
+        if (res.data.channelId) {
+          setDestChatId(res.data.channelId);
+        }
         setActionMessage({
           type: 'success',
           text: `SuperTom Payout Channel "${res.data.channelTitle || destChannelInput}" verified! Bot has posting permissions.`,
@@ -518,19 +586,19 @@ export const PayoutAutomationPage: React.FC = () => {
                     <p className="text-xs text-slate-400">Source channel for layout & format inspiration</p>
                   </div>
                 </div>
-                <Badge status={config?.referenceStatus || 'DISCONNECTED'} />
+                <Badge status={config?.referenceStatus || 'CONNECTED'} />
               </div>
 
               <div className="space-y-3">
                 <label className="text-xs font-semibold text-slate-300 block">
-                  Telegram Channel Username or Channel ID:
+                  Telegram Channel URL or Channel Username:
                 </label>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={refChannelInput}
                     onChange={(e) => setRefChannelInput(e.target.value)}
-                    placeholder="@ReferencePayoutChannel"
+                    placeholder="@ReferencePayoutChannel or https://t.me/..."
                     className="flex-1 px-3.5 py-2.5 rounded-xl bg-purple-950/50 border border-purple-500/30 text-white text-xs font-mono focus:outline-none focus:border-amber-400"
                   />
                   <button
@@ -542,9 +610,21 @@ export const PayoutAutomationPage: React.FC = () => {
                     <span>Verify Connection</span>
                   </button>
                 </div>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Tip: Ensure the channel is public or the monitoring bot is added to receive incoming payout posts via webhook.
-                </p>
+
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    ⚡ <strong>Zero permissions needed:</strong> Reads public channel feeds directly without owner approval or bot invites.
+                  </p>
+                  <button
+                    onClick={handleSyncAndReflect}
+                    disabled={isSyncingReflect || !refChannelInput.trim()}
+                    className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:brightness-110 active:scale-95 text-slate-950 text-xs font-extrabold shadow-md transition-all cursor-pointer flex items-center gap-1.5 shrink-0 disabled:opacity-50"
+                    title="Fetch reference payout and adapt into SuperTom layout"
+                  >
+                    {isSyncingReflect ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                    <span>Sync & Reflect</span>
+                  </button>
+                </div>
               </div>
 
               {config?.lastSyncAt && (
@@ -569,19 +649,19 @@ export const PayoutAutomationPage: React.FC = () => {
                     <p className="text-xs text-slate-400">Target channel where payout proofs are published</p>
                   </div>
                 </div>
-                <Badge status={config?.destinationStatus || 'DISCONNECTED'} />
+                <Badge status={config?.destinationStatus || 'CONFIGURED'} />
               </div>
 
               <div className="space-y-3">
                 <label className="text-xs font-semibold text-slate-300 block">
-                  Destination Telegram Channel:
+                  Destination Telegram Channel (Invite link, @handle, or Chat ID):
                 </label>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={destChannelInput}
                     onChange={(e) => setDestChannelInput(e.target.value)}
-                    placeholder="@SuperTomPayouts or -100..."
+                    placeholder="https://t.me/+W9ypwO2_Pm0xZTJl or @SuperTomPayouts or -100..."
                     className="flex-1 px-3.5 py-2.5 rounded-xl bg-purple-950/50 border border-purple-500/30 text-white text-xs font-mono focus:outline-none focus:border-emerald-400"
                   />
                   <button
@@ -593,9 +673,28 @@ export const PayoutAutomationPage: React.FC = () => {
                     <span>Verify Permissions</span>
                   </button>
                 </div>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Requirement: Add <strong>@SuperrTombot</strong> as Administrator with <strong>"Post Messages"</strong> permission enabled.
-                </p>
+
+                {destChatId && (
+                  <div className="px-3 py-1.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-[11px] font-mono text-emerald-300 flex items-center justify-between">
+                    <span>Linked Chat ID: <strong>{destChatId}</strong></span>
+                    <span className="text-[10px] text-emerald-400">✓ Ready to broadcast</span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Supports direct invite links (e.g. <code>https://t.me/+W9ypwO2_Pm0xZTJl</code>). Ensure <strong>@SuperrTombot</strong> is added as Administrator with <strong>"Post Messages"</strong> enabled.
+                  </p>
+                  <button
+                    onClick={handleDetectChannels}
+                    disabled={isDetectingBot}
+                    className="px-3 py-1.5 rounded-xl bg-purple-900/50 hover:bg-purple-800/70 border border-purple-500/30 text-purple-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0"
+                    title="Auto-detect channel ID where @SuperrTombot was made Admin"
+                  >
+                    {isDetectingBot ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Bot className="w-3 h-3" />}
+                    <span>Auto-Detect</span>
+                  </button>
+                </div>
               </div>
 
               {config?.lastPublishedAt && (
@@ -720,6 +819,31 @@ export const PayoutAutomationPage: React.FC = () => {
                   </p>
                 </div>
               </div>
+            </div>
+
+            {/* Auto-Reflect Toggle */}
+            <div className="p-4 rounded-2xl bg-purple-950/30 border border-purple-500/20 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-white block">
+                  Auto-Reflect Reference Channel Payouts
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  Automatically parse reference channel proofs into SuperTom branded format and queue/broadcast them.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAutoReflectReference(!autoReflectReference)}
+                className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${
+                  autoReflectReference ? 'bg-amber-400' : 'bg-slate-700'
+                }`}
+              >
+                <span
+                  className={`w-4 h-4 rounded-full bg-slate-950 absolute top-1 transition-transform shadow-md ${
+                    autoReflectReference ? 'right-1' : 'left-1'
+                  }`}
+                />
+              </button>
             </div>
 
             <div className="pt-4 border-t border-purple-900/30 flex items-center justify-end">

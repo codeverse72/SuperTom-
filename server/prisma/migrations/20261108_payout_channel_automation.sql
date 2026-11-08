@@ -99,3 +99,4 @@ VALUES
     (gen_random_uuid()::text, 'Royal Feline Celebration', 'High energy announcement celebrating King Tom payouts with community mining stats.', '👑 King Tom Royal Payout Disbursed! 🎉', 'A fellow feline has received their verified rewards!', '🐱 Feed King Tom biscuits to multiply your hourly Poops! Support: @SuperTomCare', '👑,🎉,💎,💰,🐱,⚡', 'USDT', true, true, true, true, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     (gen_random_uuid()::text, 'Proof of Reserves Minimal', 'Sleek, transparent receipt design with explicit transaction ID and zero fluff.', '⚡ Verified Withdrawal Sent', 'Instant on-chain transfer confirmed.', 'Join official chat & support: @SuperTomCare', '⚡,🔗,🛡️,✅', 'USDT', false, false, true, true, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT DO NOTHING;
+

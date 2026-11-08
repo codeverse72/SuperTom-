@@ -474,10 +474,12 @@ class AdminApiClient {
         id: string;
         referenceChannel: string;
         destinationChannel: string;
+        destinationChatId?: string | null;
         referenceStatus: string;
         destinationStatus: string;
         automationEnabled: boolean;
         publishingMode: 'AUTOMATIC' | 'MANUAL_APPROVAL';
+        autoReflectReference?: boolean;
         activeTemplateId: string | null;
         lastSyncAt: string | null;
         lastPublishedAt: string | null;
@@ -498,8 +500,10 @@ class AdminApiClient {
   public async updatePayoutAutomationConfig(data: {
     referenceChannel?: string;
     destinationChannel?: string;
+    destinationChatId?: string | null;
     automationEnabled?: boolean;
     publishingMode?: 'AUTOMATIC' | 'MANUAL_APPROVAL';
+    autoReflectReference?: boolean;
     activeTemplateId?: string | null;
   }) {
     return this.request<{ config: any; message: string }>('/payout-automation/config', {
@@ -523,7 +527,7 @@ class AdminApiClient {
     });
   }
 
-  public async verifyDestinationChannel(channel?: string) {
+  public async verifyDestinationChannel(channel?: string, chatId?: string) {
     return this.request<{
       success: boolean;
       channelId?: string;
@@ -532,10 +536,29 @@ class AdminApiClient {
       memberCount?: number;
       canPostMessages: boolean;
       isAdministrator: boolean;
+      isInviteLink?: boolean;
       error?: string;
     }>('/payout-automation/verify-destination', {
       method: 'POST',
-      body: JSON.stringify({ channel }),
+      body: JSON.stringify({ channel, chatId }),
+    });
+  }
+
+  public async detectBotChannels() {
+    return this.request<{
+      channels: Array<{ id: string; title: string; type: string }>;
+    }>('/payout-automation/detect-channels');
+  }
+
+  public async syncAndReflectReferencePayout(sampleText?: string) {
+    return this.request<{
+      reflected: boolean;
+      announcement?: any;
+      published?: boolean;
+      message: string;
+    }>('/payout-automation/sync-reflect', {
+      method: 'POST',
+      body: JSON.stringify({ sampleText }),
     });
   }
 

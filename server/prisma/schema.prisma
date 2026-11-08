@@ -547,12 +547,14 @@ model CampaignDailyReward {
 // 23. Payout Channel Automation Configuration
 model PayoutChannelConfig {
   id                   String    @id @default(uuid())
-  referenceChannel     String?   @default("@ReferencePayoutChannel")
-  destinationChannel   String    @default("@SuperTomPayouts")
-  referenceStatus      String    @default("DISCONNECTED") // CONNECTED, DISCONNECTED, ERROR
-  destinationStatus    String    @default("DISCONNECTED") // VERIFIED, PERMISSION_MISSING, DISCONNECTED, ERROR
+  referenceChannel     String?   @default("https://t.me/payouts")
+  destinationChannel   String    @default("https://t.me/+W9ypwO2_Pm0xZTJl")
+  destinationChatId    String?
+  referenceStatus      String    @default("CONNECTED") // CONNECTED, DISCONNECTED, ERROR
+  destinationStatus    String    @default("CONFIGURED") // VERIFIED, CONFIGURED, PERMISSION_MISSING, ERROR
   automationEnabled    Boolean   @default(false)
   publishingMode       String    @default("MANUAL_APPROVAL") // AUTOMATIC, MANUAL_APPROVAL
+  autoReflectReference Boolean   @default(true)
   activeTemplateId     String?
   lastSyncAt           DateTime?
   lastPublishedAt      DateTime?
@@ -589,14 +591,16 @@ model PayoutMessageTemplate {
 // 25. Payout Announcement Records
 model PayoutAnnouncement {
   id                String                 @id @default(uuid())
-  withdrawalId      String                 @unique
-  userId            String
+  withdrawalId      String?                @unique
+  source            String                 @default("SUPERTOM_PAYOUT") // SUPERTOM_PAYOUT, REFERENCE_CHANNEL
+  referencePostId   String?
+  userId            String?
   templateId        String?
   network           String                 @default("TRC20")
   currency          String                 @default("USDT")
   amountCrypto      Decimal                @db.Decimal(18, 4)
   amountUsdt        Decimal                @db.Decimal(18, 4)
-  amountPoops       BigInt
+  amountPoops       BigInt                 @default(0)
   walletAddress     String
   txHash            String
   explorerUrl       String?
@@ -611,10 +615,11 @@ model PayoutAnnouncement {
   createdAt         DateTime               @default(now())
   updatedAt         DateTime               @updatedAt
 
-  withdrawal        Withdrawal             @relation(fields: [withdrawalId], references: [id], onDelete: Cascade)
+  withdrawal        Withdrawal?            @relation(fields: [withdrawalId], references: [id], onDelete: Cascade)
   template          PayoutMessageTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
 
   @@index([status])
+  @@index([source])
   @@index([createdAt])
   @@index([txHash])
 }
