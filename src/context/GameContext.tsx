@@ -8,7 +8,7 @@
  *    -> clean local UI management.
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { 
   INITIAL_MISSIONS, 
   Mission, 
@@ -61,10 +61,6 @@ interface NoticeModalState {
 interface GameContextType {
   balance: number | null;
   productionRate: number | null;
-  unclaimedPoops: number;
-  isClaimingMining: boolean;
-  claimMiningEarnings: () => Promise<boolean>;
-  refreshMiningStatus: () => Promise<void>;
   isAuthenticated: boolean;
   biscuitCatalog: BiscuitConfig[];
   biscuitInventory: Record<string, number> | null;
@@ -72,6 +68,8 @@ interface GameContextType {
   spinState: SpinState;
   remainingSpinTimeMs: number;
   isSpinReady: boolean;
+  remainingMiningTimeMs: number;
+  hourlyAdditionProgressPercent: number;
   isWheelOpen: boolean;
   setIsWheelOpen: (open: boolean) => void;
   isEating: boolean;
@@ -220,10 +218,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     usdtAmount: number;
   } | null>(null);
 
-  // Mining unclaimed earnings & claiming state
-  const [unclaimedPoops, setUnclaimedPoops] = useState<number>(0);
-  const [isClaimingMining, setIsClaimingMining] = useState<boolean>(false);
-
   // Local UI settings
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [isWheelOpen, setIsWheelOpen] = useState<boolean>(false);
@@ -292,7 +286,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setBalance(authRes.data.initialState.balancePoops);
             if (authRes.data.initialState.mining) {
               setProductionRate(authRes.data.initialState.mining.totalRatePerHour);
-              setUnclaimedPoops(authRes.data.initialState.mining.unclaimedPoops || 0);
             }
             if (authRes.data.initialState.spinState) {
               setSpinState({
@@ -302,33 +295,26 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 cycleCount: authRes.data.initialState.spinState.cycleCount,
               });
             }
-          } else {
-            // Fallback for older auth responses
-            userService.getBalance().then((bRes) => {
-              if (bRes.success && bRes.data) {
-                setBalance(bRes.data.balancePoops);
+          }
+
+          // Auto-settle completed hours into main balance on app open (Option A - 24 additions/day)
+          if (isFeatureAvailable('mining')) {
+            miningService.getMiningStatus().then((mRes) => {
+              if (mRes.success && mRes.data) {
+                setProductionRate(mRes.data.totalRatePerHour);
+                if (mRes.data.settledAmount && mRes.data.settledAmount > 0 && mRes.data.newBalance !== undefined) {
+                  setBalance(mRes.data.newBalance);
+                  showToast(
+                    'Hourly Mining Added!',
+                    `+${mRes.data.settledAmount.toLocaleString()} Poops added to main balance (${mRes.data.completedHoursSettled} hr${(mRes.data.completedHoursSettled || 1) > 1 ? 's' : ''})!`,
+                    'reward'
+                  );
+                }
+                if (mRes.data.msUntilNextHour !== undefined) {
+                  setNextMiningAdditionTimestamp(Date.now() + mRes.data.msUntilNextHour);
+                }
               }
             });
-            if (isFeatureAvailable('mining')) {
-              miningService.getMiningStatus().then((mRes) => {
-                if (mRes.success && mRes.data) {
-                  setProductionRate(mRes.data.totalRatePerHour);
-                  setUnclaimedPoops(mRes.data.unclaimedMiningPoops || 0);
-                }
-              });
-            }
-            if (isFeatureAvailable('spin_rewards')) {
-              spinService.getSpinStatus().then((sRes) => {
-                if (sRes.success && sRes.data) {
-                  setSpinState({
-                    currentMilestone: sRes.data.currentMilestone,
-                    targetTimestamp: sRes.data.nextUnlockTimestamp,
-                    claimedMilestones: sRes.data.claimedMilestones,
-                    cycleCount: sRes.data.cycleCount,
-                  });
-                }
-              });
-            }
           }
 
           // 2. PARALLEL SECONDARY DATA (Inventory, Missions, & Biscuits Catalogue)
@@ -395,54 +381,30 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const remainingSpinTimeMs = Math.max(0, spinState.targetTimestamp - now);
   const isSpinReady = remainingSpinTimeMs === 0;
 
-  // Live real-time ticker for accrued mining poops
+  // Hourly Mining Addition countdown in ms (adds 24 times / day starting from start/feed)
+  const [nextMiningAdditionTimestamp, setNextMiningAdditionTimestamp] = useState<number>(() => Date.now() + 3600 * 1000);
+  const remainingMiningTimeMs = Math.max(0, nextMiningAdditionTimestamp - now);
+  const hourlyAdditionProgressPercent = Math.min(100, Math.max(0, Math.round(((3600 * 1000 - remainingMiningTimeMs) / (3600 * 1000)) * 100)));
+
+  // Auto-settle when each hour completes while the app is active
+  const isSettlingMiningRef = useRef(false);
   useEffect(() => {
-    if (!productionRate || productionRate <= 0) return;
-    const timer = setInterval(() => {
-      setUnclaimedPoops((prev) => {
-        const addPerSec = productionRate / 3600;
-        return prev + addPerSec;
+    if (remainingMiningTimeMs === 0 && isAuthenticated && !isSettlingMiningRef.current) {
+      isSettlingMiningRef.current = true;
+      miningService.claimMiningEarnings().then((res) => {
+        if (res.success && res.data) {
+          if (res.data.claimedAmount > 0) {
+            setBalance(res.data.newBalance);
+            showToast('Hourly Mining Added!', `+${res.data.claimedAmount.toLocaleString()} Poops added to main balance!`, 'reward');
+          }
+          const nextMs = res.data.msUntilNextHour ?? 3600 * 1000;
+          setNextMiningAdditionTimestamp(Date.now() + nextMs);
+        }
+      }).finally(() => {
+        setTimeout(() => { isSettlingMiningRef.current = false; }, 3000);
       });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [productionRate]);
-
-  const refreshMiningStatus = useCallback(async (): Promise<void> => {
-    try {
-      const res = await miningService.getMiningStatus();
-      if (res.success && res.data) {
-        setProductionRate(res.data.totalRatePerHour);
-        setUnclaimedPoops(res.data.unclaimedMiningPoops || 0);
-      }
-    } catch {
-      // Ignore
     }
-  }, [setProductionRate]);
-
-  const claimMiningEarnings = useCallback(async (): Promise<boolean> => {
-    if (isClaimingMining) return false;
-    setIsClaimingMining(true);
-    try {
-      const res = await miningService.claimMiningEarnings();
-      if (res.success && res.data) {
-        const { claimedAmount, newBalance } = res.data;
-        setBalance(newBalance);
-        setUnclaimedPoops(0);
-        sound.playCoin();
-        showToast('Poops Harvested!', `+${claimedAmount.toLocaleString()} Poops claimed to your Main Balance!`, 'reward');
-        return true;
-      } else {
-        showToast('Mining Farm', res.error?.message || 'No unclaimed Poops available at this time.', 'info');
-        return false;
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to claim mining earnings';
-      showToast('Claim Error', msg, 'error');
-      return false;
-    } finally {
-      setIsClaimingMining(false);
-    }
-  }, [isClaimingMining, setBalance, showToast]);
+  }, [remainingMiningTimeMs, isAuthenticated]);
 
   const toggleSound = () => {
     const next = !soundEnabled;
@@ -471,7 +433,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           [biscuitId]: (prev[biscuitId] || 0) + count,
         }));
         showToast('Tom Fed!', `Production increased to +${res.data.newProductionRate}/h!`, 'success');
-        refreshMiningStatus();
+        // Refresh mining status to synchronize new hourly anchor and countdown
+        miningService.getMiningStatus().then((mRes) => {
+          if (mRes.success && mRes.data?.msUntilNextHour !== undefined) {
+            setNextMiningAdditionTimestamp(Date.now() + mRes.data.msUntilNextHour);
+          }
+        });
       } else {
         showToast('Feeding Error', res.error?.message || 'Feeding failed', 'error');
       }
@@ -799,10 +766,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         balance,
         productionRate,
-        unclaimedPoops,
-        isClaimingMining,
-        claimMiningEarnings,
-        refreshMiningStatus,
         isAuthenticated,
         biscuitCatalog,
         biscuitInventory,
@@ -810,6 +773,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         spinState,
         remainingSpinTimeMs,
         isSpinReady,
+        remainingMiningTimeMs,
+        hourlyAdditionProgressPercent,
         isWheelOpen,
         setIsWheelOpen,
         isEating,

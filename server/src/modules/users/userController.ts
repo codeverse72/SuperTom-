@@ -3,6 +3,7 @@ import { prisma } from '../../config/database.js';
 import { AuthenticatedRequest } from '../../middleware/auth.js';
 import { sendSuccess, sendError } from '../../utils/apiResponse.js';
 import { env } from '../../config/env.js';
+import { MiningService } from '../mining/miningService.js';
 
 export class UserController {
   /**
@@ -16,6 +17,9 @@ export class UserController {
     }
 
     try {
+      // Auto-settle any completed hours into main balance (Option A)
+      await MiningService.settleUserHourlyEarnings(userId);
+
       const user = await prisma.user.findUnique({
         where: { id: userId },
         include: {
@@ -66,6 +70,9 @@ export class UserController {
     }
 
     try {
+      // Auto-settle any completed hours into main balance (Option A)
+      await MiningService.settleUserHourlyEarnings(userId);
+
       const user = await prisma.user.findUnique({
         where: { id: userId },
         select: {

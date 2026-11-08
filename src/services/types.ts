@@ -53,8 +53,13 @@ export interface MiningRateDto {
   baseRatePerHour: number;
   boostRatePerHour: number;
   totalRatePerHour: number;
-  unclaimedMiningPoops: number;
+  unclaimedMiningPoops?: number;
+  settledAmount?: number;
+  completedHoursSettled?: number;
+  newBalance?: number;
   lastCollectedAt: string;
+  msUntilNextHour?: number;
+  nextAdditionAt?: string;
 }
 
 export interface MissionDto {

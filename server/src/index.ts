@@ -5,6 +5,7 @@ import { logger } from './utils/logger.js';
 import { CampaignService } from './modules/campaign/campaignService.js';
 import { PayoutAutomationService } from './modules/payoutAutomation/payoutAutomationService.js';
 import { TelegramBotController } from './modules/telegramBot/telegramBotController.js';
+import { MiningService } from './modules/mining/miningService.js';
 
 async function bootstrap() {
   const app = createApp();
@@ -47,11 +48,25 @@ async function bootstrap() {
     }
   }, 30 * 1000);
 
+  // Hourly Mining Settlement Scheduler: Auto-adds poops to main balances 24 times/day
+  // Runs every 2 minutes to settle any completed hours for active miners
+  const miningSchedulerInterval = setInterval(async () => {
+    try {
+      const res = await MiningService.processScheduledHourlySettlements();
+      if (res.processedCount > 0) {
+        logger.info(`[MiningScheduler] Auto-credited ${res.processedCount} players (+${res.totalPoopsAwarded.toLocaleString()} Poops hourly additions).`);
+      }
+    } catch (miningErr) {
+      logger.error('[MiningScheduler] Error in hourly mining job:', miningErr);
+    }
+  }, 2 * 60 * 1000);
+
   // Graceful shutdown handling for Render deployments
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}. Initiating graceful shutdown...`);
     clearInterval(campaignSchedulerInterval);
     clearInterval(payoutAutomationInterval);
+    clearInterval(miningSchedulerInterval);
     server.close(async () => {
       logger.info('HTTP server closed.');
       try {

@@ -4,6 +4,7 @@ import { prisma } from '../../config/database.js';
 import { AuthenticatedRequest } from '../../middleware/auth.js';
 import { sendSuccess, sendError } from '../../utils/apiResponse.js';
 import { LedgerService } from '../ledger/ledgerService.js';
+import { MiningService } from '../mining/miningService.js';
 
 // Default static fallback catalog rules
 export const BISCUIT_CATALOG = {
@@ -155,6 +156,9 @@ export class StoreController {
       }
 
       const totalBoost = biscuit.productionBoostPerHour * count;
+
+      // Settle any completed hours at previous rate before applying new boost
+      await MiningService.settleUserHourlyEarnings(userId);
 
       const result = await prisma.$transaction(async (tx) => {
         // 2. Verify user has enough biscuits

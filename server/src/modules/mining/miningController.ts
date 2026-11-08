@@ -2,31 +2,13 @@ import { Response } from 'express';
 import { prisma } from '../../config/database.js';
 import { AuthenticatedRequest } from '../../middleware/auth.js';
 import { sendSuccess, sendError } from '../../utils/apiResponse.js';
-import { LedgerService } from '../ledger/ledgerService.js';
+import { MiningService } from './miningService.js';
 
 export class MiningController {
   /**
-   * Helper to compute real-time accumulated Poops using server timestamps.
-   */
-  private static calculateAccumulatedPoops(
-    lastSettledAt: Date,
-    ratePerHour: number,
-    unclaimedStored: bigint,
-    maxHours: number = 24
-  ): { unclaimedTotal: bigint; elapsedHours: number } {
-    const now = Date.now();
-    const elapsedMs = Math.max(0, now - lastSettledAt.getTime());
-    const elapsedHours = Math.min(maxHours, elapsedMs / (3600 * 1000));
-    
-    // Exact accrued integer poops
-    const newlyMined = BigInt(Math.floor(elapsedHours * ratePerHour));
-    const unclaimedTotal = unclaimedStored + newlyMined;
-
-    return { unclaimedTotal, elapsedHours };
-  }
-
-  /**
    * GET /api/v1/mining/status
+   * Checks real-time mining speed, auto-settles any completed hours into main balance (Option A),
+   * and returns the exact milliseconds remaining until the next hourly addition.
    */
   public static async getStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
     const userId = req.user?.userId;
@@ -36,36 +18,23 @@ export class MiningController {
     }
 
     try {
-      let settlement = await prisma.miningSettlement.findUnique({
+      // Auto-settle any completed hours into the user's main balance (Option A)
+      const settleResult = await MiningService.settleUserHourlyEarnings(userId);
+
+      const settlement = await prisma.miningSettlement.findUnique({
         where: { userId },
       });
 
-      if (!settlement) {
-        settlement = await prisma.miningSettlement.create({
-          data: {
-            userId,
-            baseRatePerHour: 10,
-            boostRatePerHour: 0,
-            totalRatePerHour: 10,
-            unclaimedPoops: 0n,
-            lastSettledAt: new Date(),
-          },
-        });
-      }
-
-      const { unclaimedTotal } = MiningController.calculateAccumulatedPoops(
-        settlement.lastSettledAt,
-        settlement.totalRatePerHour,
-        settlement.unclaimedPoops,
-        settlement.maxAccumulationHours
-      );
-
       sendSuccess(res, {
-        baseRatePerHour: settlement.baseRatePerHour,
-        boostRatePerHour: settlement.boostRatePerHour,
-        totalRatePerHour: settlement.totalRatePerHour,
-        unclaimedMiningPoops: Number(unclaimedTotal),
-        lastCollectedAt: settlement.lastSettledAt.toISOString(),
+        baseRatePerHour: settlement?.baseRatePerHour ?? 10,
+        boostRatePerHour: settlement?.boostRatePerHour ?? 0,
+        totalRatePerHour: settleResult.totalRatePerHour,
+        settledAmount: settleResult.amountSettled,
+        completedHoursSettled: settleResult.completedHours,
+        newBalance: settleResult.newBalance,
+        lastCollectedAt: settleResult.lastSettledAt.toISOString(),
+        msUntilNextHour: settleResult.msUntilNextHour,
+        nextAdditionAt: settleResult.nextAdditionAt.toISOString(),
       });
     } catch {
       sendError(res, 'Failed to fetch mining status', 500, 'MINING_STATUS_ERROR');
@@ -74,7 +43,7 @@ export class MiningController {
 
   /**
    * POST /api/v1/mining/claim
-   * Settles accrued Poops atomically and resets calculation clock.
+   * Settles completed hours into main balance and resets hourly interval.
    */
   public static async claimEarnings(req: AuthenticatedRequest, res: Response): Promise<void> {
     const userId = req.user?.userId;
@@ -84,55 +53,23 @@ export class MiningController {
     }
 
     try {
-      const result = await prisma.$transaction(async (tx) => {
-        const settlement = await tx.miningSettlement.findUnique({
-          where: { userId },
-        });
+      const result = await MiningService.settleUserHourlyEarnings(userId);
 
-        if (!settlement) {
-          throw new Error('Mining settlement record not found');
-        }
-
-        const { unclaimedTotal } = MiningController.calculateAccumulatedPoops(
-          settlement.lastSettledAt,
-          settlement.totalRatePerHour,
-          settlement.unclaimedPoops,
-          settlement.maxAccumulationHours
-        );
-
-        if (unclaimedTotal <= 0n) {
-          throw new Error('No unclaimed Poops available at this time');
-        }
-
-        // Reset settlement timestamp and unclaimed stored balance to 0
-        await tx.miningSettlement.update({
-          where: { userId },
-          data: {
-            unclaimedPoops: 0n,
-            lastSettledAt: new Date(),
-          },
-        });
-
-        // Credit user balance atomically and write immutable ledger entry
-        const { balanceAfter } = await LedgerService.executeBalanceTransaction(tx, {
-          userId,
-          type: 'MINING_SETTLEMENT',
-          amount: unclaimedTotal,
-          description: `Mining claim of ${unclaimedTotal} Poops (${settlement.totalRatePerHour}/h rate)`,
-          idempotencyKey: `claim_${userId}_${Date.now()}`,
-        });
-
-        return {
-          claimedAmount: Number(unclaimedTotal),
-          newBalance: Number(balanceAfter),
-        };
+      sendSuccess(res, {
+        claimedAmount: result.amountSettled,
+        newBalance: result.newBalance,
+        completedHours: result.completedHours,
+        msUntilNextHour: result.msUntilNextHour,
+        nextAdditionAt: result.nextAdditionAt.toISOString(),
+        message: result.settled
+          ? `Added +${result.amountSettled} Poops to your main balance (${result.completedHours} hr${result.completedHours > 1 ? 's' : ''})!`
+          : 'Hourly mining in progress. Next addition will occur when the hour completes.',
       });
-
-      sendSuccess(res, result);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Claiming failed';
       sendError(res, msg, 400, 'CLAIM_FAILED');
     }
   }
 }
+
 
