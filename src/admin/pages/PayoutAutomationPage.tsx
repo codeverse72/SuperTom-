@@ -681,6 +681,32 @@ export const PayoutAutomationPage: React.FC = () => {
                   </div>
                 )}
 
+                {config?.destinationStatus !== 'VERIFIED' && (
+                  <div className="p-3.5 rounded-2xl bg-amber-950/30 border border-amber-500/30 text-xs space-y-1.5">
+                    <div className="font-bold text-amber-400 flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>One-Time Telegram Step Required:</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      To broadcast payout announcements, add <strong className="text-white">@SuperrTombot</strong> as an Administrator:
+                    </p>
+                    <ol className="text-[11px] text-slate-300 list-decimal list-inside space-y-0.5">
+                      <li>Open <strong className="text-white">{destChannelInput.includes('SuperrTomMining') ? '@SuperrTomMining' : 'your channel'}</strong> in Telegram</li>
+                      <li>Go to <strong>Channel Settings ➜ Administrators ➜ Add Administrator</strong></li>
+                      <li>Search for <strong className="text-amber-300">@SuperrTombot</strong> (SuperTom Earns)</li>
+                      <li>Toggle <strong className="text-emerald-400">"Post Messages"</strong> to ON and tap Save</li>
+                      <li>Click the green <strong>"Verify Permissions"</strong> button above</li>
+                    </ol>
+                  </div>
+                )}
+
+                {config?.destinationStatus === 'VERIFIED' && (
+                  <div className="p-3 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-xs text-emerald-300 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>@SuperrTombot is verified with posting permission. Broadcasts are active!</span>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between gap-2 pt-1">
                   <p className="text-[11px] text-slate-400 leading-relaxed">
                     Supports direct invite links (e.g. <code>https://t.me/+W9ypwO2_Pm0xZTJl</code>). Ensure <strong>@SuperrTombot</strong> is added as Administrator with <strong>"Post Messages"</strong> enabled.

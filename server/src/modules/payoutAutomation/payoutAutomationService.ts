@@ -296,7 +296,7 @@ export class PayoutAutomationService {
             canPostMessages,
             isAdministrator,
             error: !canPostMessages
-              ? 'Bot is not an administrator or lacks "Post Messages" permission in this channel.'
+              ? '@SuperrTombot is not an Administrator in this channel yet! Please open your channel in Telegram -> Channel Settings -> Administrators -> Add @SuperrTombot with "Post Messages" enabled.'
               : undefined,
           };
         }
@@ -542,9 +542,13 @@ export class PayoutAutomationService {
 
     // 5. If Mode A (AUTOMATIC), publish directly to the SuperTom Payout Channel!
     let published = false;
+    let publishError: string | undefined;
     if (config.automationEnabled && config.publishingMode === 'AUTOMATIC') {
       const pubRes = await this.publishAnnouncement(announcement.id, 'AUTOMATED_REFLECTOR');
       published = pubRes.success;
+      if (!pubRes.success) {
+        publishError = pubRes.error;
+      }
     }
 
     return {
@@ -553,6 +557,8 @@ export class PayoutAutomationService {
       published,
       message: published
         ? 'Reference payout reflected and broadcasted directly to SuperTom Payout Channel!'
+        : publishError
+        ? `Reference payout queued, but broadcast failed: ${publishError}`
         : 'Reference payout reflected and queued for 1-click admin approval.',
     };
   }
@@ -726,20 +732,17 @@ export class PayoutAutomationService {
     }
 
     // Resolve channel target
-    let target = params.channelId;
+    const config = await this.getOrCreateConfig();
+    let target = config.destinationChatId || this.normalizeChannelId(params.channelId);
+
     if (target.includes('/+') || target.startsWith('+')) {
-      const config = await this.getOrCreateConfig();
-      if (config.destinationChatId) {
-        target = config.destinationChatId;
-      } else {
-        const detected = await this.detectBotAdminChannels();
-        if (detected.length > 0) {
-          target = detected[0].id;
-          await prisma.payoutChannelConfig.update({
-            where: { id: config.id },
-            data: { destinationChatId: target },
-          });
-        }
+      const detected = await this.detectBotAdminChannels();
+      if (detected.length > 0) {
+        target = detected[0].id;
+        await prisma.payoutChannelConfig.update({
+          where: { id: config.id },
+          data: { destinationChatId: target },
+        });
       }
     }
 
@@ -779,7 +782,11 @@ export class PayoutAutomationService {
         });
         const fallbackData: any = await fallbackRes.json();
         if (!fallbackData.ok) {
-          return { ok: false, error: data.description || 'Telegram API rejected message.' };
+          let errText = fallbackData.description || data.description || 'Telegram API rejected message.';
+          if (errText.includes('bot is not a member of the channel chat') || errText.includes('chat not found') || errText.includes('member list is inaccessible')) {
+            errText = '@SuperrTombot is not added as Administrator in your payout channel yet! Open your channel in Telegram -> Channel Settings -> Administrators -> Add @SuperrTombot with "Post Messages" enabled.';
+          }
+          return { ok: false, error: errText };
         }
         return { ok: true, messageId: fallbackData.result?.message_id };
       }
