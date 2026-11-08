@@ -8,9 +8,12 @@
 
 import { ApiResponse } from './types';
 
-// Sanitize base URL by stripping trailing slashes
+// Sanitize base URL by stripping trailing slashes, default to live Render backend
 const RAW_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-const API_BASE_URL = RAW_BASE_URL ? RAW_BASE_URL.replace(/\/+$/, '') : '/api/v1';
+const PRODUCTION_BACKEND_URL = 'https://supertom-backend.onrender.com/api/v1';
+const API_BASE_URL = (RAW_BASE_URL && RAW_BASE_URL.trim().length > 0)
+  ? RAW_BASE_URL.replace(/\/+$/, '') 
+  : PRODUCTION_BACKEND_URL;
 
 class ApiClient {
   private authToken: string | null = null;
@@ -39,10 +42,10 @@ class ApiClient {
   }
 
   /**
-   * Checks whether an external backend base URL has been configured.
+   * Checks whether the backend is configured (production default is active).
    */
   public isBackendConfigured(): boolean {
-    return Boolean(RAW_BASE_URL && RAW_BASE_URL.trim().length > 0);
+    return import.meta.env.VITE_BACKEND_DISABLED !== 'true';
   }
 
   /**

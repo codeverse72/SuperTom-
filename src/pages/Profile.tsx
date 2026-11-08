@@ -272,7 +272,7 @@ export const Profile: React.FC = () => {
               </div>
               <div className="p-3 rounded-2xl bg-purple-950/60 border border-purple-500/20 flex justify-between">
                 <span className="text-purple-300">Current Production:</span>
-                <span className="font-bold text-emerald-400">{productionRate !== null ? `+${productionRate} Poops / hr` : 'Offline / Pending Backend'}</span>
+                <span className="font-bold text-emerald-400">{productionRate !== null ? `+${productionRate} Poops / hr` : '0 Poops / hr'}</span>
               </div>
               <div className="p-3 rounded-2xl bg-purple-950/60 border border-purple-500/20 flex justify-between">
                 <span className="text-purple-300">Account Rank:</span>

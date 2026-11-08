@@ -142,6 +142,17 @@ export class MissionController {
         let progress = userProgress?.progress ?? 0;
         let total = userProgress?.total ?? 1;
 
+        // Daily mission reset logic (resets at 00:00 UTC)
+        const now = new Date();
+        const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+        const isDaily = m.category === MissionCategory.DAILY;
+        const claimedBeforeToday = userProgress?.claimedAt && new Date(userProgress.claimedAt) < startOfToday;
+
+        if (isDaily && claimedBeforeToday) {
+          status = 'start';
+          progress = 0;
+        }
+
         // Dynamic checks for game actions
         if (status === 'start' || status === 'in_progress') {
           if (m.id === 'm4_invite_3') {
@@ -273,11 +284,16 @@ export class MissionController {
           throw new Error('Mission not started or not completed yet');
         }
 
-        if (userMission.status === 'CLAIMED') {
+        const now = new Date();
+        const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+        const isDaily = userMission.mission.category === MissionCategory.DAILY;
+        const claimedToday = userMission.claimedAt && new Date(userMission.claimedAt) >= startOfToday;
+
+        if (userMission.status === 'CLAIMED' && (!isDaily || claimedToday)) {
           throw new Error('Mission reward has already been claimed');
         }
 
-        if (userMission.status !== 'COMPLETED') {
+        if (userMission.status !== 'COMPLETED' && (!isDaily || userMission.status === 'START')) {
           throw new Error('Mission conditions not yet fulfilled');
         }
 
@@ -292,12 +308,13 @@ export class MissionController {
 
         // 2. Credit Poops via Ledger
         const reward = userMission.mission.rewardPoops;
+        const dateSuffix = isDaily ? `_${startOfToday.toISOString().slice(0, 10)}` : '';
         const { balanceAfter } = await LedgerService.executeBalanceTransaction(tx, {
           userId,
           type: 'MISSION_REWARD',
           amount: reward,
           description: `Reward for completing quest: ${userMission.mission.title}`,
-          idempotencyKey: `mission_${userId}_${missionId}`,
+          idempotencyKey: `mission_${userId}_${missionId}${dateSuffix}`,
         });
 
         return {

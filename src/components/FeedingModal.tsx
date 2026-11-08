@@ -11,16 +11,31 @@ interface FeedingModalProps {
 }
 
 export const FeedingModal: React.FC<FeedingModalProps> = ({ isOpen, onClose, onNavigateToStore }) => {
-  const { biscuitInventory, triggerNotice } = useGame();
+  const { biscuitInventory, feedTom, showToast } = useGame();
   const [selectedBiscuitId, setSelectedBiscuitId] = useState<string>('common');
 
   if (!isOpen) return null;
 
   const currentConfig = BISCUIT_CONFIGS[selectedBiscuitId];
-  const ownedCount = biscuitInventory !== null ? (biscuitInventory[selectedBiscuitId] ?? 0) : '--';
+  const ownedCount = biscuitInventory !== null ? (biscuitInventory[selectedBiscuitId] ?? 0) : 0;
 
   const handleFeed = () => {
-    triggerNotice('Cat Feeding', SYSTEM_MESSAGES.FEEDING_UNAVAILABLE, 'Feeding Unavailable');
+    if (typeof ownedCount === 'number' && ownedCount <= 0) {
+      showToast('No Biscuits', `You don't have any ${currentConfig.name}s. Visit the Store to get biscuits!`, 'info');
+      onClose();
+      onNavigateToStore();
+      return;
+    }
+
+    const success = feedTom(selectedBiscuitId, 1);
+    if (success) {
+      showToast(
+        'Tom Fed!',
+        `Gave 1x ${currentConfig.name} to King Tom! Hourly mining boosted by +${currentConfig.productionBoost}/hr 🚀`,
+        'reward'
+      );
+      onClose();
+    }
   };
 
   return (
@@ -121,8 +136,17 @@ export const FeedingModal: React.FC<FeedingModalProps> = ({ isOpen, onClose, onN
             onClick={handleFeed}
             className="w-full py-3 rounded-2xl btn-gold-3d font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl cursor-pointer"
           >
-            <ServerOff className="w-4 h-4 text-purple-950" />
-            <span>Feed Tom (Backend Offline)</span>
+            {ownedCount > 0 ? (
+              <>
+                <Cookie className="w-4 h-4 text-purple-950" />
+                <span>Feed King Tom (+{currentConfig.productionBoost}/hr)</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 text-purple-950" />
+                <span>Get {currentConfig.name} in Store</span>
+              </>
+            )}
           </button>
 
           <button

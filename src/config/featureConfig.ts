@@ -9,8 +9,8 @@
 
 import { FeatureDefinition, FeatureId, FeatureStatus } from '../types/feature';
 
-// Check environment variables for backend configuration
-const IS_BACKEND_CONFIGURED = Boolean(import.meta.env.VITE_API_BASE_URL);
+// Backend connection is live and active on Render
+const IS_BACKEND_CONFIGURED = import.meta.env.VITE_BACKEND_DISABLED !== 'true';
 
 export const FEATURE_REGISTRY: Record<FeatureId, FeatureDefinition> = {
   auth: {
@@ -24,7 +24,7 @@ export const FEATURE_REGISTRY: Record<FeatureId, FeatureDefinition> = {
   mining: {
     id: 'mining',
     name: 'Poop Mining Services',
-    status: (IS_BACKEND_CONFIGURED && import.meta.env.VITE_FEATURE_MINING === 'true') ? 'AVAILABLE' : 'UNAVAILABLE',
+    status: (IS_BACKEND_CONFIGURED && import.meta.env.VITE_FEATURE_MINING !== 'false') ? 'AVAILABLE' : 'UNAVAILABLE',
     unavailableMessage: 'Mining services are temporarily unavailable.',
     requiresAuth: true,
     requiresBackend: true
@@ -48,7 +48,7 @@ export const FEATURE_REGISTRY: Record<FeatureId, FeatureDefinition> = {
   spin_rewards: {
     id: 'spin_rewards',
     name: 'Spin Rewards',
-    status: (IS_BACKEND_CONFIGURED && import.meta.env.VITE_FEATURE_SPIN === 'true') ? 'AVAILABLE' : 'UNAVAILABLE',
+    status: (IS_BACKEND_CONFIGURED && import.meta.env.VITE_FEATURE_SPIN !== 'false') ? 'AVAILABLE' : 'UNAVAILABLE',
     unavailableMessage: 'Spin rewards are temporarily unavailable.',
     requiresAuth: true,
     requiresBackend: true
@@ -56,7 +56,7 @@ export const FEATURE_REGISTRY: Record<FeatureId, FeatureDefinition> = {
   spin_timer_sync: {
     id: 'spin_timer_sync',
     name: 'Spin Timer Synchronization',
-    status: (IS_BACKEND_CONFIGURED && import.meta.env.VITE_FEATURE_SPIN_SYNC === 'true') ? 'AVAILABLE' : 'UNAVAILABLE',
+    status: (IS_BACKEND_CONFIGURED && import.meta.env.VITE_FEATURE_SPIN_SYNC !== 'false') ? 'AVAILABLE' : 'UNAVAILABLE',
     unavailableMessage: 'Spin timer synchronization is temporarily unavailable.',
     requiresAuth: true,
     requiresBackend: true
@@ -64,7 +64,7 @@ export const FEATURE_REGISTRY: Record<FeatureId, FeatureDefinition> = {
   mission_verification: {
     id: 'mission_verification',
     name: 'Mission Verification',
-    status: (IS_BACKEND_CONFIGURED && import.meta.env.VITE_FEATURE_MISSION_VERIFY === 'true') ? 'AVAILABLE' : 'UNAVAILABLE',
+    status: (IS_BACKEND_CONFIGURED && import.meta.env.VITE_FEATURE_MISSION_VERIFY !== 'false') ? 'AVAILABLE' : 'UNAVAILABLE',
     unavailableMessage: 'Mission verification is currently unavailable.',
     requiresAuth: true,
     requiresBackend: true
@@ -72,7 +72,7 @@ export const FEATURE_REGISTRY: Record<FeatureId, FeatureDefinition> = {
   mission_claiming: {
     id: 'mission_claiming',
     name: 'Mission Reward Claiming',
-    status: (IS_BACKEND_CONFIGURED && import.meta.env.VITE_FEATURE_MISSION_CLAIM === 'true') ? 'AVAILABLE' : 'UNAVAILABLE',
+    status: (IS_BACKEND_CONFIGURED && import.meta.env.VITE_FEATURE_MISSION_CLAIM !== 'false') ? 'AVAILABLE' : 'UNAVAILABLE',
     unavailableMessage: 'Reward claiming is temporarily unavailable.',
     requiresAuth: true,
     requiresBackend: true
@@ -80,7 +80,7 @@ export const FEATURE_REGISTRY: Record<FeatureId, FeatureDefinition> = {
   referral_rewards: {
     id: 'referral_rewards',
     name: 'Referral Rewards',
-    status: (IS_BACKEND_CONFIGURED && import.meta.env.VITE_FEATURE_REFERRALS === 'true') ? 'AVAILABLE' : 'UNAVAILABLE',
+    status: (IS_BACKEND_CONFIGURED && import.meta.env.VITE_FEATURE_REFERRALS !== 'false') ? 'AVAILABLE' : 'UNAVAILABLE',
     unavailableMessage: 'Referral rewards are temporarily unavailable.',
     requiresAuth: true,
     requiresBackend: true
@@ -88,7 +88,7 @@ export const FEATURE_REGISTRY: Record<FeatureId, FeatureDefinition> = {
   withdrawals: {
     id: 'withdrawals',
     name: 'USDT Withdrawals',
-    status: (IS_BACKEND_CONFIGURED && import.meta.env.VITE_FEATURE_WITHDRAWALS === 'true') ? 'AVAILABLE' : 'UNAVAILABLE',
+    status: (IS_BACKEND_CONFIGURED && import.meta.env.VITE_FEATURE_WITHDRAWALS !== 'false') ? 'AVAILABLE' : 'UNAVAILABLE',
     unavailableMessage: 'Withdrawals are temporarily unavailable.',
     requiresAuth: true,
     requiresBackend: true
@@ -96,7 +96,7 @@ export const FEATURE_REGISTRY: Record<FeatureId, FeatureDefinition> = {
   transaction_history: {
     id: 'transaction_history',
     name: 'Transaction History',
-    status: (IS_BACKEND_CONFIGURED && import.meta.env.VITE_FEATURE_HISTORY === 'true') ? 'AVAILABLE' : 'UNAVAILABLE',
+    status: (IS_BACKEND_CONFIGURED && import.meta.env.VITE_FEATURE_HISTORY !== 'false') ? 'AVAILABLE' : 'UNAVAILABLE',
     unavailableMessage: 'No transaction history.',
     requiresAuth: true,
     requiresBackend: true
