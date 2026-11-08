@@ -209,7 +209,11 @@ export const Missions: React.FC = () => {
             <button
               key={cat.id}
               onClick={() => {
-                sound.playTap();
+                if (activeCategory !== cat.id) {
+                  sound.playTabSwitch();
+                } else {
+                  sound.playTap();
+                }
                 setActiveCategory(cat.id);
               }}
               className={`flex-1 py-2 px-2 rounded-xl text-xs font-extrabold tracking-wide transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer ${

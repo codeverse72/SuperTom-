@@ -44,6 +44,51 @@ class SoundController {
     }
   }
 
+  public playTabSwitch() {
+    if (!this.enabled) return;
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+
+      // Primary crisp pop tone
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(520, now);
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.045);
+
+      gain.gain.setValueAtTime(0.14, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.06);
+
+      // Subtle warm harmonic for tactile depth
+      const subOsc = this.ctx.createOscillator();
+      const subGain = this.ctx.createGain();
+
+      subOsc.type = 'triangle';
+      subOsc.frequency.setValueAtTime(320, now);
+      subOsc.frequency.exponentialRampToValueAtTime(440, now + 0.04);
+
+      subGain.gain.setValueAtTime(0.08, now);
+      subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+      subOsc.connect(subGain);
+      subGain.connect(this.ctx.destination);
+
+      subOsc.start(now);
+      subOsc.stop(now + 0.05);
+    } catch {
+      // AudioContext policy suppression fallback
+    }
+  }
+
   public playCoin() {
     if (!this.enabled) return;
     try {

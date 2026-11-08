@@ -10,6 +10,7 @@ import { Payout } from './pages/Payout';
 import { Profile } from './pages/Profile';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useTelegram } from './hooks/useTelegram';
+import { sound } from './utils/sound';
 
 // Lazy-load AdminApp so Telegram Mini App users do not download any admin bundle assets
 const AdminApp = React.lazy(() =>
@@ -74,6 +75,7 @@ export default function App() {
 
   const handleTabChange = (tab: NavTab) => {
     if (tab !== activeTab) {
+      sound.playTabSwitch();
       hapticSelection();
       setActiveTab(tab);
       window.scrollTo({ top: 0, behavior: 'smooth' });

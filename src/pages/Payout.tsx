@@ -29,6 +29,7 @@ import { paymentService } from '../services/paymentService';
 import { QRCode } from '../components/QRCode';
 import { DepositDto } from '../services/types';
 import { CampaignBanner } from '../components/CampaignBanner';
+import { sound } from '../utils/sound';
 
 export interface CurrencyConfig {
   id: string;
@@ -829,6 +830,9 @@ export const Payout: React.FC = () => {
         <button
           type="button"
           onClick={() => {
+            if (activeTab !== 'payout') {
+              sound.playTabSwitch();
+            }
             setActiveTab('payout');
             setWithdrawError(null);
           }}
@@ -845,6 +849,9 @@ export const Payout: React.FC = () => {
         <button
           type="button"
           onClick={() => {
+            if (activeTab !== 'deposit') {
+              sound.playTabSwitch();
+            }
             setActiveTab('deposit');
             setDepositError(null);
           }}
