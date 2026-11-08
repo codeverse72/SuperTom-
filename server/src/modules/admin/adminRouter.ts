@@ -12,6 +12,7 @@ import { AdminTransactionController } from './adminTransactionController.js';
 import { AdminReferralController } from './adminReferralController.js';
 import { AdminAuditLogController } from './adminAuditLogController.js';
 import { AdminCampaignController } from './adminCampaignController.js';
+import { PayoutAutomationController } from '../payoutAutomation/payoutAutomationController.js';
 
 export const adminRouter = Router();
 
@@ -173,4 +174,71 @@ adminRouter.get(
 
 // Audit Trail Logs
 adminRouter.get('/audit-logs', AdminAuditLogController.listLogs);
+
+// === Payout Channel Automation Management ===
+adminRouter.get('/payout-automation/config', PayoutAutomationController.getConfig);
+adminRouter.put(
+  '/payout-automation/config',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  PayoutAutomationController.updateConfig
+);
+adminRouter.post(
+  '/payout-automation/verify-reference',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  PayoutAutomationController.verifyReferenceChannel
+);
+adminRouter.post(
+  '/payout-automation/verify-destination',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  PayoutAutomationController.verifyDestinationChannel
+);
+adminRouter.get('/payout-automation/templates', PayoutAutomationController.listTemplates);
+adminRouter.post(
+  '/payout-automation/templates',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  PayoutAutomationController.createTemplate
+);
+adminRouter.put(
+  '/payout-automation/templates/:id',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  PayoutAutomationController.updateTemplate
+);
+adminRouter.delete(
+  '/payout-automation/templates/:id',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  PayoutAutomationController.deleteTemplate
+);
+adminRouter.post(
+  '/payout-automation/analyze',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  PayoutAutomationController.analyzeMessage
+);
+adminRouter.post(
+  '/payout-automation/preview',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  PayoutAutomationController.previewMessage
+);
+adminRouter.get('/payout-automation/announcements', PayoutAutomationController.listAnnouncements);
+adminRouter.post(
+  '/payout-automation/announcements/:id/publish',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  PayoutAutomationController.publishAnnouncement
+);
+adminRouter.put(
+  '/payout-automation/announcements/:id',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  PayoutAutomationController.editAnnouncement
+);
+adminRouter.post(
+  '/payout-automation/announcements/:id/reject',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  PayoutAutomationController.rejectAnnouncement
+);
+adminRouter.post(
+  '/payout-automation/test-send',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  PayoutAutomationController.testSendAnnouncement
+);
+adminRouter.get('/payout-automation/analytics', PayoutAutomationController.getAnalytics);
+
 

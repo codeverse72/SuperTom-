@@ -346,6 +346,7 @@ model Withdrawal {
   updatedAt       DateTime         @updatedAt
 
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  announcement    PayoutAnnouncement?
 
   @@index([userId])
   @@index([status])
@@ -542,5 +543,95 @@ model CampaignDailyReward {
   @@index([rewardDate])
   @@index([participationId])
 }
+
+// 23. Payout Channel Automation Configuration
+model PayoutChannelConfig {
+  id                   String    @id @default(uuid())
+  referenceChannel     String?   @default("@ReferencePayoutChannel")
+  destinationChannel   String    @default("@SuperTomPayouts")
+  referenceStatus      String    @default("DISCONNECTED") // CONNECTED, DISCONNECTED, ERROR
+  destinationStatus    String    @default("DISCONNECTED") // VERIFIED, PERMISSION_MISSING, DISCONNECTED, ERROR
+  automationEnabled    Boolean   @default(false)
+  publishingMode       String    @default("MANUAL_APPROVAL") // AUTOMATIC, MANUAL_APPROVAL
+  activeTemplateId     String?
+  lastSyncAt           DateTime?
+  lastPublishedAt      DateTime?
+  lastPublishedTxHash  String?
+  lastPublishedAmount  Decimal?  @db.Decimal(18, 4)
+  failedAttemptsCount  Int       @default(0)
+  totalPublishedCount  Int       @default(0)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
+// 24. Payout Announcement Templates
+model PayoutMessageTemplate {
+  id               String               @id @default(uuid())
+  name             String
+  description      String?
+  heading          String               @default("✅ SuperTom Withdrawal Complete")
+  successMessage   String               @default("Payment successfully sent to user on-chain!")
+  footer           String               @default("🐱 Thank you for mining with SuperTom! Join @SuperTomCare for support.")
+  emojis           String               @default("💎,💰,🚀,🐱,✅,🔗")
+  currencyDisplay  String               @default("USDT")
+  showUsd          Boolean              @default(true)
+  showPoops        Boolean              @default(true)
+  showExplorerLink Boolean              @default(true)
+  maskUserAddress  Boolean              @default(true)
+  rawTemplate      String?              @db.Text
+  isDefault        Boolean              @default(false)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  announcements    PayoutAnnouncement[]
+}
+
+// 25. Payout Announcement Records
+model PayoutAnnouncement {
+  id                String                 @id @default(uuid())
+  withdrawalId      String                 @unique
+  userId            String
+  templateId        String?
+  network           String                 @default("TRC20")
+  currency          String                 @default("USDT")
+  amountCrypto      Decimal                @db.Decimal(18, 4)
+  amountUsdt        Decimal                @db.Decimal(18, 4)
+  amountPoops       BigInt
+  walletAddress     String
+  txHash            String
+  explorerUrl       String?
+  recipientMasked   String
+  renderedMessage   String                 @db.Text
+  telegramMessageId BigInt?
+  telegramChatId    String?
+  status            String                 @default("PENDING_APPROVAL") // PENDING_APPROVAL, PUBLISHED, REJECTED, FAILED
+  failureReason     String?
+  publishedAt       DateTime?
+  publishedBy       String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  withdrawal        Withdrawal             @relation(fields: [withdrawalId], references: [id], onDelete: Cascade)
+  template          PayoutMessageTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([txHash])
+}
+
+// 26. Payout Automation Activity & Audit Logs
+model PayoutAutomationLog {
+  id        String   @id @default(uuid())
+  eventType String   // CHANNEL_VERIFIED, ANNOUNCEMENT_PUBLISHED, ANNOUNCEMENT_QUEUED, PUBLISH_FAILED, CONFIG_UPDATED, FORMAT_EXTRACTED
+  status    String   @default("INFO") // INFO, SUCCESS, WARNING, ERROR
+  message   String
+  details   Json?
+  adminId   String?
+  createdAt DateTime @default(now())
+
+  @@index([eventType])
+  @@index([createdAt])
+}
+
 
 

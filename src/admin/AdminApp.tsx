@@ -10,6 +10,7 @@ import { BiscuitsPage } from './pages/BiscuitsPage';
 import { MissionsPage } from './pages/MissionsPage';
 import { SpinPage } from './pages/SpinPage';
 import { PayoutsPage } from './pages/PayoutsPage';
+import { PayoutAutomationPage } from './pages/PayoutAutomationPage';
 import { CampaignPage } from './pages/CampaignPage';
 import { TransactionsPage } from './pages/TransactionsPage';
 import { ReferralsPage } from './pages/ReferralsPage';
@@ -66,6 +67,10 @@ const AdminContent: React.FC = () => {
       title: 'Payouts & Player Deposits',
       subtitle: 'TRON TRC20 manual review pipeline, double-action approvals, and txHash auditing.',
     },
+    payoutAutomation: {
+      title: 'Payout Channel Automation',
+      subtitle: 'Reference channel monitoring, adaptive format extraction, and Telegram payout broadcasting.',
+    },
     campaign: {
       title: '5K Members Achievement Celebration',
       subtitle: 'Manage 30% instant cashback, tiered daily rewards, participant schedules, and batch disbursements.',
@@ -104,6 +109,7 @@ const AdminContent: React.FC = () => {
           {activeTab === 'missions' && <MissionsPage />}
           {activeTab === 'spin' && <SpinPage />}
           {activeTab === 'payouts' && <PayoutsPage />}
+          {activeTab === 'payoutAutomation' && <PayoutAutomationPage />}
           {activeTab === 'campaign' && <CampaignPage />}
           {activeTab === 'transactions' && <TransactionsPage />}
           {activeTab === 'referrals' && <ReferralsPage />}

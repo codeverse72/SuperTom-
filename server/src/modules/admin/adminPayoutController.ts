@@ -5,6 +5,8 @@ import { sendSuccess, sendError } from '../../utils/apiResponse.js';
 import { AuthenticatedAdminRequest, recordAuditLog } from '../../middleware/adminAuth.js';
 import { LedgerService } from '../ledger/ledgerService.js';
 import { CampaignService } from '../campaign/campaignService.js';
+import { PayoutAutomationService } from '../payoutAutomation/payoutAutomationService.js';
+import { logger } from '../../utils/logger.js';
 import { WithdrawalStatus, DepositStatus } from '@prisma/client';
 
 const completeWithdrawalSchema = z.object({
@@ -342,6 +344,11 @@ export class AdminPayoutController {
         previousValue: { status: withdrawal.status },
         newValue: { status: 'COMPLETED', txHash: txHash.trim() },
         req,
+      });
+
+      // Trigger Payout Channel Automation hook (non-blocking for response)
+      PayoutAutomationService.onWithdrawalCompleted(updated.id).catch((err) => {
+        logger.error(`[AdminPayoutController] Payout automation hook failed for withdrawal ${updated.id}:`, err);
       });
 
       sendSuccess(res, {

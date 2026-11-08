@@ -3,17 +3,60 @@ import { prisma } from '../../config/database.js';
 import { env } from '../../config/env.js';
 import { logger } from '../../utils/logger.js';
 import { sendSuccess, sendError } from '../../utils/apiResponse.js';
+import { PayoutAutomationService } from '../payoutAutomation/payoutAutomationService.js';
 
 export class TelegramBotController {
   /**
    * POST /api/v1/bot/webhook
-   * Receives incoming Telegram webhook updates (e.g. /start commands with referral codes).
+   * Receives incoming Telegram webhook updates (e.g. /start commands, channel posts).
    */
   public static async handleWebhook(req: Request, res: Response): Promise<void> {
     // Acknowledge Telegram immediately to prevent timeout retries
     res.status(200).json({ ok: true });
 
     try {
+      // 1. Handle Channel Post updates (for reference payout channel monitoring)
+      const channelPost = req.body?.channel_post;
+      if (channelPost && channelPost.text && channelPost.chat) {
+        try {
+          const config = await prisma.payoutChannelConfig.findFirst();
+          if (config && config.referenceChannel) {
+            const ref = PayoutAutomationService.normalizeChannelId(config.referenceChannel).toLowerCase();
+            const chatUsername = channelPost.chat.username ? `@${channelPost.chat.username}`.toLowerCase() : '';
+            const chatId = channelPost.chat.id.toString();
+
+            if (chatUsername === ref || chatId === ref || config.referenceChannel.includes(chatId)) {
+              const extracted = PayoutAutomationService.analyzeReferenceMessage(channelPost.text);
+              await prisma.payoutAutomationLog.create({
+                data: {
+                  eventType: 'FORMAT_EXTRACTED',
+                  status: 'SUCCESS',
+                  message: `Auto-detected reference post in ${ref}: "${extracted.detectedHeading}"`,
+                  details: {
+                    channelId: chatId,
+                    heading: extracted.detectedHeading,
+                    emojis: extracted.detectedEmojis,
+                    currency: extracted.detectedCurrency,
+                    amount: extracted.detectedAmount,
+                  },
+                },
+              });
+              await prisma.payoutChannelConfig.update({
+                where: { id: config.id },
+                data: {
+                  lastSyncAt: new Date(),
+                  referenceStatus: 'CONNECTED',
+                },
+              });
+              logger.info(`[TelegramBot] Processed reference channel post from ${ref}`);
+            }
+          }
+        } catch (postErr) {
+          logger.error('[TelegramBot] Failed to process channel_post update:', postErr);
+        }
+      }
+
+      // 2. Handle Direct Player Messages (/start, referrals, etc.)
       const message = req.body?.message;
       if (!message || !message.text || !message.chat?.id || !message.from?.id) {
         return;

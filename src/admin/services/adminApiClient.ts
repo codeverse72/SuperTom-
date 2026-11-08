@@ -466,6 +466,235 @@ class AdminApiClient {
       exportedAt: string;
     }>('/campaign/export');
   }
+
+  // === Payout Channel Automation ===
+  public async getPayoutAutomationConfig() {
+    return this.request<{
+      config: {
+        id: string;
+        referenceChannel: string;
+        destinationChannel: string;
+        referenceStatus: string;
+        destinationStatus: string;
+        automationEnabled: boolean;
+        publishingMode: 'AUTOMATIC' | 'MANUAL_APPROVAL';
+        activeTemplateId: string | null;
+        lastSyncAt: string | null;
+        lastPublishedAt: string | null;
+        lastPublishedTxHash: string | null;
+        lastPublishedAmount: number | null;
+        failedAttemptsCount: number;
+        totalPublishedCount: number;
+      };
+      counts: {
+        pendingCount: number;
+        publishedCount: number;
+        failedCount: number;
+        totalTemplates: number;
+      };
+    }>('/payout-automation/config');
+  }
+
+  public async updatePayoutAutomationConfig(data: {
+    referenceChannel?: string;
+    destinationChannel?: string;
+    automationEnabled?: boolean;
+    publishingMode?: 'AUTOMATIC' | 'MANUAL_APPROVAL';
+    activeTemplateId?: string | null;
+  }) {
+    return this.request<{ config: any; message: string }>('/payout-automation/config', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  public async verifyReferenceChannel(channel?: string) {
+    return this.request<{
+      success: boolean;
+      channelId?: string;
+      channelTitle?: string;
+      username?: string;
+      canPostMessages: boolean;
+      isAdministrator: boolean;
+      error?: string;
+    }>('/payout-automation/verify-reference', {
+      method: 'POST',
+      body: JSON.stringify({ channel }),
+    });
+  }
+
+  public async verifyDestinationChannel(channel?: string) {
+    return this.request<{
+      success: boolean;
+      channelId?: string;
+      channelTitle?: string;
+      username?: string;
+      memberCount?: number;
+      canPostMessages: boolean;
+      isAdministrator: boolean;
+      error?: string;
+    }>('/payout-automation/verify-destination', {
+      method: 'POST',
+      body: JSON.stringify({ channel }),
+    });
+  }
+
+  public async getPayoutTemplates() {
+    return this.request<{
+      templates: Array<{
+        id: string;
+        name: string;
+        description: string | null;
+        heading: string;
+        successMessage: string;
+        footer: string;
+        emojis: string;
+        currencyDisplay: string;
+        showUsd: boolean;
+        showPoops: boolean;
+        showExplorerLink: boolean;
+        maskUserAddress: boolean;
+        rawTemplate: string | null;
+        isDefault: boolean;
+        createdAt: string;
+      }>;
+    }>('/payout-automation/templates');
+  }
+
+  public async createPayoutTemplate(data: any) {
+    return this.request<{ template: any; message: string }>('/payout-automation/templates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  public async updatePayoutTemplate(id: string, data: any) {
+    return this.request<{ template: any; message: string }>(`/payout-automation/templates/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  public async deletePayoutTemplate(id: string) {
+    return this.request<{ message: string }>(`/payout-automation/templates/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  public async analyzeReferenceMessage(rawMessage: string) {
+    return this.request<{
+      detectedHeading: string;
+      detectedSuccessIndicator: string;
+      detectedCurrency: string;
+      detectedAmount?: string;
+      detectedUsd?: string;
+      detectedTxHash?: string;
+      detectedExplorerDomain?: string;
+      detectedEmojis: string[];
+      recommendedTemplate: any;
+    }>('/payout-automation/analyze', {
+      method: 'POST',
+      body: JSON.stringify({ rawMessage }),
+    });
+  }
+
+  public async previewPayoutMessage(data: any) {
+    return this.request<{ message: string; explorerUrl: string }>('/payout-automation/preview', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  public async getPayoutAnnouncements(params: { page?: number; limit?: number; status?: string }) {
+    const q = new URLSearchParams();
+    if (params.page) q.set('page', params.page.toString());
+    if (params.limit) q.set('limit', params.limit.toString());
+    if (params.status) q.set('status', params.status);
+    return this.request<{
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+      announcements: Array<{
+        id: string;
+        withdrawalId: string;
+        userId: string;
+        network: string;
+        currency: string;
+        amountCrypto: number;
+        amountUsdt: number;
+        amountPoops: string;
+        walletAddress: string;
+        txHash: string;
+        explorerUrl: string | null;
+        recipientMasked: string;
+        renderedMessage: string;
+        telegramMessageId: string | null;
+        telegramChatId: string | null;
+        status: string;
+        failureReason: string | null;
+        publishedAt: string | null;
+        publishedBy: string | null;
+        createdAt: string;
+        templateName: string;
+        withdrawal?: any;
+      }>;
+    }>(`/payout-automation/announcements?${q.toString()}`);
+  }
+
+  public async publishPayoutAnnouncement(id: string) {
+    return this.request<{ message: string; messageId?: number }>(`/payout-automation/announcements/${id}/publish`, {
+      method: 'POST',
+    });
+  }
+
+  public async editPayoutAnnouncement(id: string, renderedMessage: string) {
+    return this.request<{ announcement: any; message: string }>(`/payout-automation/announcements/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ renderedMessage }),
+    });
+  }
+
+  public async rejectPayoutAnnouncement(id: string, reason?: string) {
+    return this.request<{ announcement: any; message: string }>(`/payout-automation/announcements/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
+
+  public async testSendPayoutAnnouncement() {
+    return this.request<{ message: string; messageId?: number }>('/payout-automation/test-send', {
+      method: 'POST',
+    });
+  }
+
+  public async getPayoutAutomationAnalytics() {
+    return this.request<{
+      stats: {
+        totalAnnouncements: number;
+        publishedAnnouncements: number;
+        pendingAnnouncements: number;
+        failedAnnouncements: number;
+        rejectedAnnouncements: number;
+        failedAttemptsCount: number;
+        totalPublishedCount: number;
+        lastPublishedAt: string | null;
+        lastPublishedAmount: number | null;
+        lastPublishedTxHash: string | null;
+        automationEnabled: boolean;
+        publishingMode: string;
+      };
+      logs: Array<{
+        id: string;
+        eventType: string;
+        status: string;
+        message: string;
+        details: any;
+        adminId: string | null;
+        createdAt: string;
+      }>;
+    }>('/payout-automation/analytics');
+  }
 }
 
 export const adminApi = new AdminApiClient();
