@@ -865,7 +865,8 @@ export class PayoutAutomationService {
           chat_id: target,
           text: params.text,
           parse_mode,
-          disable_web_page_preview: false,
+          disable_web_page_preview: true,
+          link_preview_options: { is_disabled: true },
           reply_markup: { inline_keyboard },
         }),
       });
@@ -879,6 +880,8 @@ export class PayoutAutomationService {
           body: JSON.stringify({
             chat_id: target,
             text: params.text.replace(/<[^>]+>/g, '').replace(/[*_`\[\]()]/g, ''),
+            disable_web_page_preview: true,
+            link_preview_options: { is_disabled: true },
             reply_markup: { inline_keyboard },
           }),
         });
