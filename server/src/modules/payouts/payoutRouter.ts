@@ -12,7 +12,7 @@ payoutRouter.get('/history', requireAuth, PayoutController.getHistory);
 payoutRouter.post('/request', requireAuth, withdrawalLimiter, PayoutController.requestWithdrawal);
 payoutRouter.get('/wallets', requireAuth, PayoutController.getWallets);
 payoutRouter.post('/wallets', requireAuth, PayoutController.saveWallet);
-payoutRouter.get('/treasury-wallets', requireAuth, PayoutController.getTreasuryWallets);
+payoutRouter.get('/treasury-wallets', PayoutController.getTreasuryWallets);
 payoutRouter.get('/deposits', requireAuth, PayoutController.getDeposits);
 payoutRouter.post('/deposits', requireAuth, depositLimiter, PayoutController.submitDeposit);
 payoutRouter.post('/deposits/create', requireAuth, depositLimiter, PayoutController.createDeposit);

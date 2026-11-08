@@ -53,9 +53,9 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
     networkType: 'TON',
     minDepositUsd: 1.0,
     minWithdrawUsd: 0.1,
-    placeholder: 'e.g. UQA64uUd0dZ1JiywxEtHYl1OPjOWEMPAE15N5zq73IamtcW6',
+    placeholder: 'e.g. UQBG6dgDogaxatpbFiVzAFNiByU3E3P1Xsdkt_xyuG4S-gzv',
     hint: 'TON addresses start with "EQ" or "UQ" and contain 48 characters.',
-    defaultTreasuryAddress: 'UQA64uUd0dZ1JiywxEtHYl1OPjOWEMPAE15N5zq73IamtcW6',
+    defaultTreasuryAddress: 'UQBG6dgDogaxatpbFiVzAFNiByU3E3P1Xsdkt_xyuG4S-gzv',
     hasMemoSupport: true,
     walletUriScheme: (addr, _amt, memo) => `ton://transfer/${addr}${memo ? `?text=${encodeURIComponent(memo)}` : ''}`,
     renderIcon: () => (
@@ -74,9 +74,9 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
     networkType: 'EVM',
     minDepositUsd: 1.0,
     minWithdrawUsd: 0.1,
-    placeholder: 'e.g. 0x55d398326f99059fF775485246999027B3197955',
+    placeholder: 'e.g. 0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1',
     hint: 'BEP20 addresses start with "0x" and contain 42 characters.',
-    defaultTreasuryAddress: '0x71C8360216Ac3456952771bEc438F5e85d99623C',
+    defaultTreasuryAddress: '0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1',
     hasMemoSupport: false,
     renderIcon: () => (
       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#009393] to-[#26A17B] flex items-center justify-center text-white shadow-md font-bold text-xl shrink-0">
@@ -92,9 +92,9 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
     networkType: 'TRON',
     minDepositUsd: 1.0,
     minWithdrawUsd: 0.1,
-    placeholder: 'e.g. TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+    placeholder: 'e.g. TJLEgXHdQG3fxwn1UiHVpDoqz29FmJshCv',
     hint: 'TRON addresses start with "T" and contain 34 characters.',
-    defaultTreasuryAddress: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+    defaultTreasuryAddress: 'TJLEgXHdQG3fxwn1UiHVpDoqz29FmJshCv',
     hasMemoSupport: false,
     renderIcon: () => (
       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#009393] to-[#26A17B] flex items-center justify-center text-white shadow-md font-bold text-xl shrink-0">
@@ -110,9 +110,9 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
     networkType: 'EVM',
     minDepositUsd: 1.0,
     minWithdrawUsd: 0.1,
-    placeholder: 'e.g. 0x71C8360216Ac3456952771bEc438F5e85d99623C',
+    placeholder: 'e.g. 0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1',
     hint: 'BNB addresses start with "0x" and contain 42 characters.',
-    defaultTreasuryAddress: '0x71C8360216Ac3456952771bEc438F5e85d99623C',
+    defaultTreasuryAddress: '0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1',
     hasMemoSupport: false,
     renderIcon: () => (
       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#F3BA2F] to-[#D49E17] flex items-center justify-center text-white shadow-md shrink-0">
@@ -130,9 +130,9 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
     networkType: 'TRON',
     minDepositUsd: 1.0,
     minWithdrawUsd: 0.1,
-    placeholder: 'e.g. TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7',
+    placeholder: 'e.g. TJLEgXHdQG3fxwn1UiHVpDoqz29FmJshCv',
     hint: 'TRON addresses start with "T" and contain 34 characters.',
-    defaultTreasuryAddress: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+    defaultTreasuryAddress: 'TJLEgXHdQG3fxwn1UiHVpDoqz29FmJshCv',
     hasMemoSupport: false,
     renderIcon: () => (
       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#EF0027] to-[#B3001B] flex items-center justify-center text-white shadow-md shrink-0">
@@ -150,9 +150,9 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
     networkType: 'SOLANA',
     minDepositUsd: 1.0,
     minWithdrawUsd: 0.1,
-    placeholder: 'e.g. 7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
+    placeholder: 'e.g. ER74j5s2PgVPx9dsT7wqyMSM7RgY4LKzfT9c1NFp92Qk',
     hint: 'Solana addresses are 32-44 characters Base58 encoded.',
-    defaultTreasuryAddress: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
+    defaultTreasuryAddress: 'ER74j5s2PgVPx9dsT7wqyMSM7RgY4LKzfT9c1NFp92Qk',
     hasMemoSupport: false,
     renderIcon: () => (
       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#9945FF] to-[#14F195] flex items-center justify-center text-white shadow-md shrink-0">
@@ -170,9 +170,9 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
     networkType: 'EVM',
     minDepositUsd: 1.0,
     minWithdrawUsd: 0.1,
-    placeholder: 'e.g. 0x71C8360216Ac3456952771bEc438F5e85d99623C',
+    placeholder: 'e.g. 0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1',
     hint: 'Base addresses start with "0x" and contain 42 characters.',
-    defaultTreasuryAddress: '0x71C8360216Ac3456952771bEc438F5e85d99623C',
+    defaultTreasuryAddress: '0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1',
     hasMemoSupport: false,
     renderIcon: () => (
       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0052FF] to-[#0038B8] flex items-center justify-center text-white shadow-md shrink-0">

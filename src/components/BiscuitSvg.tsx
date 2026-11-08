@@ -326,3 +326,4 @@ export const BiscuitSvg: React.FC<BiscuitSvgProps> = ({
     </svg>
   );
 };
+
