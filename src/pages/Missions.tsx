@@ -98,12 +98,18 @@ export const Missions: React.FC = () => {
     if (mission.id === 'm4_invite_3') {
       const botUser = 'SuperrTombot';
       const refCode = user?.referralCode || 'TOMVIP';
-      const shareUrl = `https://t.me/${botUser}?start=${refCode}`;
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(shareUrl);
-        showToast('Referral Link Copied!', 'Share your link with 3 friends to complete this quest.', 'success');
+      const shareUrl = `https://t.me/${botUser}?startapp=${refCode}`;
+      if (mission.status === 'start') {
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(shareUrl);
+        }
+        showToast('Invite Friends', 'Share your link with 3 friends! Rewards unlock when they open the bot.', 'info');
+        verifyMission(mission.id);
+        return;
       }
+      setVerifyingId(mission.id);
       verifyMission(mission.id);
+      setTimeout(() => setVerifyingId(null), 1200);
       return;
     }
 

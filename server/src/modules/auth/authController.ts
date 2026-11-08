@@ -6,6 +6,7 @@ import { signAccessToken, signRefreshToken, hashToken } from '../../utils/crypto
 import { sendSuccess, sendError } from '../../utils/apiResponse.js';
 import { AuthenticatedRequest } from '../../middleware/auth.js';
 import { logger } from '../../utils/logger.js';
+import { LedgerService } from '../ledger/ledgerService.js';
 
 const telegramAuthSchema = z.object({
   initData: z.string().min(1, 'initData is required'),
@@ -50,14 +51,27 @@ export class AuthController {
           // Generate unique 8-character uppercase referral code
           const referralCode = `TOM${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
-          // Check if start_param represents a referrer's referralCode
-          let referrerId: string | null = null;
-          if (start_param) {
-            const referrer = await tx.user.findUnique({
-              where: { referralCode: start_param.trim().toUpperCase() },
-              select: { id: true },
+          // Check if start_param represents a referrer's referralCode, or if a pending attribution exists from Telegram chat /start
+          let effectiveReferralCode: string | null = start_param ? start_param.trim().toUpperCase() : null;
+
+          if (!effectiveReferralCode) {
+            const pending = await tx.pendingReferral.findUnique({
+              where: { telegramId: tgId },
             });
-            if (referrer) {
+            if (pending) {
+              effectiveReferralCode = pending.referralCode;
+              await tx.pendingReferral.delete({ where: { telegramId: tgId } }).catch(() => {});
+            }
+          }
+
+          let referrerId: string | null = null;
+          if (effectiveReferralCode) {
+            const referrer = await tx.user.findUnique({
+              where: { referralCode: effectiveReferralCode },
+              select: { id: true, telegramId: true },
+            });
+            // Strictly enforce no self-referral
+            if (referrer && referrer.telegramId !== tgId) {
               referrerId = referrer.id;
             }
           }
@@ -102,7 +116,7 @@ export class AuthController {
             },
           });
 
-          // Attribute referral bonus if referred
+          // Attribute referral bonus ONLY NOW that the referent user has actually opened the bot
           if (referrerId) {
             await tx.referral.create({
               data: {
@@ -111,30 +125,30 @@ export class AuthController {
                 rewardPoops: 2000n,
                 commissionPercent: 10,
                 totalCommissionPoops: 0n,
+                status: 'REWARDED',
               },
             });
 
-            // Credit referrer with 2,000 Poops bonus
-            const referrerUser = await tx.user.findUnique({
-              where: { id: referrerId },
-              select: { poopsBalance: true },
+            // Credit referrer with 2,000 Poops bonus via double-entry Ledger
+            await LedgerService.executeBalanceTransaction(tx, {
+              userId: referrerId,
+              type: 'REFERRAL_BONUS',
+              amount: 2000n,
+              description: `Referral bonus: @${tgUser.username || tgUser.id} opened SuperTom via your invite`,
+              idempotencyKey: `ref_bonus_${referrerId}_${user.id}`,
             });
-            if (referrerUser) {
-              await tx.user.update({
-                where: { id: referrerId },
-                data: { poopsBalance: referrerUser.poopsBalance + 2000n },
-              });
-              await tx.ledgerEntry.create({
-                data: {
-                  userId: referrerId,
-                  type: 'REFERRAL_BONUS',
-                  amount: 2000n,
-                  balanceBefore: referrerUser.poopsBalance,
-                  balanceAfter: referrerUser.poopsBalance + 2000n,
-                  description: `Referral bonus for inviting @${tgUser.username || tgUser.id}`,
-                },
-              });
-            }
+
+            // Credit the new player who opened the bot with a 1,000 Poop welcome starter bonus!
+            const welcomeBonus = 1000n;
+            const { balanceAfter: newPlayerBalance } = await LedgerService.executeBalanceTransaction(tx, {
+              userId: user.id,
+              type: 'REFERRAL_BONUS',
+              amount: welcomeBonus,
+              description: `Welcome bonus for joining via referral code ${effectiveReferralCode}`,
+              idempotencyKey: `ref_welcome_${user.id}_${referrerId}`,
+            });
+
+            user.poopsBalance = newPlayerBalance;
           }
         } else {
           // Update profile info on return if changed in Telegram

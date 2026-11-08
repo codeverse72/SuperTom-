@@ -215,16 +215,48 @@ export class MissionController {
       }
 
       let verified = false;
+      let missionProgress = 0;
+      let missionTotal = 1;
 
       if (mission.verificationType === 'TELEGRAM_CHANNEL' || mission.verificationType === 'TELEGRAM_GROUP') {
         const targetChat = mission.channelId || '@SuperTomAnnouncements';
         verified = await MissionController.verifyTelegramChatMember(targetChat, telegramId);
+        missionProgress = verified ? 1 : 0;
+        missionTotal = 1;
       } else if (mission.verificationType === 'EXTERNAL_LINK') {
         // Link clicking verified upon callback
         verified = true;
+        missionProgress = 1;
+        missionTotal = 1;
+      } else if (mission.verificationType === 'GAME_ACTION') {
+        if (mission.id === 'm4_invite_3') {
+          // Strictly verify that at least 3 referred players have opened the bot and joined!
+          const refereeCount = await prisma.user.count({
+            where: { referredById: userId },
+          });
+          missionProgress = Math.min(3, refereeCount);
+          missionTotal = 3;
+          verified = refereeCount >= 3;
+        } else if (mission.id === 'm5_feed_5_biscuits') {
+          const feedCount = await prisma.feedingEvent.count({
+            where: { userId },
+          });
+          missionProgress = Math.min(5, feedCount);
+          missionTotal = 5;
+          verified = feedCount >= 5;
+        } else if (mission.id === 'm6_reach_level_5') {
+          const player = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { level: true },
+          });
+          const lvl = player?.level ?? 1;
+          missionProgress = Math.min(5, lvl);
+          missionTotal = 5;
+          verified = lvl >= 5;
+        }
       }
 
-      const newStatus = verified ? 'COMPLETED' : 'VERIFY';
+      const newStatus = verified ? 'COMPLETED' : missionProgress > 0 ? 'IN_PROGRESS' : 'START';
 
       await prisma.userMission.upsert({
         where: { userId_missionId: { userId, missionId } },
@@ -232,12 +264,13 @@ export class MissionController {
           userId,
           missionId,
           status: newStatus,
-          progress: verified ? 1 : 0,
-          total: 1,
+          progress: missionProgress,
+          total: missionTotal,
         },
         update: {
           status: newStatus,
-          progress: verified ? 1 : 0,
+          progress: missionProgress,
+          total: missionTotal,
         },
       });
 
@@ -251,8 +284,8 @@ export class MissionController {
           category: mission.category.toLowerCase(),
           icon: mission.icon,
           status: newStatus.toLowerCase(),
-          progress: verified ? 1 : 0,
-          total: 1,
+          progress: missionProgress,
+          total: missionTotal,
         },
       });
     } catch {

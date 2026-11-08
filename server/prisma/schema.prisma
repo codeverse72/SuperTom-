@@ -317,6 +317,17 @@ model Referral {
   @@index([refereeId])
 }
 
+// 12b. Pending Referral Attributions (recorded when referee taps /start in Telegram chat before opening bot)
+model PendingReferral {
+  id           String   @id @default(uuid())
+  telegramId   BigInt   @unique
+  referralCode String
+  createdAt    DateTime @default(now())
+
+  @@index([telegramId])
+  @@index([referralCode])
+}
+
 // 13. USDT TRC20/TON/BEP20 Withdrawal Requests
 model Withdrawal {
   id              String           @id @default(uuid())

@@ -279,7 +279,7 @@ export function getTelegramBotUsername(): string {
  */
 export function generateReferralLink(referralCode: string): string {
   const botUsername = getTelegramBotUsername();
-  return `https://t.me/${botUsername}?start=${encodeURIComponent(referralCode)}`;
+  return `https://t.me/${botUsername}?startapp=${encodeURIComponent(referralCode)}`;
 }
 
 /**
