@@ -70,7 +70,7 @@ class ApiClient {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s request timeout
+      const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s request timeout for cloud cold starts
 
       const response = await fetch(url, {
         ...options,

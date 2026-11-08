@@ -12,6 +12,7 @@ interface AuthResponseData {
   token?: string;
   refreshToken?: string;
   user?: UserSessionDto;
+  initialState?: UserSessionDto['initialState'];
 }
 
 export const authService = {
@@ -25,9 +26,13 @@ export const authService = {
       if (res.data.token) {
         apiClient.setAuthToken(res.data.token);
       }
+      const userData = res.data.user;
+      if (userData && res.data.initialState) {
+        userData.initialState = res.data.initialState;
+      }
       return {
         success: true,
-        data: res.data.user,
+        data: userData,
       };
     }
 

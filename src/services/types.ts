@@ -24,6 +24,22 @@ export interface UserSessionDto {
   levelTitle: string;
   referralCode: string;
   createdAt: string;
+  initialState?: {
+    balancePoops: number;
+    mining?: {
+      baseRatePerHour: number;
+      boostRatePerHour: number;
+      totalRatePerHour: number;
+      unclaimedPoops: number;
+      lastSettledAt: string;
+    } | null;
+    spinState?: {
+      currentMilestone: number;
+      targetTimestamp: number;
+      claimedMilestones: number[];
+      cycleCount: number;
+    } | null;
+  };
 }
 
 export interface BalanceDto {

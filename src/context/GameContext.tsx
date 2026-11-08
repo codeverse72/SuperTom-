@@ -130,21 +130,65 @@ const DEFAULT_FED: Record<string, number> = {
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Server-owned state defaults to null / empty: No fake user data, no fake balances
-  const [balance, setBalance] = useState<number | null>(null);
-  const [productionRate, setProductionRate] = useState<number | null>(null);
+  // Cached initial state for instant 0ms first render (stale-while-revalidate)
+  const [balance, setBalanceState] = useState<number | null>(() => {
+    const cached = localStorage.getItem('supertom_cache_balance');
+    return cached !== null ? Number(cached) : null;
+  });
+  const [productionRate, setProductionRateState] = useState<number | null>(() => {
+    const cached = localStorage.getItem('supertom_cache_rate');
+    return cached !== null ? Number(cached) : 10;
+  });
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [biscuitInventory, setBiscuitInventory] = useState<Record<string, number> | null>(null);
   const [biscuitFedCount, setBiscuitFedCount] = useState<Record<string, number>>(DEFAULT_FED);
 
-  // Spin timer milestones (starts with clean 4h 12m target for UI matching reference)
-  const [spinState, setSpinState] = useState<SpinState>(() => ({
-    currentMilestone: 1,
-    targetTimestamp: Date.now() + (4 * 3600 + 12 * 60 + 36) * 1000,
-    claimedMilestones: [1, 2], // Node 1 and Node 2 checkmarked visually per reference image
-    cycleCount: 1
-  }));
+  // Spin timer milestones (starts with cached or default milestone)
+  const [spinState, setSpinStateInternal] = useState<SpinState>(() => {
+    const cached = localStorage.getItem('supertom_cache_spin');
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch {}
+    }
+    return {
+      currentMilestone: 1,
+      targetTimestamp: Date.now() + 2 * 3600 * 1000,
+      claimedMilestones: [],
+      cycleCount: 1
+    };
+  });
+
+  const setBalance = useCallback((val: number | null | ((prev: number | null) => number | null)) => {
+    setBalanceState((prev) => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (next !== null) {
+        localStorage.setItem('supertom_cache_balance', next.toString());
+      }
+      return next;
+    });
+  }, []);
+
+  const setProductionRate = useCallback((val: number | null | ((prev: number | null) => number | null)) => {
+    setProductionRateState((prev) => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (next !== null) {
+        localStorage.setItem('supertom_cache_rate', next.toString());
+      }
+      return next;
+    });
+  }, []);
+
+  const setSpinState = useCallback((val: SpinState | ((prev: SpinState) => SpinState)) => {
+    setSpinStateInternal((prev) => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      try {
+        localStorage.setItem('supertom_cache_spin', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, []);
 
   // Clean initial missions catalogue
   const [missions, setMissions] = useState<Mission[]>(INITIAL_MISSIONS);
@@ -225,50 +269,59 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             createdAt: authRes.data.createdAt,
           });
 
-          // Fetch Live Balance
-          userService.getBalance().then((bRes) => {
-            if (bRes.success && bRes.data) {
-              setBalance(bRes.data.balancePoops);
+          // 1. INSTANT HYDRATION FROM AUTH (0 additional roundtrips!)
+          if (authRes.data.initialState) {
+            setBalance(authRes.data.initialState.balancePoops);
+            if (authRes.data.initialState.mining) {
+              setProductionRate(authRes.data.initialState.mining.totalRatePerHour);
             }
-          });
-
-          // Fetch Live Mining Rate
-          if (isFeatureAvailable('mining')) {
-            miningService.getMiningStatus().then((mRes) => {
-              if (mRes.success && mRes.data) {
-                setProductionRate(mRes.data.totalRatePerHour);
+            if (authRes.data.initialState.spinState) {
+              setSpinState({
+                currentMilestone: (authRes.data.initialState.spinState.currentMilestone as 1 | 2 | 3) || 1,
+                targetTimestamp: authRes.data.initialState.spinState.targetTimestamp,
+                claimedMilestones: authRes.data.initialState.spinState.claimedMilestones,
+                cycleCount: authRes.data.initialState.spinState.cycleCount,
+              });
+            }
+          } else {
+            // Fallback for older auth responses
+            userService.getBalance().then((bRes) => {
+              if (bRes.success && bRes.data) {
+                setBalance(bRes.data.balancePoops);
               }
             });
+            if (isFeatureAvailable('mining')) {
+              miningService.getMiningStatus().then((mRes) => {
+                if (mRes.success && mRes.data) {
+                  setProductionRate(mRes.data.totalRatePerHour);
+                }
+              });
+            }
+            if (isFeatureAvailable('spin_rewards')) {
+              spinService.getSpinStatus().then((sRes) => {
+                if (sRes.success && sRes.data) {
+                  setSpinState({
+                    currentMilestone: sRes.data.currentMilestone,
+                    targetTimestamp: sRes.data.nextUnlockTimestamp,
+                    claimedMilestones: sRes.data.claimedMilestones,
+                    cycleCount: sRes.data.cycleCount,
+                  });
+                }
+              });
+            }
           }
 
-          // Fetch Live Inventory
-          if (isFeatureAvailable('biscuit_purchases')) {
-            storeService.getInventory().then((iRes) => {
-              if (iRes.success && iRes.data) {
-                setBiscuitInventory(iRes.data);
-              }
-            });
-          }
-
-          // Fetch Live Spin Cooldowns
-          if (isFeatureAvailable('spin_rewards')) {
-            spinService.getSpinStatus().then((sRes) => {
-              if (sRes.success && sRes.data) {
-                setSpinState({
-                  currentMilestone: sRes.data.currentMilestone,
-                  targetTimestamp: sRes.data.nextUnlockTimestamp,
-                  claimedMilestones: sRes.data.claimedMilestones,
-                  cycleCount: sRes.data.cycleCount,
-                });
-              }
-            });
-          }
-
-          // Fetch Live Missions
-          missionService.getMissions().then((misRes) => {
-            if (misRes.success && misRes.data && misRes.data.length > 0) {
+          // 2. PARALLEL SECONDARY DATA (Inventory & Missions in one parallel promise)
+          Promise.allSettled([
+            isFeatureAvailable('biscuit_purchases') ? storeService.getInventory() : Promise.resolve(null),
+            missionService.getMissions(),
+          ]).then(([invRes, misRes]) => {
+            if (invRes.status === 'fulfilled' && invRes.value && 'data' in invRes.value && invRes.value.data) {
+              setBiscuitInventory(invRes.value.data as Record<string, number>);
+            }
+            if (misRes.status === 'fulfilled' && misRes.value && 'data' in misRes.value && misRes.value.data && (misRes.value.data as any[]).length > 0) {
               setMissions(
-                misRes.data.map((m) => ({
+                (misRes.value.data as any[]).map((m: any) => ({
                   id: m.id,
                   title: m.title,
                   description: m.description,
@@ -280,43 +333,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   total: m.total,
                   badge: m.badge,
                   actionUrl: m.actionUrl,
-                }))
-              );
-            }
-          });
-
-          // Fetch Live Withdrawals
-          paymentService.getHistory().then((wRes) => {
-            if (wRes.success && wRes.data) {
-              setWithdrawals(
-                wRes.data.map((w) => ({
-                  id: w.id,
-                  timestamp: w.timestamp,
-                  amountPoops: w.amountPoops,
-                  amountUsdt: w.amountUsdt,
-                  walletAddress: w.walletAddress,
-                  network: w.network,
-                  status: w.status,
-                  txHash: w.txHash,
-                  rejectionReason: w.rejectionReason,
-                }))
-              );
-            }
-          });
-
-          // Fetch Live Deposits
-          paymentService.getDeposits().then((dRes) => {
-            if (dRes.success && dRes.data) {
-              setDeposits(
-                dRes.data.map((d) => ({
-                  id: d.id,
-                  timestamp: d.timestamp,
-                  amountUsdt: d.amountUsdt,
-                  amountPoops: d.amountPoops,
-                  network: d.network,
-                  status: d.status,
-                  txHash: d.txHash,
-                  notes: d.notes,
                 }))
               );
             }

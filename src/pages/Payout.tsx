@@ -240,7 +240,7 @@ export const Payout: React.FC = () => {
     return (balance / 2000).toFixed(4);
   }, [balance]);
 
-  // Fetch Treasury Wallets on mount
+  // Fetch Treasury Wallets & refresh user payout data on mount
   useEffect(() => {
     paymentService.getTreasuryWallets().then((res) => {
       if (res.success && res.data?.wallets) {
@@ -251,7 +251,9 @@ export const Payout: React.FC = () => {
         setTreasuryWallets(map);
       }
     });
-  }, []);
+    refreshWithdrawals();
+    refreshDeposits();
+  }, [refreshWithdrawals, refreshDeposits]);
 
   // When selectedPlanForDeposit is set from Store, open deposit view with that currency
   useEffect(() => {

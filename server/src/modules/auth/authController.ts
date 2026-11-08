@@ -189,6 +189,22 @@ export class AuthController {
           referralCode: result.user.referralCode,
           createdAt: result.user.createdAt.toISOString(),
         },
+        initialState: {
+          balancePoops: Number(result.user.poopsBalance),
+          mining: result.user.miningSettlement ? {
+            baseRatePerHour: result.user.miningSettlement.baseRatePerHour,
+            boostRatePerHour: result.user.miningSettlement.boostRatePerHour,
+            totalRatePerHour: result.user.miningSettlement.totalRatePerHour,
+            unclaimedPoops: Number(result.user.miningSettlement.unclaimedPoops),
+            lastSettledAt: result.user.miningSettlement.lastSettledAt.toISOString(),
+          } : null,
+          spinState: result.user.spinState ? {
+            currentMilestone: result.user.spinState.currentMilestone,
+            targetTimestamp: result.user.spinState.nextUnlockAt.getTime(),
+            claimedMilestones: JSON.parse(result.user.spinState.claimedMilestones || '[]'),
+            cycleCount: result.user.spinState.cycleCount,
+          } : null,
+        },
       });
     } catch (err: unknown) {
       logger.error('Failed to authenticate Telegram user:', err);
