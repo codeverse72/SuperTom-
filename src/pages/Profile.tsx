@@ -7,7 +7,6 @@ import {
   Check, 
   Volume2, 
   VolumeX, 
-  RotateCcw, 
   HelpCircle, 
   Info, 
   ChevronRight, 
@@ -30,7 +29,6 @@ export const Profile: React.FC = () => {
     productionRate, 
     soundEnabled, 
     toggleSound, 
-    resetDemoData, 
     showToast 
   } = useGame();
 
@@ -192,26 +190,7 @@ export const Profile: React.FC = () => {
           </button>
         </div>
 
-        {/* 4. Reset Local State */}
-        <div className="p-3.5 rounded-2xl flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-300">
-              <RotateCcw className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-sm font-bold text-white font-display">Clear Local Cache</span>
-              <p className="text-[11px] text-purple-300/70">Reset cached preferences and sound settings</p>
-            </div>
-          </div>
-          <button
-            onClick={resetDemoData}
-            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-500/20 hover:bg-rose-500 hover:text-white text-rose-300 border border-rose-500/30 transition-all cursor-pointer"
-          >
-            Clear
-          </button>
-        </div>
-
-        {/* 5. 24/7 Live Customer Support */}
+        {/* 4. 24/7 Live Customer Support */}
         <a
           href="https://t.me/SuperTomCare"
           target="_blank"
