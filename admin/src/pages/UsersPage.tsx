@@ -40,6 +40,7 @@ export const UsersPage: React.FC = () => {
   const [adjustAmount, setAdjustAmount] = useState<number>(0);
   const [adjustReason, setAdjustReason] = useState<string>('');
   const [isSubmittingAdjust, setIsSubmittingAdjust] = useState(false);
+  const [adjustError, setAdjustError] = useState<string | null>(null);
 
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
@@ -88,17 +89,19 @@ export const UsersPage: React.FC = () => {
 
   const handleAdjustBalance = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!balanceModalUser || adjustAmount === 0 || !adjustReason) return;
+    if (!balanceModalUser || adjustAmount === 0 || !adjustReason.trim()) return;
+    setAdjustError(null);
     setIsSubmittingAdjust(true);
-    const res = await adminApi.adjustUserBalance(balanceModalUser.id, adjustAmount, adjustReason);
+    const res = await adminApi.adjustUserBalance(balanceModalUser.id, adjustAmount, adjustReason.trim());
     setIsSubmittingAdjust(false);
     if (res.success) {
       setBalanceModalUser(null);
       setAdjustAmount(0);
       setAdjustReason('');
+      setAdjustError(null);
       fetchUsers();
     } else {
-      alert(res.error || 'Failed to adjust balance');
+      setAdjustError(res.error || 'Failed to adjust balance');
     }
   };
 
@@ -220,6 +223,7 @@ export const UsersPage: React.FC = () => {
                               setBalanceModalUser(u);
                               setAdjustAmount(0);
                               setAdjustReason('');
+                              setAdjustError(null);
                             }}
                             title="Audited Balance Adjustment"
                             className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-purple-900/40 transition-colors"
@@ -410,6 +414,12 @@ export const UsersPage: React.FC = () => {
         maxWidth="md"
       >
         <form onSubmit={handleAdjustBalance} className="space-y-4 text-xs">
+          {adjustError && (
+            <div className="p-3 rounded-xl bg-rose-950/70 border border-rose-500/40 text-rose-300 text-xs">
+              {adjustError}
+            </div>
+          )}
+
           <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-500/30 text-amber-300">
             Current balance:{' '}
             <strong className="font-mono">{balanceModalUser?.poopsBalance.toLocaleString()} Poops</strong>

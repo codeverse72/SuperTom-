@@ -13,7 +13,7 @@ const statusSchema = z.object({
 
 const adjustBalanceSchema = z.object({
   amountPoops: z.number().int().refine((val) => val !== 0, 'Amount cannot be 0'),
-  reason: z.string().min(3, 'Audit reason required'),
+  reason: z.string().min(1, 'Audit reason is required'),
 });
 
 export class AdminUserController {
@@ -246,7 +246,8 @@ export class AdminUserController {
 
     const parse = adjustBalanceSchema.safeParse(req.body);
     if (!parse.success) {
-      sendError(res, 'Invalid adjustment parameters', 422, 'VALIDATION_ERROR', parse.error.format());
+      const errorMsg = parse.error.issues[0]?.message || 'Invalid adjustment parameters';
+      sendError(res, errorMsg, 422, 'VALIDATION_ERROR', parse.error.format());
       return;
     }
 
