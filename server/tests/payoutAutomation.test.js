@@ -141,5 +141,21 @@ describe('Payout Channel Automation Suite', () => {
       );
     });
   });
+
+  describe('6. Direct Reference Message Adaptation (Tesla -> SuperTom)', () => {
+    test('should replace all variations of Tesla with SuperTom and preserve HTML and explorer links', () => {
+      const rawSample = `<b>✅ Tesla Withdrawal Complete</b><br/><br/>🔹 Amount: 2.823622 USDT<br/>🔹 In USD: &#036;2.83<br/>🌐 TxId: <a href="https://bscscan.com/tx/0x1360" target="_blank" onclick="return false;">0x136 ... a239e</a><br/>Bot: @TeslaFarmBot Channel: https://t.me/TeslaMiningPayouts`;
+      const adapted = PayoutAutomationService.adaptReferencePostText(rawSample);
+
+      assert.ok(adapted.includes('<b>✅ SuperTom Withdrawal Complete</b>'));
+      assert.ok(adapted.includes('🔹 Amount: 2.823622 USDT'));
+      assert.ok(adapted.includes('🔹 In USD: $2.83'));
+      assert.ok(adapted.includes('<a href="https://bscscan.com/tx/0x1360">0x136 ... a239e</a>'));
+      assert.ok(adapted.includes('@SuperrTombot'));
+      assert.ok(adapted.includes('SuperrTomMining'));
+      assert.ok(!adapted.includes('Tesla'));
+      assert.ok(!adapted.includes('target="_blank"'));
+    });
+  });
 });
 

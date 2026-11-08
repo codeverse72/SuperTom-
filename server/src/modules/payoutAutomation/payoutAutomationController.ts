@@ -46,7 +46,6 @@ export class PayoutAutomationController {
    */
   public static async getConfig(req: AuthenticatedAdminRequest, res: Response): Promise<void> {
     try {
-      await PayoutAutomationService.ensureDefaultTemplates();
       const config = await PayoutAutomationService.getOrCreateConfig();
 
       const [pendingCount, publishedCount, failedCount, totalTemplates] = await Promise.all([
@@ -251,7 +250,6 @@ export class PayoutAutomationController {
    */
   public static async listTemplates(req: AuthenticatedAdminRequest, res: Response): Promise<void> {
     try {
-      await PayoutAutomationService.ensureDefaultTemplates();
       const templates = await prisma.payoutMessageTemplate.findMany({
         orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
       });

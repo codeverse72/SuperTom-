@@ -833,7 +833,7 @@ export const PayoutAutomationPage: React.FC = () => {
                     onChange={(e) => setSelectedTemplateId(e.target.value || null)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-purple-950/50 border border-purple-500/30 text-white text-xs font-sans focus:outline-none focus:border-purple-400"
                   >
-                    <option value="">Default (SuperTom Classic Gold)</option>
+                    <option value="">Mirror Reference Channel (Tesla ➔ SuperTom)</option>
                     {templates.map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.name} {t.isDefault ? '(Default)' : ''}
@@ -841,7 +841,7 @@ export const PayoutAutomationPage: React.FC = () => {
                     ))}
                   </select>
                   <p className="text-xs text-slate-400">
-                    Determines heading, emojis, currency, and footer formatting for all incoming payout broadcasts.
+                    Mirrors the exact reference channel message format with SuperTom branding. If you create a custom template, you can select it here.
                   </p>
                 </div>
               </div>
@@ -1039,56 +1039,75 @@ export const PayoutAutomationPage: React.FC = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {templates.map((tmpl) => (
-              <div
-                key={tmpl.id}
-                className="p-5 rounded-2xl bg-[#0F0821] border border-purple-900/30 space-y-3 relative group"
-              >
-                <div className="flex items-center justify-between">
-                  <h4 className="font-extrabold text-white text-sm font-display">{tmpl.name}</h4>
-                  {tmpl.isDefault && <Badge status="ACTIVE" />}
-                </div>
-                <p className="text-xs text-slate-400">{tmpl.description || 'Custom payout style'}</p>
-
-                <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/20 text-xs font-mono text-slate-300 whitespace-pre-wrap max-h-40 overflow-y-auto">
-                  <div className="font-bold text-amber-300">{tmpl.heading}</div>
-                  <div className="text-[11px] text-purple-200/80 mt-1">{tmpl.footer}</div>
-                </div>
-
-                <div className="flex items-center justify-between pt-2">
-                  <button
-                    onClick={() => {
-                      setSelectedTemplateId(tmpl.id);
-                      handleSaveConfig();
-                    }}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      selectedTemplateId === tmpl.id
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-purple-950/60 text-purple-300 hover:bg-purple-800'
-                    }`}
-                  >
-                    {selectedTemplateId === tmpl.id ? 'Active' : 'Set as Active'}
-                  </button>
-
-                  {!tmpl.isDefault && (
-                    <button
-                      onClick={async () => {
-                        if (window.confirm(`Delete template "${tmpl.name}"?`)) {
-                          await adminApi.deletePayoutTemplate(tmpl.id);
-                          loadTemplates();
-                        }
-                      }}
-                      className="text-xs text-rose-400 hover:text-rose-300 p-1"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
+          {templates.length === 0 ? (
+            <div className="p-12 rounded-3xl bg-[#0F0821] border border-purple-900/40 text-center space-y-3">
+              <div className="w-12 h-12 mx-auto rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300">
+                <Layers className="w-6 h-6" />
               </div>
-            ))}
-          </div>
+              <h4 className="text-sm font-extrabold text-white">No Custom Templates</h4>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                Payout automation is configured to mirror reference channel messages directly (adapting &quot;Tesla&quot; ➔ &quot;SuperTom&quot;). Whenever you want to create a custom layout, click &quot;Create New Template&quot;.
+              </p>
+              <button
+                onClick={() => setIsCreatingTemplate(true)}
+                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer inline-flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Create New Template</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {templates.map((tmpl) => (
+                <div
+                  key={tmpl.id}
+                  className="p-5 rounded-2xl bg-[#0F0821] border border-purple-900/30 space-y-3 relative group"
+                >
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-extrabold text-white text-sm font-display">{tmpl.name}</h4>
+                    {tmpl.isDefault && <Badge status="ACTIVE" />}
+                  </div>
+                  <p className="text-xs text-slate-400">{tmpl.description || 'Custom payout style'}</p>
+
+                  <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/20 text-xs font-mono text-slate-300 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                    <div className="font-bold text-amber-300">{tmpl.heading}</div>
+                    <div className="text-[11px] text-purple-200/80 mt-1">{tmpl.footer}</div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2">
+                    <button
+                      onClick={() => {
+                        setSelectedTemplateId(tmpl.id);
+                        handleSaveConfig();
+                      }}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        selectedTemplateId === tmpl.id
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-purple-950/60 text-purple-300 hover:bg-purple-800'
+                      }`}
+                    >
+                      {selectedTemplateId === tmpl.id ? 'Active' : 'Set as Active'}
+                    </button>
+
+                    {!tmpl.isDefault && (
+                      <button
+                        onClick={async () => {
+                          if (window.confirm(`Delete template "${tmpl.name}"?`)) {
+                            await adminApi.deletePayoutTemplate(tmpl.id);
+                            loadTemplates();
+                          }
+                        }}
+                        className="text-xs text-rose-400 hover:text-rose-300 p-1"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Create Template Modal */}
           {isCreatingTemplate && (
