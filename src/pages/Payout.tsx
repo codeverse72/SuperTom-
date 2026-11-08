@@ -19,7 +19,8 @@ import {
   Gift,
   ArrowLeft,
   Cpu,
-  Cookie
+  Cookie,
+  Headphones
 } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { formatNumber, poopsToUsdt } from '../utils/probability';
@@ -753,14 +754,29 @@ export const Payout: React.FC = () => {
           )}
 
           {depositStatus === 'PAYMENT_DETECTED' ? (
-            <div className="p-3 rounded-xl bg-indigo-950/70 border border-indigo-500/40 text-center space-y-1">
+            <div className="p-3.5 rounded-xl bg-indigo-950/70 border border-indigo-500/40 text-center space-y-2">
               <div className="text-xs font-bold text-indigo-300 flex items-center justify-center gap-1.5">
                 <Clock className="w-4 h-4 text-indigo-400 animate-spin" />
                 <span>Payment Proof Under Review</span>
               </div>
-              <p className="text-[11px] text-slate-300">
+              <p className="text-[11px] text-slate-300 leading-relaxed">
                 Your transaction hash has been sent to the Admin Panel. Your Poops will be credited as soon as an Admin approves the on-chain transfer!
               </p>
+              <a
+                href="https://t.me/SuperTomCare"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => {
+                  if (window.Telegram?.WebApp?.openTelegramLink) {
+                    e.preventDefault();
+                    window.Telegram.WebApp.openTelegramLink('https://t.me/SuperTomCare');
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 hover:text-emerald-200 text-[11px] font-bold transition-all cursor-pointer"
+              >
+                <Headphones className="w-3.5 h-3.5" />
+                <span>Need fast-track verification? Contact @SuperTomCare</span>
+              </a>
             </div>
           ) : (
             <button
@@ -1106,6 +1122,26 @@ export const Payout: React.FC = () => {
             </p>
           )
         )}
+
+        {/* 24/7 Official Support Link */}
+        <div className="pt-3 border-t border-cyan-900/30 flex items-center justify-between text-xs text-slate-400">
+          <span className="text-[11px] text-slate-400">Questions about deposits or payouts?</span>
+          <a
+            href="https://t.me/SuperTomCare"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => {
+              if (window.Telegram?.WebApp?.openTelegramLink) {
+                e.preventDefault();
+                window.Telegram.WebApp.openTelegramLink('https://t.me/SuperTomCare');
+              }
+            }}
+            className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
+          >
+            <Headphones className="w-3.5 h-3.5" />
+            <span>@SuperTomCare</span>
+          </a>
+        </div>
       </div>
     </div>
   );

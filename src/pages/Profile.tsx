@@ -14,7 +14,9 @@ import {
   Sparkles,
   Users,
   Trophy,
-  Cookie
+  Cookie,
+  Headphones,
+  ExternalLink
 } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { useTelegram } from '../hooks/useTelegram';
@@ -209,7 +211,37 @@ export const Profile: React.FC = () => {
           </button>
         </div>
 
-        {/* 5. Help & Support */}
+        {/* 5. 24/7 Live Customer Support */}
+        <a
+          href="https://t.me/SuperTomCare"
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => {
+            if (window.Telegram?.WebApp?.openTelegramLink) {
+              e.preventDefault();
+              window.Telegram.WebApp.openTelegramLink('https://t.me/SuperTomCare');
+            }
+          }}
+          className="w-full p-3.5 rounded-2xl flex items-center justify-between hover:bg-purple-900/30 transition-all text-left cursor-pointer group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform">
+              <Headphones className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold text-white font-display">Customer Support</span>
+                <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  @SuperTomCare
+                </span>
+              </div>
+              <p className="text-[11px] text-purple-300/70">24/7 Live Agent & Payout Help</p>
+            </div>
+          </div>
+          <ExternalLink className="w-4 h-4 text-emerald-400" />
+        </a>
+
+        {/* 6. Help & Support */}
         <button
           onClick={() => setActiveModal('faq')}
           className="w-full p-3.5 rounded-2xl flex items-center justify-between hover:bg-purple-900/30 transition-all text-left"
@@ -364,6 +396,32 @@ export const Profile: React.FC = () => {
               <button onClick={() => setActiveModal(null)} className="text-purple-300 hover:text-white p-1">✕</button>
             </div>
             <div className="py-4 space-y-3 text-xs leading-relaxed">
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/60 to-purple-950/60 border border-emerald-500/30 flex items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                    <Headphones className="w-4 h-4" />
+                    <span>Need Help? Contact Support</span>
+                  </div>
+                  <p className="text-[11px] text-purple-200/80 mt-0.5">
+                    Live 24/7 assistance on Telegram at <span className="text-emerald-300 font-mono font-bold">@SuperTomCare</span>
+                  </p>
+                </div>
+                <a
+                  href="https://t.me/SuperTomCare"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => {
+                    if (window.Telegram?.WebApp?.openTelegramLink) {
+                      e.preventDefault();
+                      window.Telegram.WebApp.openTelegramLink('https://t.me/SuperTomCare');
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-[11px] shrink-0 transition-transform active:scale-95 cursor-pointer shadow-md"
+                >
+                  Chat Now
+                </a>
+              </div>
+
               <div className="p-3 rounded-2xl bg-purple-950/60 border border-purple-500/20">
                 <h4 className="font-bold text-amber-300">How do I mine Poops?</h4>
                 <p className="text-purple-200/80 mt-1">
