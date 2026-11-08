@@ -140,16 +140,51 @@ export class PayoutAutomationService {
     const token = env.TELEGRAM_BOT_TOKEN;
     if (!token || token === 'TEST_BOT_TOKEN_PLACEHOLDER') return [];
 
+    const channels: Map<string, { id: string; title: string; type: string }> = new Map();
+
+    // 1. Check existing stored channel in config
+    try {
+      const config = await prisma.payoutChannelConfig.findFirst();
+      if (config?.destinationChatId && config.destinationChatId.startsWith('-')) {
+        channels.set(config.destinationChatId, {
+          id: config.destinationChatId,
+          title: config.destinationChannel || 'SuperTom Payout Channel',
+          type: 'channel',
+        });
+      }
+    } catch {
+      // Optional
+    }
+
+    // 2. Check if webhook is active before attempting getUpdates (getUpdates deletes active webhooks)
+    try {
+      const infoRes = await fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`);
+      const infoData: any = await infoRes.json();
+      if (infoData.ok && infoData.result?.url) {
+        // Webhook is active; avoid calling getUpdates to prevent webhook deletion
+        return Array.from(channels.values());
+      }
+    } catch {
+      // Continue
+    }
+
     try {
       const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates?offset=-25`);
       const data: any = await res.json();
-      if (!data.ok || !Array.isArray(data.result)) return [];
-
-      const channels: Map<string, { id: string; title: string; type: string }> = new Map();
-      for (const update of data.result) {
-        if (update.my_chat_member?.chat) {
-          const c = update.my_chat_member.chat;
-          if (c.type === 'channel' || c.type === 'supergroup') {
+      if (data.ok && Array.isArray(data.result)) {
+        for (const update of data.result) {
+          if (update.my_chat_member?.chat) {
+            const c = update.my_chat_member.chat;
+            if (c.type === 'channel' || c.type === 'supergroup') {
+              channels.set(c.id.toString(), {
+                id: c.id.toString(),
+                title: c.title || c.username || c.id.toString(),
+                type: c.type,
+              });
+            }
+          }
+          if (update.channel_post?.chat) {
+            const c = update.channel_post.chat;
             channels.set(c.id.toString(), {
               id: c.id.toString(),
               title: c.title || c.username || c.id.toString(),
@@ -157,18 +192,10 @@ export class PayoutAutomationService {
             });
           }
         }
-        if (update.channel_post?.chat) {
-          const c = update.channel_post.chat;
-          channels.set(c.id.toString(), {
-            id: c.id.toString(),
-            title: c.title || c.username || c.id.toString(),
-            type: c.type,
-          });
-        }
       }
       return Array.from(channels.values());
     } catch {
-      return [];
+      return Array.from(channels.values());
     }
   }
 

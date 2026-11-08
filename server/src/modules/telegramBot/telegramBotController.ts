@@ -5,10 +5,310 @@ import { logger } from '../../utils/logger.js';
 import { sendSuccess, sendError } from '../../utils/apiResponse.js';
 import { PayoutAutomationService } from '../payoutAutomation/payoutAutomationService.js';
 
+interface TelegramUser {
+  id: number | bigint;
+  is_bot?: boolean;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+  language_code?: string;
+}
+
 export class TelegramBotController {
   /**
+   * Escape special characters for Telegram HTML parse_mode
+   */
+  public static escapeHtml(input?: string | null): string {
+    if (!input) return '';
+    return input
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  /**
+   * Resolve destination URL for the SuperTom Mini App
+   */
+  public static resolveMiniAppUrl(refCode?: string | null): string {
+    const baseAppUrl = (env.FRONTEND_URL && env.FRONTEND_URL !== '*')
+      ? env.FRONTEND_URL.split(',')[0].trim()
+      : 'https://super-tom.vercel.app';
+
+    if (refCode && refCode.trim().length > 0) {
+      return `${baseAppUrl}?startapp=${encodeURIComponent(refCode.trim())}`;
+    }
+    return baseAppUrl;
+  }
+
+  /**
+   * Resolve public Telegram link for SuperTom Payouts Channel
+   */
+  public static async resolvePayoutChannelUrl(): Promise<string> {
+    try {
+      const config = await prisma.payoutChannelConfig.findFirst();
+      if (config?.destinationChannel) {
+        const dest = config.destinationChannel.trim();
+        if (dest.startsWith('https://t.me/') || dest.startsWith('http://t.me/')) {
+          return dest;
+        }
+        if (dest.startsWith('@')) {
+          return `https://t.me/${dest.slice(1)}`;
+        }
+        if (!dest.startsWith('-') && !dest.startsWith('+')) {
+          return `https://t.me/${dest}`;
+        }
+      }
+    } catch {
+      // Fallback
+    }
+    return 'https://t.me/SuperrTomMining';
+  }
+
+  /**
+   * Resolve Telegram Customer Support link
+   */
+  public static resolveSupportUrl(): string {
+    const support = process.env.SUPPORT_TELEGRAM_USERNAME || 'SuperTomCare';
+    const clean = support.startsWith('@') ? support.slice(1) : support;
+    return `https://t.me/${clean}`;
+  }
+
+  /**
+   * Ensure Webhook is registered with Telegram API on server boot
+   */
+  public static async ensureWebhookRegistered(): Promise<void> {
+    const token = env.TELEGRAM_BOT_TOKEN;
+    if (!token || token === 'TEST_BOT_TOKEN_PLACEHOLDER') return;
+
+    try {
+      const webhookUrl = 'https://supertom-backend.onrender.com/api/v1/bot/webhook';
+      const infoRes = await fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`);
+      const infoData: any = await infoRes.json();
+
+      if (infoData.ok && infoData.result?.url === webhookUrl) {
+        logger.info(`[TelegramBot] Webhook verified and active: ${webhookUrl}`);
+        return;
+      }
+
+      logger.info(`[TelegramBot] Registering Telegram webhook: ${webhookUrl}...`);
+      const setRes = await fetch(
+        `https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(webhookUrl)}&drop_pending_updates=false`
+      );
+      const setData: any = await setRes.json();
+      if (setData.ok) {
+        logger.info(`[TelegramBot] Webhook successfully set to ${webhookUrl}`);
+      } else {
+        logger.warn(`[TelegramBot] setWebhook returned:`, setData);
+      }
+    } catch (err) {
+      logger.error(`[TelegramBot] Failed to verify/register webhook on startup:`, err);
+    }
+  }
+
+  /**
+   * Core Handler: Responds to Telegram /start command with dynamic user info & inline buttons
+   */
+  public static async handleStartCommand(params: {
+    chatId: number | string;
+    from: TelegramUser;
+    text: string;
+  }): Promise<{ ok: boolean; messageId?: number; error?: string }> {
+    const token = env.TELEGRAM_BOT_TOKEN;
+    if (!token || token === 'TEST_BOT_TOKEN_PLACEHOLDER') {
+      return { ok: false, error: 'TELEGRAM_BOT_TOKEN is not configured.' };
+    }
+
+    const fromId = BigInt(params.from.id);
+    const firstName = this.escapeHtml(params.from.first_name || 'Miner');
+    const chatId = params.chatId.toString();
+
+    // 1. Extract optional referral code from "/start <refCode>"
+    const parts = params.text.trim().split(/\s+/);
+    const rawRefCode = parts.length > 1 ? parts[1].trim().toUpperCase() : null;
+
+    let validReferralCode: string | null = null;
+    let referrerName: string | null = null;
+
+    // 2. Check if user already exists in Supabase
+    let user = await prisma.user.findUnique({
+      where: { telegramId: fromId },
+      select: {
+        id: true,
+        telegramId: true,
+        username: true,
+        firstName: true,
+        lastName: true,
+        poopsBalance: true,
+        level: true,
+        referralCode: true,
+        accountStatus: true,
+        createdAt: true,
+      },
+    });
+
+    const isReturningUser = !!user;
+
+    // 3. Referral handling for new users
+    if (!isReturningUser && rawRefCode) {
+      try {
+        const referrer = await prisma.user.findUnique({
+          where: { referralCode: rawRefCode },
+          select: { id: true, telegramId: true, username: true, firstName: true },
+        });
+
+        if (referrer && referrer.telegramId !== fromId) {
+          validReferralCode = rawRefCode;
+          referrerName = referrer.firstName || (referrer.username ? `@${referrer.username}` : 'a fellow feline miner');
+
+          // Record pending referral attribution in Supabase
+          await prisma.pendingReferral.upsert({
+            where: { telegramId: fromId },
+            create: {
+              telegramId: fromId,
+              referralCode: validReferralCode,
+            },
+            update: {
+              referralCode: validReferralCode,
+            },
+          });
+          logger.info(`[TelegramBot] Pending referral stored: TG ${fromId} -> Code ${validReferralCode}`);
+        }
+      } catch (refErr) {
+        logger.warn('[TelegramBot] Referral lookup failed:', refErr);
+      }
+    }
+
+    // 4. Update profile details for existing users if changed on Telegram (without resetting balances/progress)
+    if (isReturningUser && user) {
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            username: params.from.username || user.username,
+            firstName: params.from.first_name || user.firstName,
+            lastName: params.from.last_name || user.lastName,
+          },
+        });
+      } catch {
+        // Non-blocking profile update
+      }
+    }
+
+    // 5. Build dynamic personalized welcome message with Telegram HTML formatting
+    const welcomeHtmlLines: string[] = [
+      `🐱 <b>WELCOME TO SUPERTOM!</b>`,
+      ``,
+    ];
+
+    if (isReturningUser) {
+      welcomeHtmlLines.push(`👋 Welcome back, <b>${firstName}</b>! 👑`);
+      welcomeHtmlLines.push(`🎉 <i>Your mining empire is active and generating rewards!</i>`);
+      welcomeHtmlLines.push(``);
+      welcomeHtmlLines.push(`💎 <b>Feed Tom with biscuits</b>, increase your mining rate, complete missions and collect rewards.`);
+    } else {
+      welcomeHtmlLines.push(`👋 Welcome, <b>${firstName}</b>!`);
+      welcomeHtmlLines.push(`🎉 <i>Your journey to earning Poops starts here!</i>`);
+      if (validReferralCode && referrerName) {
+        welcomeHtmlLines.push(``);
+        welcomeHtmlLines.push(`👑 <i>Invited by ${this.escapeHtml(referrerName)}! Your starter bonus is ready to claim.</i>`);
+      }
+      welcomeHtmlLines.push(``);
+      welcomeHtmlLines.push(`💎 <b>Feed Tom with biscuits</b>, increase your mining rate, complete missions and collect rewards.`);
+    }
+
+    welcomeHtmlLines.push(``);
+    welcomeHtmlLines.push(`<b>🚀 WHAT YOU CAN DO:</b>`);
+    welcomeHtmlLines.push(``);
+    welcomeHtmlLines.push(`🍪 <b>Feed Tom</b> — Increase your Poop production.`);
+    welcomeHtmlLines.push(`🎡 <b>Spin &amp; Earn</b> — Unlock exciting spin rewards.`);
+    welcomeHtmlLines.push(`🏆 <b>Missions</b> — Complete tasks and earn Poops.`);
+    welcomeHtmlLines.push(`💰 <b>Payouts</b> — Request withdrawals according to the platform's rules.`);
+    welcomeHtmlLines.push(`👥 <b>Referrals</b> — Invite friends and grow your rewards.`);
+    welcomeHtmlLines.push(``);
+    welcomeHtmlLines.push(isReturningUser
+      ? `👇 <b>Tap "Open SuperTom" below to resume mining!</b>`
+      : `👇 <b>Tap "Open SuperTom" below to start mining!</b>`
+    );
+
+    const messageText = welcomeHtmlLines.join('\n');
+
+    // 6. Build interactive inline buttons (Row 1: Mini App, Row 2: Payout Channel + Support)
+    const miniAppUrl = this.resolveMiniAppUrl(validReferralCode);
+    const payoutChannelUrl = await this.resolvePayoutChannelUrl();
+    const supportUrl = this.resolveSupportUrl();
+
+    const inlineKeyboard = [
+      [
+        {
+          text: '🚀 Open SuperTom',
+          web_app: { url: miniAppUrl },
+        },
+      ],
+      [
+        {
+          text: '💰 Payout Channel',
+          url: payoutChannelUrl,
+        },
+        {
+          text: '🆘 Support',
+          url: supportUrl,
+        },
+      ],
+    ];
+
+    // 7. Dispatch message via Telegram Bot API
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: messageText,
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+          reply_markup: {
+            inline_keyboard: inlineKeyboard,
+          },
+        }),
+      });
+
+      const data: any = await res.json();
+
+      if (!data.ok) {
+        // Fallback: Retry with plain text stripped of HTML tags
+        logger.warn('[TelegramBot] HTML sendMessage failed, retrying plain text:', data.description);
+        const fallbackRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: messageText.replace(/<[^>]+>/g, ''),
+            disable_web_page_preview: true,
+            reply_markup: {
+              inline_keyboard: inlineKeyboard,
+            },
+          }),
+        });
+        const fallbackData: any = await fallbackRes.json();
+        if (!fallbackData.ok) {
+          logger.error('[TelegramBot] Fallback sendMessage also failed:', fallbackData);
+          return { ok: false, error: fallbackData.description || 'Failed to deliver message' };
+        }
+        return { ok: true, messageId: fallbackData.result?.message_id };
+      }
+
+      logger.info(`[TelegramBot] Sent welcome message to TG user ${fromId} (${firstName})`);
+      return { ok: true, messageId: data.result?.message_id };
+    } catch (err: unknown) {
+      logger.error('[TelegramBot] Network error delivering welcome message:', err);
+      return { ok: false, error: err instanceof Error ? err.message : 'Network error' };
+    }
+  }
+
+  /**
    * POST /api/v1/bot/webhook
-   * Receives incoming Telegram webhook updates (e.g. /start commands, channel posts).
+   * Receives incoming Telegram webhook updates (/start commands, channel posts, etc.)
    */
   public static async handleWebhook(req: Request, res: Response): Promise<void> {
     // Acknowledge Telegram immediately to prevent timeout retries
@@ -56,82 +356,21 @@ export class TelegramBotController {
         }
       }
 
-      // 2. Handle Direct Player Messages (/start, referrals, etc.)
+      // 2. Handle Direct Player Messages (/start, commands)
       const message = req.body?.message;
       if (!message || !message.text || !message.chat?.id || !message.from?.id) {
         return;
       }
 
       const text = message.text.trim();
-      const chatId = message.chat.id;
-      const fromId = BigInt(message.from.id);
 
-      // Handle /start commands (e.g., "/start" or "/start TOM12345")
+      // Handle /start commands (e.g. "/start", "/start TOM12345")
       if (text.startsWith('/start')) {
-        const parts = text.split(/\s+/);
-        const refCode = parts[1]?.trim().toUpperCase();
-
-        let isValidReferral = false;
-        if (refCode) {
-          // Check if referral code belongs to a valid player (and not self)
-          const referrer = await prisma.user.findUnique({
-            where: { referralCode: refCode },
-            select: { id: true, telegramId: true, username: true },
-          });
-
-          if (referrer && referrer.telegramId !== fromId) {
-            isValidReferral = true;
-            // Record pending referral attribution.
-            // NOTE: No reward is given yet! Reward is ONLY awarded when the user actually opens the bot.
-            await prisma.pendingReferral.upsert({
-              where: { telegramId: fromId },
-              create: {
-                telegramId: fromId,
-                referralCode: refCode,
-              },
-              update: {
-                referralCode: refCode,
-              },
-            });
-            logger.info(`[TelegramBot] Pending referral stored for TG ${fromId} -> Code ${refCode}`);
-          }
-        }
-
-        const appUrl = (env.FRONTEND_URL && env.FRONTEND_URL !== '*')
-          ? env.FRONTEND_URL.split(',')[0].trim()
-          : 'https://super-tom.vercel.app';
-
-        const directAppUrl = refCode && isValidReferral
-          ? `${appUrl}?startapp=${encodeURIComponent(refCode)}`
-          : appUrl;
-
-        const welcomeText = isValidReferral
-          ? `👑 *Welcome to SuperTom!* 🐱\n\n🎉 *You were invited by a fellow feline!* Tap below to open SuperTom, activate your starter bonus, and begin mining with King Tom! 🚀`
-          : `👑 *Welcome to SuperTom Mining Game!* 🐱\n\nStart your royal feline journey: mine Poops, spin the Lucky Wheel, and earn USDT rewards!\n\nTap below to play:`;
-
-        if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_BOT_TOKEN !== 'TEST_BOT_TOKEN_PLACEHOLDER') {
-          await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: chatId,
-              text: welcomeText,
-              parse_mode: 'Markdown',
-              reply_markup: {
-                inline_keyboard: [
-                  [
-                    {
-                      text: '🚀 Open SuperTom',
-                      web_app: { url: directAppUrl },
-                    },
-                  ],
-                ],
-              },
-            }),
-          }).catch((err) => {
-            logger.error('[TelegramBot] Failed to send Telegram welcome message:', err);
-          });
-        }
+        await TelegramBotController.handleStartCommand({
+          chatId: message.chat.id,
+          from: message.from,
+          text,
+        });
       }
     } catch (err) {
       logger.error('[TelegramBot] Error processing webhook update:', err);
@@ -145,14 +384,14 @@ export class TelegramBotController {
   public static async setWebhook(req: Request, res: Response): Promise<void> {
     try {
       const webhookUrl = req.body?.webhookUrl || `${req.protocol}://${req.get('host')}/api/v1/bot/webhook`;
-      
+
       if (!env.TELEGRAM_BOT_TOKEN || env.TELEGRAM_BOT_TOKEN === 'TEST_BOT_TOKEN_PLACEHOLDER') {
         sendError(res, 'TELEGRAM_BOT_TOKEN not configured', 400, 'BOT_TOKEN_MISSING');
         return;
       }
 
       const tgRes = await fetch(
-        `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/setWebhook?url=${encodeURIComponent(webhookUrl)}`
+        `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/setWebhook?url=${encodeURIComponent(webhookUrl)}&drop_pending_updates=false`
       );
       const data = await tgRes.json();
       sendSuccess(res, { webhookUrl, telegramResponse: data });
@@ -162,4 +401,3 @@ export class TelegramBotController {
     }
   }
 }
-

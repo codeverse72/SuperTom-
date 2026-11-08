@@ -4,12 +4,16 @@ import { connectDatabase, prisma } from './config/database.js';
 import { logger } from './utils/logger.js';
 import { CampaignService } from './modules/campaign/campaignService.js';
 import { PayoutAutomationService } from './modules/payoutAutomation/payoutAutomationService.js';
+import { TelegramBotController } from './modules/telegramBot/telegramBotController.js';
 
 async function bootstrap() {
   const app = createApp();
 
   // Attempt database connection
   await connectDatabase();
+
+  // Verify and register Telegram Bot Webhook
+  await TelegramBotController.ensureWebhookRegistered();
 
   const server = app.listen(env.PORT, env.HOST, () => {
     logger.info(`👑 SuperTom Backend Server running on http://${env.HOST}:${env.PORT}`);
