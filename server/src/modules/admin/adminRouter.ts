@@ -11,6 +11,7 @@ import { AdminPayoutController } from './adminPayoutController.js';
 import { AdminTransactionController } from './adminTransactionController.js';
 import { AdminReferralController } from './adminReferralController.js';
 import { AdminAuditLogController } from './adminAuditLogController.js';
+import { AdminCampaignController } from './adminCampaignController.js';
 
 export const adminRouter = Router();
 
@@ -151,6 +152,24 @@ adminRouter.get('/transactions', AdminTransactionController.listTransactions);
 
 // Referral Program Management
 adminRouter.get('/referrals', AdminReferralController.getReferralStats);
+
+// 5K Celebration Campaign Management
+adminRouter.get('/campaign', AdminCampaignController.getCampaignConfig);
+adminRouter.put(
+  '/campaign',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  AdminCampaignController.updateCampaignConfig
+);
+adminRouter.post(
+  '/campaign/process-rewards',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  AdminCampaignController.triggerProcessDailyRewards
+);
+adminRouter.get(
+  '/campaign/export',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  AdminCampaignController.exportParticipants
+);
 
 // Audit Trail Logs
 adminRouter.get('/audit-logs', AdminAuditLogController.listLogs);

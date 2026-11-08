@@ -14,6 +14,7 @@ import { missionRouter } from './modules/missions/missionRouter.js';
 import { referralRouter } from './modules/referrals/referralRouter.js';
 import { payoutRouter } from './modules/payouts/payoutRouter.js';
 import { adminRouter } from './modules/admin/adminRouter.js';
+import { campaignRouter } from './modules/campaign/campaignRouter.js';
 import { swaggerDocument } from './docs/swagger.js';
 import { sendSuccess } from './utils/apiResponse.js';
 
@@ -72,6 +73,7 @@ export function createApp(): Express {
   apiV1.use('/referrals', referralRouter);
   apiV1.use('/payouts', payoutRouter);
   apiV1.use('/admin', adminRouter);
+  apiV1.use('/campaign', campaignRouter);
 
   app.use('/api/v1', apiV1);
 

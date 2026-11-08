@@ -388,6 +388,84 @@ class AdminApiClient {
       logs: AuditLogItem[];
     }>(`/audit-logs?${q.toString()}`);
   }
+  // === 5K Celebration Campaign ===
+  public async getCampaignConfig() {
+    return this.request<{
+      campaign: {
+        id: string;
+        key: string;
+        title: string;
+        description: string;
+        isActive: boolean;
+        minDepositAmount: number;
+        maxDepositCap: number;
+        cashbackPercentage: number;
+        dailyRewardPoops: number;
+        minRewardDays: number;
+        maxRewardDays: number;
+        allowMultipleCashbacks: boolean;
+        conversionRatePoopsPerUsd: number;
+        startsAt: string;
+        endsAt: string | null;
+      };
+      stats: {
+        totalEnrolled: number;
+        activeSchedules: number;
+        completedSchedules: number;
+        totalCashbackPoopsDistributed: number;
+        totalDailyPoopsDistributed: number;
+        totalPoopsDistributed: number;
+      };
+      participants: Array<{
+        id: string;
+        userId: string;
+        userTelegramId: string;
+        username: string | null;
+        qualifyingDepositAmount: number;
+        cashbackPoops: number;
+        totalRewardDays: number;
+        daysClaimed: number;
+        remainingDays: number;
+        totalDailyPoopsCredited: number;
+        status: string;
+        createdAt: string;
+        nextRewardAt: string | null;
+      }>;
+    }>('/campaign');
+  }
+
+  public async updateCampaignConfig(data: {
+    isActive?: boolean;
+    minDepositAmount?: number;
+    maxDepositCap?: number;
+    cashbackPercentage?: number;
+    dailyRewardPoops?: number;
+    minRewardDays?: number;
+    maxRewardDays?: number;
+    allowMultipleCashbacks?: boolean;
+    startsAt?: string;
+    endsAt?: string | null;
+  }) {
+    return this.request<{ campaign: any; message: string }>('/campaign', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  public async triggerProcessDailyRewards() {
+    return this.request<{ processedCount: number; message: string }>('/campaign/process-rewards', {
+      method: 'POST',
+    });
+  }
+
+  public async exportCampaignParticipants() {
+    return this.request<{
+      campaign: any;
+      stats: any;
+      participants: any[];
+      exportedAt: string;
+    }>('/campaign/export');
+  }
 }
 
 export const adminApi = new AdminApiClient();

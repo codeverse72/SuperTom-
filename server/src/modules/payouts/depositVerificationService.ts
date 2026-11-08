@@ -2,6 +2,7 @@ import { prisma } from '../../config/database.js';
 import { env } from '../../config/env.js';
 import { LedgerService } from '../ledger/ledgerService.js';
 import { logger } from '../../utils/logger.js';
+import { CampaignService } from '../campaign/campaignService.js';
 
 export interface CryptoPriceMap {
   [currency: string]: number; // price in USD
@@ -178,6 +179,17 @@ Your account balance has been updated immediately!`;
           confirmedAt: new Date(),
         },
       });
+
+      // 2.5 Process 5K Members Celebration Campaign Enrollment & 30% Instant Cashback
+      try {
+        await CampaignService.processDepositForCampaign(tx, {
+          id: deposit.id,
+          userId: deposit.userId,
+          amountUsdt: deposit.amountUsdt,
+        });
+      } catch (cErr) {
+        logger.error('[DepositVerification] Campaign processing error:', cErr);
+      }
 
       // 3. Dispatch Telegram Notification
       if (deposit.user?.telegramId) {

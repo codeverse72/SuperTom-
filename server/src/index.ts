@@ -2,6 +2,7 @@ import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { connectDatabase, prisma } from './config/database.js';
 import { logger } from './utils/logger.js';
+import { CampaignService } from './modules/campaign/campaignService.js';
 
 async function bootstrap() {
   const app = createApp();
@@ -15,9 +16,23 @@ async function bootstrap() {
     logger.info(`🩺 Health check live on http://${env.HOST}:${env.PORT}/health`);
   });
 
+  // 5K Celebration Campaign: Automated Daily Reward Scheduler
+  // Runs every 5 minutes on Render, checking for eligible daily rewards across all participants
+  const campaignSchedulerInterval = setInterval(async () => {
+    try {
+      const res = await CampaignService.processScheduledDailyRewards();
+      if (res.processedCount > 0) {
+        logger.info(`[CampaignScheduler] Auto-credited ${res.processedCount} daily rewards (+${res.totalPoopsAwarded.toLocaleString()} Poops).`);
+      }
+    } catch (schedErr) {
+      logger.error('[CampaignScheduler] Error in daily reward job:', schedErr);
+    }
+  }, 5 * 60 * 1000);
+
   // Graceful shutdown handling for Render deployments
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}. Initiating graceful shutdown...`);
+    clearInterval(campaignSchedulerInterval);
     server.close(async () => {
       logger.info('HTTP server closed.');
       try {

@@ -4,6 +4,7 @@ import { prisma } from '../../config/database.js';
 import { sendSuccess, sendError } from '../../utils/apiResponse.js';
 import { AuthenticatedAdminRequest, recordAuditLog } from '../../middleware/adminAuth.js';
 import { LedgerService } from '../ledger/ledgerService.js';
+import { CampaignService } from '../campaign/campaignService.js';
 import { WithdrawalStatus, DepositStatus } from '@prisma/client';
 
 const completeWithdrawalSchema = z.object({
@@ -481,6 +482,17 @@ export class AdminPayoutController {
           idempotencyKey: `dep_conf_${deposit.id}`,
         });
 
+        // 1.5 Process 5K Members Celebration Campaign Enrollment & 30% Instant Cashback
+        try {
+          await CampaignService.processDepositForCampaign(tx, {
+            id: deposit.id,
+            userId: deposit.userId,
+            amountUsdt: deposit.amountUsdt,
+          });
+        } catch (cErr) {
+          console.error('[AdminPayout] Campaign processing error in confirmDeposit:', cErr);
+        }
+
         // 2. Adjust mining speed if a plan boost applies
         if (appliedBoost > 0) {
           await tx.miningSettlement.update({
@@ -576,6 +588,17 @@ export class AdminPayoutController {
           description: `Admin deposit credit of $${amountUsdt} USDT (${amountPoops} Poops). Reason: ${notes}`,
           idempotencyKey: `dep_manual_${deposit.id}`,
         });
+
+        // 2.5 Process 5K Members Celebration Campaign Enrollment & 30% Instant Cashback
+        try {
+          await CampaignService.processDepositForCampaign(tx, {
+            id: deposit.id,
+            userId: targetUser.id,
+            amountUsdt: deposit.amountUsdt,
+          });
+        } catch (cErr) {
+          console.error('[AdminPayout] Campaign processing error in manualCreditDeposit:', cErr);
+        }
 
         // 3. Adjust mining speed if a plan boost applies
         if (boostPerHour > 0) {

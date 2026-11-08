@@ -224,3 +224,52 @@ export interface ReferralStatsDto {
   commissionEarnedPoops: number;
   commissionRatePercent: number;
 }
+
+export interface CampaignConfigDto {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  isActive: boolean;
+  minDepositUsdt: number;
+  maxDepositUsdt: number;
+  cashbackPercent: number;
+  dailyRewardPoops: number;
+  minRewardDays: number;
+  maxRewardDays: number;
+  allowMultipleCashbacks: boolean;
+  startDate: string;
+  endDate: string | null;
+}
+
+export interface CampaignDailyRewardItemDto {
+  id: string;
+  dayIndex: number;
+  rewardDate: string;
+  rewardPoops: number;
+  status: string;
+  processedAt: number;
+}
+
+export interface UserCampaignParticipationDto {
+  id: string;
+  qualifyingDepositAmount: number;
+  cashbackPoops: number;
+  cashbackCreditedAt: number;
+  totalRewardDays: number;
+  daysClaimed: number;
+  remainingDays: number;
+  totalDailyPoopsCredited: number;
+  nextRewardTimestamp: number;
+  remainingTimeMs: number;
+  rewardStartTimestamp: number;
+  rewardEndTimestamp: number;
+  status: string;
+  dailyRewards: CampaignDailyRewardItemDto[];
+}
+
+export interface CampaignStatusResponseDto {
+  campaign: CampaignConfigDto;
+  isParticipating: boolean;
+  participation: UserCampaignParticipationDto | null;
+}

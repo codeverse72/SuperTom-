@@ -7,6 +7,7 @@ import {
   Trophy,
   RotateCw,
   ArrowDownUp,
+  Flame,
   FileText,
   Network,
   ShieldAlert,
@@ -24,6 +25,7 @@ export type AdminTab =
   | 'missions'
   | 'spin'
   | 'payouts'
+  | 'campaign'
   | 'transactions'
   | 'referrals'
   | 'audit';
@@ -44,6 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab }) => {
     { id: 'missions' as AdminTab, label: 'Quests & Missions', icon: Trophy },
     { id: 'spin' as AdminTab, label: 'Lucky Wheel', icon: RotateCw },
     { id: 'payouts' as AdminTab, label: 'Payouts & Deposits', icon: ArrowDownUp },
+    { id: 'campaign' as AdminTab, label: '5K Celebration', icon: Flame },
     { id: 'transactions' as AdminTab, label: 'Ledger Audit', icon: FileText },
     { id: 'referrals' as AdminTab, label: 'Referral Tree', icon: Network },
     { id: 'audit' as AdminTab, label: 'Admin Audit Trail', icon: ShieldAlert },

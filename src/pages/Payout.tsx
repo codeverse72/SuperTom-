@@ -28,6 +28,7 @@ import { validateNetworkAddress } from '../utils/validation';
 import { paymentService } from '../services/paymentService';
 import { QRCode } from '../components/QRCode';
 import { DepositDto } from '../services/types';
+import { CampaignBanner } from '../components/CampaignBanner';
 
 export interface CurrencyConfig {
   id: string;
@@ -668,8 +669,12 @@ export const Payout: React.FC = () => {
                       Biscuit Price
                     </span>
                   ) : amt === 10 ? (
-                    <span className="block text-[8px] text-amber-300 font-mono font-normal">
-                      +20% bonus
+                    <span className="block text-[8px] text-amber-300 font-mono font-bold">
+                      +30% + 13d Daily
+                    </span>
+                  ) : amt === 5 ? (
+                    <span className="block text-[8px] text-amber-300 font-mono font-bold">
+                      +30% + 5d Daily
                     </span>
                   ) : null}
                 </button>
@@ -854,60 +859,11 @@ export const Payout: React.FC = () => {
         </button>
       </div>
 
-      {/* 4. Limited Flash Deal Promotion Card (Deposit Tab Only, matching Screenshot 2) */}
+      {/* 4. 5K Members Celebration Campaign (Replaces old Limited Flash Deal) */}
       {activeTab === 'deposit' && (
-        <div className="rounded-2xl bg-gradient-to-b from-[#14120a] via-[#0f0e07] to-[#0a0a06] border border-[#f59e0b]/50 p-4 shadow-2xl space-y-3 relative overflow-hidden">
-          <div className="flex items-center justify-between text-xs">
-            <span className="px-2.5 py-0.5 rounded-full bg-[#f59e0b] text-[#1a1202] text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
-              <span>⚡</span>
-              <span>LIMITED FLASH DEAL</span>
-            </span>
-            <span className="text-[10px] text-amber-300 font-bold flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Instant 20% Cashback</span>
-            </span>
-          </div>
-
-          <div className="flex items-start gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#f59e0b] to-[#d97706] flex items-center justify-center text-white shadow-lg shrink-0">
-              <Gift className="w-5 h-5" />
-            </div>
-            <div>
-              <h4 className="text-xs font-black text-white leading-tight">
-                Deposit $10.00 ➔ Get <span className="text-emerald-400">+$2.00 USDT Instant!</span>
-              </h4>
-              <p className="text-[11px] text-slate-300 mt-0.5 font-sans">
-                Earn <span className="text-cyan-300 font-bold">+1.00 USDT Daily</span> automated passive mining income!
-              </p>
-            </div>
-          </div>
-
-          {/* 3 Stat Boxes matching Screenshot 2 */}
-          <div className="grid grid-cols-3 gap-2">
-            <div className="p-2 rounded-xl bg-[#1a1405] border border-amber-500/20 text-center">
-              <span className="text-[9px] uppercase font-bold text-slate-400 block">Instant Bonus</span>
-              <span className="text-xs font-black text-cyan-400 font-mono">+$2.00 USDT</span>
-            </div>
-            <div className="p-2 rounded-xl bg-[#1a1405] border border-amber-500/20 text-center">
-              <span className="text-[9px] uppercase font-bold text-slate-400 block">Daily Income</span>
-              <span className="text-xs font-black text-blue-400 font-mono">+1.00 USDT/d</span>
-            </div>
-            <div className="p-2 rounded-xl bg-[#1a1405] border border-amber-500/20 text-center">
-              <span className="text-[9px] uppercase font-bold text-slate-400 block">Withdrawals</span>
-              <span className="text-xs font-black text-amber-300 font-mono">Instant / No Fee</span>
-            </div>
-          </div>
-
-          {/* Clickable offer link */}
-          <button
-            type="button"
-            onClick={() => handleOpenDepositDetails(SUPPORTED_CURRENCIES[2], 10.0)}
-            className="w-full text-center text-xs font-bold text-[#f59e0b] hover:text-amber-300 flex items-center justify-center gap-1 transition-colors cursor-pointer pt-0.5"
-          >
-            <span>Tap to apply $10 offer & view deposit address</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <CampaignBanner
+          onApplyDeposit={(amt) => handleOpenDepositDetails(SUPPORTED_CURRENCIES[2], amt)}
+        />
       )}
 
       {/* 5. Live Payout Proofs Banner matching Screenshot 2, 3, 4 */}
