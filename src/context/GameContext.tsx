@@ -12,6 +12,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { 
   INITIAL_MISSIONS, 
   Mission, 
+  SPIN_REWARDS,
   SpinRewardConfig 
 } from '../config/gameConfig';
 import { 
@@ -428,7 +429,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           [biscuitId]: (prev[biscuitId] || 0) + 1,
         }));
 
-        sound.playEating();
+        sound.playMunch();
         showToast(
           'Mining Speed Boosted!',
           `Plan activated! Hourly mining speed increased to +${feedRes.data.newProductionRate} Poops/hr 🚀`,

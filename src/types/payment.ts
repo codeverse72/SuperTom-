@@ -2,8 +2,8 @@
  * Payout and Payment System Types
  */
 
-export type TransactionStatus = 'Pending' | 'Approved' | 'Processing' | 'Completed' | 'Rejected';
-export type DepositStatus = 'Pending' | 'Confirmed' | 'Rejected';
+export type TransactionStatus = 'Pending' | 'Approved' | 'Processing' | 'Completed' | 'Rejected' | string;
+export type DepositStatus = 'Pending' | 'Confirmed' | 'Rejected' | 'Completed' | 'Processing' | 'Waiting_for_payment' | 'Payment_detected' | 'Confirming' | string;
 
 export type SupportedCurrency = 
   | 'GRAM'

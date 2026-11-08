@@ -258,8 +258,8 @@ export const Payout: React.FC = () => {
     if (selectedPlanForDeposit) {
       setActiveTab('deposit');
       setActiveDepositCurrency(SUPPORTED_CURRENCIES[2]); // USDT TRC20 by default
-      setDepositAmountUsd(selectedPlanForDeposit.costUsdt);
-      setCustomAmountInput(selectedPlanForDeposit.costUsdt.toFixed(2));
+      setDepositAmountUsd(selectedPlanForDeposit.usdtAmount);
+      setCustomAmountInput(selectedPlanForDeposit.usdtAmount.toFixed(2));
     }
   }, [selectedPlanForDeposit]);
 
@@ -337,7 +337,7 @@ export const Payout: React.FC = () => {
             refreshDeposits();
           } else {
             setDepositStatus('WAITING_FOR_PAYMENT');
-            setDepositError(res.error || subRes.error || 'Verification failed');
+            setDepositError(res.error?.message || subRes.error || 'Verification failed');
           }
         });
       }
