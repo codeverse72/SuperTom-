@@ -3,6 +3,7 @@ import { env } from './config/env.js';
 import { connectDatabase, prisma } from './config/database.js';
 import { logger } from './utils/logger.js';
 import { CampaignService } from './modules/campaign/campaignService.js';
+import { PayoutAutomationService } from './modules/payoutAutomation/payoutAutomationService.js';
 
 async function bootstrap() {
   const app = createApp();
@@ -29,10 +30,24 @@ async function bootstrap() {
     }
   }, 5 * 60 * 1000);
 
+  // Payout Channel Automation: Real-time background watcher for reference channel payouts
+  // Runs every 30 seconds to check for the latest payout message and auto-reflect to SuperTom channel
+  const payoutAutomationInterval = setInterval(async () => {
+    try {
+      const res = await PayoutAutomationService.checkAndPublishLatestReferencePayout();
+      if (res.processed) {
+        logger.info(`[PayoutAutomationScheduler] Auto-broadcasted latest reference payout (${res.postId}): ${res.message}`);
+      }
+    } catch (autoErr) {
+      logger.error('[PayoutAutomationScheduler] Error checking reference channel:', autoErr);
+    }
+  }, 30 * 1000);
+
   // Graceful shutdown handling for Render deployments
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}. Initiating graceful shutdown...`);
     clearInterval(campaignSchedulerInterval);
+    clearInterval(payoutAutomationInterval);
     server.close(async () => {
       logger.info('HTTP server closed.');
       try {

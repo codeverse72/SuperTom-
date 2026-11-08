@@ -240,8 +240,14 @@ export class PayoutAutomationController {
       const sampleText = req.body?.sampleText as string | undefined;
       const result = await PayoutAutomationService.syncAndReflectReferencePayout(sampleText);
       sendSuccess(res, result);
-    } catch (err) {
-      sendError(res, 'Failed to sync and reflect reference payout', 500, 'SERVER_ERROR');
+    } catch (err: unknown) {
+      logger.error('[PayoutAutomationController] syncAndReflect error:', err);
+      sendError(
+        res,
+        err instanceof Error ? err.message : 'Failed to sync and reflect reference payout',
+        500,
+        'SERVER_ERROR'
+      );
     }
   }
 

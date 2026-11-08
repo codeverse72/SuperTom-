@@ -471,10 +471,13 @@ export class PayoutAutomationService {
     let html = '';
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 6000);
+      const timeout = setTimeout(() => controller.abort(), 8000);
       const res = await fetch(`https://t.me/s/${username}`, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Cache-Control': 'no-cache',
         },
         signal: controller.signal,
       });
@@ -489,7 +492,11 @@ export class PayoutAutomationService {
     if (!html) {
       try {
         const { execSync } = await import('child_process');
-        html = execSync(`curl.exe -4 -s -L "https://t.me/s/${username}"`, { timeout: 8000, maxBuffer: 10 * 1024 * 1024 }).toString();
+        const curlCmd = process.platform === 'win32' ? 'curl.exe' : 'curl';
+        html = execSync(
+          `${curlCmd} -4 -s -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" "https://t.me/s/${username}"`,
+          { timeout: 10000, maxBuffer: 10 * 1024 * 1024 }
+        ).toString();
       } catch {
         html = '';
       }
@@ -538,6 +545,13 @@ export class PayoutAutomationService {
         network,
       });
     }
+
+    // Sort posts DESCENDING by numeric post ID so index 0 is always the LATEST post from the reference channel!
+    posts.sort((a, b) => {
+      const idA = parseInt(a.postId.split('/').pop() || '0', 10);
+      const idB = parseInt(b.postId.split('/').pop() || '0', 10);
+      return idB - idA;
+    });
 
     return posts;
   }
@@ -599,17 +613,17 @@ export class PayoutAutomationService {
         const existingPostIds = new Set(existing.map((e) => e.referencePostId).filter(Boolean));
         const existingHashes = new Set(existing.map((e) => e.txHash).filter(Boolean));
 
-        // Find posts not yet reflected
+        // Find posts not yet reflected (ordered newest-first)
         const unreflected = posts.filter(
           (p) => !existingPostIds.has(p.postId) && (!p.detectedTxHash || !existingHashes.has(p.detectedTxHash))
         );
 
         if (unreflected.length > 0) {
-          // Pick the next unreflected post (chronologically oldest to newest, so announcements mirror in order)
+          // Always pick the LATEST unreflected post (index 0 is the newest since posts are sorted descending)
           targetPost = unreflected[0];
         } else {
-          // All posts currently reflected; pick newest with a fresh unique marker so testing doesn't fail
-          const latest = posts[posts.length - 1];
+          // All recent posts currently reflected; take the newest/latest post with a fresh unique marker so manual test broadcasts always succeed
+          const latest = posts[0];
           targetPost = {
             ...latest,
             postId: `${latest.postId}_ref_${Date.now()}`,
@@ -708,6 +722,62 @@ export class PayoutAutomationService {
         : publishError
         ? `Reference payout queued, but broadcast failed: ${publishError}`
         : `Reference payout (${amountUsdt} ${currency}) reflected and queued for 1-click admin approval.`,
+    };
+  }
+
+  /**
+   * Periodic Automated Worker: Checks the reference channel for new payout posts
+   * and automatically reflects & broadcasts them to the SuperTom Payout Channel.
+   */
+  public static async checkAndPublishLatestReferencePayout(): Promise<{
+    processed: boolean;
+    postId?: string;
+    message?: string;
+  }> {
+    const config = await this.getOrCreateConfig();
+    if (!config.automationEnabled || config.publishingMode !== 'AUTOMATIC' || !config.autoReflectReference) {
+      return { processed: false, message: 'Automation or Auto-Reflect not enabled.' };
+    }
+
+    if (!config.referenceChannel) {
+      return { processed: false, message: 'No reference channel configured.' };
+    }
+
+    const posts = await this.fetchPublicReferencePosts(config.referenceChannel);
+    if (posts.length === 0) {
+      return { processed: false, message: 'No posts retrieved from reference channel.' };
+    }
+
+    // posts[0] is the LATEST post on the reference channel (sorted descending)
+    const latestPost = posts[0];
+
+    // Check if this latest post was already reflected/published
+    const existing = await prisma.payoutAnnouncement.findFirst({
+      where: {
+        source: 'REFERENCE_CHANNEL',
+        OR: [
+          { referencePostId: latestPost.postId },
+          ...(latestPost.detectedTxHash ? [{ txHash: latestPost.detectedTxHash }] : []),
+        ],
+      },
+    });
+
+    if (existing) {
+      // Latest post is already processed; touch lastSyncAt
+      await prisma.payoutChannelConfig.update({
+        where: { id: config.id },
+        data: { lastSyncAt: new Date() },
+      });
+      return { processed: false, postId: latestPost.postId, message: 'Latest reference post already broadcasted.' };
+    }
+
+    // A brand new payout announcement has appeared in the reference channel!
+    logger.info(`[PayoutAutomation] Detected new reference payout (${latestPost.postId}). Broadcasting to SuperTom Payout Channel...`);
+    const result = await this.syncAndReflectReferencePayout();
+    return {
+      processed: result.published ?? false,
+      postId: latestPost.postId,
+      message: result.message,
     };
   }
 
