@@ -40,17 +40,18 @@ export const Store: React.FC<StoreProps> = ({ onNavigateToDeposit }) => {
   const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
 
   const handleBuyWithDeposit = (biscuit: BiscuitConfig) => {
+    const biscuitPriceUsdt = PLAN_USDT_RATES[biscuit.id] ?? Math.max(1, Number((biscuit.cost / 200).toFixed(2)));
     setSelectedPlanForDeposit({
       id: biscuit.id,
-      name: `${biscuit.name} Mining Plan`,
+      name: biscuit.name,
       boostPerHour: biscuit.productionBoost,
       costPoops: biscuit.cost,
-      usdtAmount: PLAN_USDT_RATES[biscuit.id] || 5.0,
+      usdtAmount: biscuitPriceUsdt,
     });
 
     showToast(
-      'Moving to Deposit',
-      `Activating ${biscuit.name} (+${biscuit.productionBoost}/hr mining boost). Complete your deposit to receive your mining speed!`,
+      'Opening Deposit',
+      `Deposit amount set to $${biscuitPriceUsdt.toFixed(2)} USDT for ${biscuit.name} (+${biscuit.productionBoost}/hr boost)!`,
       'info'
     );
 
@@ -200,7 +201,7 @@ export const Store: React.FC<StoreProps> = ({ onNavigateToDeposit }) => {
                   className="w-full py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-purple-950 shadow-lg shadow-amber-500/20 cursor-pointer active:scale-95"
                 >
                   <Zap className="w-3.5 h-3.5 text-purple-950 fill-purple-950" />
-                  <span>Buy Plan (${planUsdt.toFixed(2)} Deposit)</span>
+                  <span>Buy Biscuit (${planUsdt.toFixed(2)} USDT)</span>
                   <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
                 </button>
 

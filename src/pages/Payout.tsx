@@ -18,7 +18,8 @@ import {
   Zap,
   Gift,
   ArrowLeft,
-  Cpu
+  Cpu,
+  Cookie
 } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { formatNumber, poopsToUsdt } from '../utils/probability';
@@ -240,6 +241,15 @@ export const Payout: React.FC = () => {
     return (balance / 2000).toFixed(4);
   }, [balance]);
 
+  // Dynamic quick deposit buttons including selected biscuit price
+  const quickDepositAmounts = useMemo(() => {
+    const list = [1, 3, 5, 10, 15, 50];
+    if (selectedPlanForDeposit && !list.includes(selectedPlanForDeposit.usdtAmount)) {
+      list.push(selectedPlanForDeposit.usdtAmount);
+    }
+    return list.sort((a, b) => a - b);
+  }, [selectedPlanForDeposit]);
+
   // Fetch Treasury Wallets & refresh user payout data on mount
   useEffect(() => {
     paymentService.getTreasuryWallets().then((res) => {
@@ -255,13 +265,30 @@ export const Payout: React.FC = () => {
     refreshDeposits();
   }, [refreshWithdrawals, refreshDeposits]);
 
-  // When selectedPlanForDeposit is set from Store, open deposit view with that currency
+  // When selectedPlanForDeposit is set from Store (Buy Biscuit), open deposit view with that exact amount
   useEffect(() => {
     if (selectedPlanForDeposit) {
       setActiveTab('deposit');
-      setActiveDepositCurrency(SUPPORTED_CURRENCIES[2]); // USDT TRC20 by default
-      setDepositAmountUsd(selectedPlanForDeposit.usdtAmount);
-      setCustomAmountInput(selectedPlanForDeposit.usdtAmount.toFixed(2));
+      const defaultCur = SUPPORTED_CURRENCIES[2]; // USDT TRC20 by default
+      setActiveDepositCurrency(defaultCur);
+      const amt = selectedPlanForDeposit.usdtAmount;
+      setDepositAmountUsd(amt);
+      setCustomAmountInput(amt.toFixed(2));
+      setDepositTxHash('');
+      setDepositError(null);
+      setDepositStatus('WAITING_FOR_PAYMENT');
+
+      // Create formal tracked deposit record on backend
+      paymentService.createDepositIntent({
+        amountUsdt: amt,
+        currency: defaultCur.symbol,
+        network: defaultCur.network,
+        notes: `[Biscuit Purchase: ${selectedPlanForDeposit.name} (+${selectedPlanForDeposit.boostPerHour.toLocaleString()}/hr)]`,
+      }).then((res) => {
+        if (res.success && res.data) {
+          setActiveDepositId(res.data.id);
+        }
+      });
     }
   }, [selectedPlanForDeposit]);
 
@@ -279,7 +306,8 @@ export const Payout: React.FC = () => {
   // Open Deposit Details Page
   const handleOpenDepositDetails = (currency: CurrencyConfig, initialAmount?: number) => {
     setActiveDepositCurrency(currency);
-    const amt = initialAmount || 10.0;
+    const defaultAmt = selectedPlanForDeposit ? selectedPlanForDeposit.usdtAmount : 10.0;
+    const amt = initialAmount !== undefined ? initialAmount : defaultAmt;
     setDepositAmountUsd(amt);
     setCustomAmountInput(amt.toFixed(2));
     setDepositTxHash('');
@@ -292,7 +320,7 @@ export const Payout: React.FC = () => {
       currency: currency.symbol,
       network: currency.network,
       notes: selectedPlanForDeposit 
-        ? `[Mining Plan: ${selectedPlanForDeposit.name} (+${selectedPlanForDeposit.boostPerHour.toLocaleString()}/hr)]`
+        ? `[Biscuit Purchase: ${selectedPlanForDeposit.name} (+${selectedPlanForDeposit.boostPerHour.toLocaleString()}/hr)]`
         : undefined,
     }).then((res) => {
       if (res.success && res.data) {
@@ -441,6 +469,40 @@ export const Payout: React.FC = () => {
           </span>
         </div>
 
+        {/* Selected Biscuit Buying Banner if user clicked Buy Biscuit in Store */}
+        {selectedPlanForDeposit && (
+          <div className="rounded-2xl bg-gradient-to-r from-amber-500/20 via-purple-900/40 to-amber-500/10 border border-amber-400/40 p-3.5 shadow-xl flex items-center justify-between animate-in fade-in">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-300 shrink-0">
+                <Cookie className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 block">
+                  BUYING BISCUIT
+                </span>
+                <h4 className="text-sm font-black text-white font-display">
+                  {selectedPlanForDeposit.name}
+                </h4>
+                <p className="text-[11px] text-emerald-400 font-mono font-bold">
+                  +{selectedPlanForDeposit.boostPerHour}/hr Mining Boost
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-sm font-black text-amber-400 font-mono block">
+                ${selectedPlanForDeposit.usdtAmount.toFixed(2)} USDT
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedPlanForDeposit(null)}
+                className="text-[10px] text-purple-300 hover:text-white underline cursor-pointer"
+              >
+                Clear Selection
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Currency Card Header matching Screenshot 1 */}
         <div className="rounded-2xl bg-[#090e1c] border border-cyan-500/30 p-3.5 shadow-xl flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -579,10 +641,11 @@ export const Payout: React.FC = () => {
             </span>
           </div>
 
-          {/* Quick Amount Buttons: $1, $3, $5, $10, $15, $50 */}
+          {/* Quick Amount Buttons */}
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-            {[1, 3, 5, 10, 15, 50].map((amt) => {
-              const isSelected = depositAmountUsd === amt;
+            {quickDepositAmounts.map((amt) => {
+              const isSelected = Math.abs(depositAmountUsd - amt) < 0.001;
+              const isBiscuitPrice = selectedPlanForDeposit && Math.abs(selectedPlanForDeposit.usdtAmount - amt) < 0.001;
               return (
                 <button
                   key={amt}
@@ -594,15 +657,21 @@ export const Payout: React.FC = () => {
                   className={`py-2 px-1 rounded-xl text-xs font-black transition-all cursor-pointer border ${
                     isSelected
                       ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white border-cyan-300 shadow-md ring-1 ring-cyan-400'
+                      : isBiscuitPrice
+                      ? 'bg-amber-950/50 border-amber-500/60 text-amber-300 hover:bg-amber-900/50'
                       : 'bg-[#0d162b] border-cyan-900/50 text-cyan-200 hover:bg-[#121e3b]'
                   }`}
                 >
-                  ${amt}
-                  {amt === 10 && (
+                  ${amt % 1 === 0 ? amt.toFixed(0) : amt.toFixed(2)}
+                  {isBiscuitPrice ? (
+                    <span className="block text-[8px] text-amber-300 font-mono font-bold uppercase tracking-tight">
+                      Biscuit Price
+                    </span>
+                  ) : amt === 10 ? (
                     <span className="block text-[8px] text-amber-300 font-mono font-normal">
                       +20% bonus
                     </span>
-                  )}
+                  ) : null}
                 </button>
               );
             })}

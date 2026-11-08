@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Sparkles, Cookie, ArrowRight, ServerOff } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { BISCUIT_CONFIGS } from '../config/gameConfig';
+import { PLAN_USDT_RATES } from '../pages/Store';
 import { BiscuitSvg } from './BiscuitSvg';
 import { SYSTEM_MESSAGES } from '../config/featureConfig';
 
@@ -12,7 +13,7 @@ interface FeedingModalProps {
 }
 
 export const FeedingModal: React.FC<FeedingModalProps> = ({ isOpen, onClose, onNavigateToStore }) => {
-  const { biscuitCatalog, biscuitInventory, feedTom, showToast } = useGame();
+  const { biscuitCatalog, biscuitInventory, feedTom, showToast, setSelectedPlanForDeposit } = useGame();
   const [selectedBiscuitId, setSelectedBiscuitId] = useState<string>('common');
 
   if (!isOpen) return null;
@@ -22,7 +23,15 @@ export const FeedingModal: React.FC<FeedingModalProps> = ({ isOpen, onClose, onN
 
   const handleFeed = () => {
     if (typeof ownedCount === 'number' && ownedCount <= 0) {
-      showToast('No Biscuits', `You don't have any ${currentConfig.name}s. Visit the Store to get biscuits!`, 'info');
+      const biscuitPrice = PLAN_USDT_RATES[currentConfig.id] ?? Math.max(1, Number((currentConfig.cost / 200).toFixed(2)));
+      setSelectedPlanForDeposit({
+        id: currentConfig.id,
+        name: currentConfig.name,
+        boostPerHour: currentConfig.productionBoost,
+        costPoops: currentConfig.cost,
+        usdtAmount: biscuitPrice,
+      });
+      showToast('No Biscuits', `Selected ${currentConfig.name} ($${biscuitPrice.toFixed(2)} USDT). Visit the Store to buy biscuits!`, 'info');
       onClose();
       onNavigateToStore();
       return;
