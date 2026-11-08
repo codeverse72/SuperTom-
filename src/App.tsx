@@ -8,6 +8,7 @@ import { Missions } from './pages/Missions';
 import { Store } from './pages/Store';
 import { Payout } from './pages/Payout';
 import { Profile } from './pages/Profile';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { useTelegram } from './hooks/useTelegram';
 
 // Lazy-load AdminApp so Telegram Mini App users do not download any admin bundle assets
@@ -99,15 +100,17 @@ export default function App() {
 
           {/* Active Tab Screen Content */}
           <main className="flex-1 p-4 pb-24 overflow-y-auto">
-            {activeTab === 'home' && (
-              <Home onNavigateToStore={() => handleTabChange('store')} />
-            )}
-            {activeTab === 'missions' && <Missions />}
-            {activeTab === 'store' && (
-              <Store onNavigateToDeposit={() => handleTabChange('payout')} />
-            )}
-            {activeTab === 'payout' && <Payout />}
-            {activeTab === 'profile' && <Profile />}
+            <ErrorBoundary>
+              {activeTab === 'home' && (
+                <Home onNavigateToStore={() => handleTabChange('store')} />
+              )}
+              {activeTab === 'missions' && <Missions />}
+              {activeTab === 'store' && (
+                <Store onNavigateToDeposit={() => handleTabChange('payout')} />
+              )}
+              {activeTab === 'payout' && <Payout />}
+              {activeTab === 'profile' && <Profile />}
+            </ErrorBoundary>
           </main>
 
           {/* Fixed Bottom Navigation Bar (The ONLY primary navigation) */}

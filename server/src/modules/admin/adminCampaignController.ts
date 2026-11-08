@@ -75,6 +75,8 @@ export class AdminCampaignController {
         data: updateData,
       });
 
+      CampaignService.invalidateCache();
+
       await recordAuditLog({
         adminId,
         action: 'UPDATE_CAMPAIGN_CONFIG',
@@ -187,3 +189,4 @@ export class AdminCampaignController {
     }
   }
 }
+

@@ -10,6 +10,7 @@ import { BiscuitsPage } from './pages/BiscuitsPage';
 import { MissionsPage } from './pages/MissionsPage';
 import { SpinPage } from './pages/SpinPage';
 import { PayoutsPage } from './pages/PayoutsPage';
+import { CampaignPage } from './pages/CampaignPage';
 import { TransactionsPage } from './pages/TransactionsPage';
 import { ReferralsPage } from './pages/ReferralsPage';
 import { AuditLogsPage } from './pages/AuditLogsPage';
@@ -65,6 +66,10 @@ const AdminContent: React.FC = () => {
       title: 'Payouts & Player Deposits',
       subtitle: 'TRON TRC20 manual review pipeline, double-action approvals, and txHash auditing.',
     },
+    campaign: {
+      title: '5K Members Achievement Celebration',
+      subtitle: 'Manage 30% instant cashback, tiered daily rewards, participant schedules, and batch disbursements.',
+    },
     transactions: {
       title: 'Double-Entry Audit Ledger',
       subtitle: 'Immutable record of every balance debit, credit, and administrative adjustment.',
@@ -99,6 +104,7 @@ const AdminContent: React.FC = () => {
           {activeTab === 'missions' && <MissionsPage />}
           {activeTab === 'spin' && <SpinPage />}
           {activeTab === 'payouts' && <PayoutsPage />}
+          {activeTab === 'campaign' && <CampaignPage />}
           {activeTab === 'transactions' && <TransactionsPage />}
           {activeTab === 'referrals' && <ReferralsPage />}
           {activeTab === 'audit' && <AuditLogsPage />}

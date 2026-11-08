@@ -20,26 +20,64 @@ interface CampaignBannerProps {
   onApplyDeposit?: (amount: number) => void;
 }
 
+const DEFAULT_CAMPAIGN_DATA: CampaignStatusResponseDto = {
+  campaign: {
+    id: '5k-members-celebration',
+    slug: '5k_members_celebration',
+    title: '5K Members Celebration',
+    description: 'Special Achievement Rewards celebrating 5,000 Telegram Members! 30% Instant Cashback + $1 USDT Daily Rewards for up to 13 days.',
+    isActive: true,
+    minDepositUsdt: 5.0,
+    maxDepositUsdt: 10.0,
+    cashbackPercent: 30.0,
+    dailyRewardPoops: 2000,
+    minRewardDays: 5,
+    maxRewardDays: 13,
+    allowMultipleCashbacks: false,
+    startDate: '2026-11-01T00:00:00.000Z',
+    endDate: null,
+  },
+  isParticipating: false,
+  participation: null,
+};
+
+const getInitialData = (): CampaignStatusResponseDto => {
+  try {
+    const cached = sessionStorage.getItem('supertom_campaign_status');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed && parsed.campaign) return parsed;
+    }
+  } catch {}
+  return DEFAULT_CAMPAIGN_DATA;
+};
+
 export const CampaignBanner: React.FC<CampaignBannerProps> = ({ onApplyDeposit }) => {
-  const [data, setData] = useState<CampaignStatusResponseDto | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [data, setData] = useState<CampaignStatusResponseDto>(getInitialData);
   const [showHistory, setShowHistory] = useState(false);
-  const [timeLeftMs, setTimeLeftMs] = useState<number>(0);
+  const [timeLeftMs, setTimeLeftMs] = useState<number>(() => {
+    const init = getInitialData();
+    if (init.participation?.nextRewardTimestamp) {
+      return Math.max(0, init.participation.nextRewardTimestamp - Date.now());
+    }
+    return 0;
+  });
 
   const fetchCampaign = async () => {
     try {
       const res = await campaignService.getStatus();
       if (res.success && res.data) {
         setData(res.data);
+        try {
+          sessionStorage.setItem('supertom_campaign_status', JSON.stringify(res.data));
+        } catch {}
         if (res.data.participation?.nextRewardTimestamp) {
           const diff = res.data.participation.nextRewardTimestamp - Date.now();
           setTimeLeftMs(Math.max(0, diff));
         }
       }
     } catch (e) {
-      console.error('Failed to load campaign data:', e);
-    } finally {
-      setIsLoading(false);
+      console.error('Failed to sync live campaign data:', e);
     }
   };
 
@@ -67,7 +105,7 @@ export const CampaignBanner: React.FC<CampaignBannerProps> = ({ onApplyDeposit }
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  if (isLoading || !data || !data.campaign.isActive) {
+  if (!data.campaign.isActive) {
     return null;
   }
 
@@ -260,3 +298,4 @@ export const CampaignBanner: React.FC<CampaignBannerProps> = ({ onApplyDeposit }
     </div>
   );
 };
+

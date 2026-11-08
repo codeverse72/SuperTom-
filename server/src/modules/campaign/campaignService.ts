@@ -55,11 +55,23 @@ export function calculateCashback(
 
 export class CampaignService {
   public static readonly DEFAULT_SLUG = '5k_members_celebration';
+  private static cachedCampaign: any = null;
+  private static cacheExpiry = 0;
+
+  public static invalidateCache() {
+    this.cachedCampaign = null;
+    this.cacheExpiry = 0;
+  }
 
   /**
    * Retrieves or provisions the default 5K Members Celebration campaign in the DB
    */
   public static async getOrCreateDefaultCampaign() {
+    const now = Date.now();
+    if (this.cachedCampaign && now < this.cacheExpiry) {
+      return this.cachedCampaign;
+    }
+
     let campaign = await prisma.campaign.findUnique({
       where: { slug: CampaignService.DEFAULT_SLUG },
     });
@@ -82,6 +94,9 @@ export class CampaignService {
         },
       });
     }
+
+    this.cachedCampaign = campaign;
+    this.cacheExpiry = now + 60 * 1000; // Cache for 60 seconds
 
     return campaign;
   }
@@ -486,3 +501,4 @@ export class CampaignService {
     };
   }
 }
+

@@ -119,8 +119,6 @@ export const Store: React.FC<StoreProps> = ({ onNavigateToDeposit }) => {
         {biscuitCatalog.map((biscuit) => {
           const owned = biscuitInventory !== null ? (biscuitInventory[biscuit.id] ?? 0) : 0;
           const planUsdt = PLAN_USDT_RATES[biscuit.id] || Math.max(1, Number((biscuit.cost / 200).toFixed(1)));
-          const hasEnoughPoops = balance !== null && balance >= biscuit.cost;
-          const isLoading = loadingPlanId === biscuit.id;
 
           return (
             <div

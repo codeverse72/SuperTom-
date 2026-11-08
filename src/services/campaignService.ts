@@ -16,3 +16,4 @@ export const campaignService = {
     return apiClient.get<any>('/campaign/info');
   },
 };
+

@@ -6,3 +6,4 @@ export const campaignRouter = Router();
 
 campaignRouter.get('/status', requireAuth, CampaignController.getStatus);
 campaignRouter.get('/info', CampaignController.getInfo);
+
