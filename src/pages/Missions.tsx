@@ -16,12 +16,14 @@ import {
   ShieldCheck, 
   Gift,
   ArrowRight,
-  RefreshCw
+  RefreshCw,
+  Copy
 } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { Mission, MissionCategory } from '../config/gameConfig';
 import { formatNumber } from '../utils/probability';
 import { sound } from '../utils/sound';
+import { shareViaTelegram, generateReferralLink } from '../utils/telegram';
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Send,
@@ -42,6 +44,45 @@ export const Missions: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<MissionCategory | 'all'>('all');
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [copiedMissionId, setCopiedMissionId] = useState<string | null>(null);
+
+  const isInviteMission = (m: Mission) =>
+    m.id === 'm4_invite_3' || m.id === 'm4' || m.id.includes('invite') || m.title.toLowerCase().includes('invite');
+
+  const getReferralUrl = () => {
+    const refCode = user?.referralCode || 'TOMVIP';
+    return generateReferralLink(refCode);
+  };
+
+  const handleCopyReferralLink = (missionId: string) => {
+    sound.playTap();
+    const url = getReferralUrl();
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url);
+    }
+    setCopiedMissionId(missionId);
+    showToast('Copied!', 'Your SuperTom referral link was copied to clipboard.', 'success');
+    setTimeout(() => setCopiedMissionId(null), 2500);
+  };
+
+  const handleShareReferralQuest = (mission: Mission) => {
+    sound.playTap();
+    const url = getReferralUrl();
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url);
+    }
+    setCopiedMissionId(mission.id);
+    shareViaTelegram(
+      url,
+      '🐱 Join me on SuperTom and start mining with King Tom! 👑 Boost your mining rate and claim free Poops!'
+    );
+    showToast('Telegram Share', 'Referral link copied & Telegram share opened!', 'success');
+    setTimeout(() => setCopiedMissionId(null), 2500);
+
+    if (mission.status === 'start') {
+      verifyMission(mission.id);
+    }
+  };
 
   // 4 Filter categories per prompt specifications
   const categories: { id: 'all' | MissionCategory; label: string; count: number }[] = [
@@ -73,6 +114,20 @@ export const Missions: React.FC = () => {
       return;
     }
 
+    // Special handling for Referral / Invite quests
+    if (isInviteMission(mission)) {
+      if (mission.status === 'start') {
+        handleShareReferralQuest(mission);
+        return;
+      }
+      if (mission.status === 'verify' || mission.status === 'in_progress') {
+        setVerifyingId(mission.id);
+        verifyMission(mission.id);
+        setTimeout(() => setVerifyingId(null), 1500);
+        return;
+      }
+    }
+
     if (mission.status === 'verify' || mission.status === 'in_progress') {
       setVerifyingId(mission.id);
       verifyMission(mission.id);
@@ -92,24 +147,6 @@ export const Missions: React.FC = () => {
         verifyMission(mission.id);
         setVerifyingId(null);
       }, 2500);
-      return;
-    }
-
-    if (mission.id === 'm4_invite_3') {
-      const botUser = 'SuperrTombot';
-      const refCode = user?.referralCode || 'TOMVIP';
-      const shareUrl = `https://t.me/${botUser}?startapp=${refCode}`;
-      if (mission.status === 'start') {
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(shareUrl);
-        }
-        showToast('Invite Friends', 'Share your link with 3 friends! Rewards unlock when they open the bot.', 'info');
-        verifyMission(mission.id);
-        return;
-      }
-      setVerifyingId(mission.id);
-      verifyMission(mission.id);
-      setTimeout(() => setVerifyingId(null), 1200);
       return;
     }
 
@@ -239,6 +276,7 @@ export const Missions: React.FC = () => {
           const Icon = iconMap[mission.icon] || Sparkles;
           const isCompleted = mission.status === 'completed';
           const isClaimed = mission.status === 'claimed';
+          const isInvite = isInviteMission(mission);
 
           return (
             <div
@@ -301,6 +339,37 @@ export const Missions: React.FC = () => {
                 </div>
               </div>
 
+              {/* Dedicated Referral Link Box for Invite Mission */}
+              {isInvite && !isClaimed && (
+                <div className="mt-3 p-2.5 rounded-2xl bg-purple-950/70 border border-purple-500/30 flex items-center justify-between gap-2">
+                  <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-hidden">
+                    <Users className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span className="text-[11px] font-mono text-purple-200 truncate select-all">
+                      {getReferralUrl()}
+                    </span>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCopyReferralLink(mission.id);
+                    }}
+                    className="px-2.5 py-1 rounded-xl bg-purple-800/90 hover:bg-purple-700 text-amber-300 border border-amber-400/30 text-[11px] font-bold flex items-center gap-1 shrink-0 active:scale-95 transition-all cursor-pointer shadow-sm"
+                  >
+                    {copiedMissionId === mission.id ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-400" />
+                        <span className="text-emerald-300">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3 text-amber-300" />
+                        <span>Copy Link</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
               {/* Status and Action Button Bar */}
               <div className="mt-3.5 pt-3 border-t border-purple-500/20 flex items-center justify-between gap-2">
                 {/* Status Indicator */}
@@ -350,6 +419,61 @@ export const Missions: React.FC = () => {
                         </>
                       )}
                     </button>
+                  ) : isInvite ? (
+                    <div className="flex items-center gap-1.5">
+                      {mission.status === 'start' ? (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopyReferralLink(mission.id);
+                            }}
+                            className="px-2.5 py-1.5 rounded-xl bg-purple-900/60 hover:bg-purple-800/70 text-purple-200 border border-purple-400/30 text-xs font-bold flex items-center gap-1 active:scale-95 cursor-pointer"
+                          >
+                            {copiedMissionId === mission.id ? (
+                              <>
+                                <Check className="w-3 h-3 text-emerald-400" />
+                                <span className="text-emerald-300">Copied!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3 text-amber-300" />
+                                <span>Copy</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleShareReferralQuest(mission)}
+                            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white border border-purple-300/40 text-xs font-bold flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
+                          >
+                            <Share2 className="w-3.5 h-3.5 text-amber-300" />
+                            <span>Start Quest</span>
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleShareReferralQuest(mission)}
+                            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white border border-purple-300/40 text-xs font-bold flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
+                          >
+                            <Share2 className="w-3.5 h-3.5 text-amber-300" />
+                            <span>Invite</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setVerifyingId(mission.id);
+                              verifyMission(mission.id);
+                              setTimeout(() => setVerifyingId(null), 1500);
+                            }}
+                            disabled={verifyingId === mission.id}
+                            className="px-2.5 py-1.5 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-300 border border-cyan-500/40 text-xs font-bold flex items-center gap-1 active:scale-95 cursor-pointer disabled:opacity-50"
+                          >
+                            <RefreshCw className={`w-3 h-3 ${verifyingId === mission.id ? 'animate-spin' : ''}`} />
+                            <span>{verifyingId === mission.id ? 'Verifying...' : 'Verify'}</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
                   ) : mission.status === 'verify' || verifyingId === mission.id ? (
                     <button
                       onClick={() => handleMissionInteraction(mission)}

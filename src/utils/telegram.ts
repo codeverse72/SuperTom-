@@ -271,7 +271,7 @@ export function getTelegramStartParam(): string | null {
  * Configured bot username placeholder for deep linking.
  */
 export function getTelegramBotUsername(): string {
-  return import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'SuperTomBot';
+  return import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'SuperrTombot';
 }
 
 /**
