@@ -170,3 +170,4 @@ export class MiningService {
     return { processedCount, totalPoopsAwarded };
   }
 }
+

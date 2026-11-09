@@ -46,7 +46,7 @@ export const paymentService = {
     return apiClient.get<DepositStatusResponseDto>(`/payouts/deposits/${depositId}/status`);
   },
 
-  verifyDeposit: async (depositId: string, txHash: string): Promise<ApiResponse<{ success: boolean; message: string; newBalance?: number }>> => {
-    return apiClient.post<{ success: boolean; message: string; newBalance?: number }>(`/payouts/deposits/${depositId}/verify`, { txHash });
+  verifyDeposit: async (depositId: string, txHash: string, amountUsdt?: number): Promise<ApiResponse<{ success: boolean; message: string; newBalance?: number }>> => {
+    return apiClient.post<{ success: boolean; message: string; newBalance?: number }>(`/payouts/deposits/${depositId}/verify`, { txHash, amountUsdt });
   },
 };

@@ -28,6 +28,7 @@ const createDepositSchema = z.object({
 
 const verifyDepositSchema = z.object({
   txHash: z.string().min(6, 'Valid transaction hash is required'),
+  amountUsdt: z.number().min(0.5).optional(),
 });
 
 const submitDepositSchema = z.object({
@@ -486,8 +487,12 @@ export class PayoutController {
       return;
     }
 
-    const { txHash } = parse.data;
-    const cleanTx = txHash.trim();
+    const { txHash, amountUsdt } = parse.data;
+    let cleanTx = txHash.trim();
+    if (cleanTx.includes('/')) {
+      const parts = cleanTx.split('/');
+      cleanTx = parts[parts.length - 1].replace(/^[#?]/, '').trim() || cleanTx;
+    }
 
     try {
       const deposit = await prisma.deposit.findUnique({
@@ -518,11 +523,16 @@ export class PayoutController {
         return;
       }
 
+      const finalAmountUsdt = amountUsdt ? amountUsdt : Number(deposit.amountUsdt);
+      const finalAmountPoops = BigInt(Math.round(finalAmountUsdt * env.POOPS_PER_USDT));
+
       // Update deposit with submitted txHash and set status to PAYMENT_DETECTED for Admin confirmation
       const updated = await prisma.deposit.update({
         where: { id },
         data: {
           txHash: cleanTx,
+          amountUsdt: finalAmountUsdt,
+          amountPoops: finalAmountPoops,
           status: 'PAYMENT_DETECTED',
           notes: deposit.notes ? `${deposit.notes} | TX submitted by user for Admin review` : 'TX submitted for Admin review',
         },
@@ -557,7 +567,11 @@ export class PayoutController {
     }
 
     const { amountUsdt, network, txHash, notes } = parseResult.data;
-    const cleanHash = txHash.trim();
+    let cleanHash = txHash.trim();
+    if (cleanHash.includes('/')) {
+      const parts = cleanHash.split('/');
+      cleanHash = parts[parts.length - 1].replace(/^[#?]/, '').trim() || cleanHash;
+    }
 
     try {
       // Check for duplicate txHash

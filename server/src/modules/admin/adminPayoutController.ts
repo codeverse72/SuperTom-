@@ -6,6 +6,7 @@ import { AuthenticatedAdminRequest, recordAuditLog } from '../../middleware/admi
 import { LedgerService } from '../ledger/ledgerService.js';
 import { CampaignService } from '../campaign/campaignService.js';
 import { PayoutAutomationService } from '../payoutAutomation/payoutAutomationService.js';
+import { DepositVerificationService } from '../payouts/depositVerificationService.js';
 import { logger } from '../../utils/logger.js';
 import { WithdrawalStatus, DepositStatus } from '@prisma/client';
 
@@ -509,6 +510,22 @@ export class AdminPayoutController {
               totalRatePerHour: { increment: appliedBoost },
             },
           });
+        }
+
+        // 3. Send Telegram confirmation receipt to the user
+        try {
+          const userRec = await tx.user.findUnique({ where: { id: deposit.userId } });
+          if (userRec?.telegramId) {
+            await DepositVerificationService.sendTelegramDepositNotification(
+              userRec.telegramId,
+              Number(deposit.amountUsdt),
+              deposit.amountPoops,
+              deposit.network,
+              txHash.trim()
+            );
+          }
+        } catch (tgErr) {
+          logger.error('[AdminPayout] Failed to send Telegram deposit receipt:', tgErr);
         }
       });
 
