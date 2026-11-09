@@ -32,6 +32,11 @@ export interface UserSessionDto {
       totalRatePerHour: number;
       unclaimedPoops: number;
       lastSettledAt: string;
+      settledAmount?: number;
+      completedHoursSettled?: number;
+      newBalance?: number;
+      msUntilNextHour?: number;
+      nextAdditionAt?: string;
     } | null;
     spinState?: {
       currentMilestone: number;
@@ -39,6 +44,21 @@ export interface UserSessionDto {
       claimedMilestones: number[];
       cycleCount: number;
     } | null;
+    inventory?: Record<string, number>;
+    missions?: Array<{
+      id: string;
+      title: string;
+      description: string;
+      rewardPoops: number;
+      category: 'daily' | 'social' | 'special';
+      icon: string;
+      badge?: string;
+      actionUrl?: string;
+      status: 'start' | 'in_progress' | 'verify' | 'completed' | 'claimed';
+      progress: number;
+      total: number;
+    }>;
+    biscuits?: Array<any>;
   };
 }
 

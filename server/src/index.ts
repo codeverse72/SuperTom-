@@ -61,12 +61,25 @@ async function bootstrap() {
     }
   }, 2 * 60 * 1000);
 
+  // Render Anti-Sleep Keepalive: Pings public health endpoint every 10 minutes to prevent free-tier spin-down
+  const keepAliveInterval = setInterval(async () => {
+    try {
+      const publicBackendUrl = process.env.BACKEND_PUBLIC_URL || 'https://supertom-backend.onrender.com';
+      await fetch(`${publicBackendUrl}/health`, {
+        headers: { 'User-Agent': 'SuperTom-AntiSleep/1.0' },
+      });
+    } catch {
+      // Ignore background keepalive errors
+    }
+  }, 10 * 60 * 1000);
+
   // Graceful shutdown handling for Render deployments
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}. Initiating graceful shutdown...`);
     clearInterval(campaignSchedulerInterval);
     clearInterval(payoutAutomationInterval);
     clearInterval(miningSchedulerInterval);
+    clearInterval(keepAliveInterval);
     server.close(async () => {
       logger.info('HTTP server closed.');
       try {

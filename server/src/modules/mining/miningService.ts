@@ -19,10 +19,26 @@ export class MiningService {
    * Strictly adds once per full completed hour (up to 24 times a day / max 24 hours).
    * Starting anchor is either when user enters/starts the bot or when biscuits are fed.
    */
-  public static async settleUserHourlyEarnings(userId: string): Promise<HourlySettlementResult> {
-    let settlement = await prisma.miningSettlement.findUnique({
-      where: { userId },
-    });
+  public static async settleUserHourlyEarnings(
+    userId: string,
+    preloadedData?: {
+      settlement?: {
+        baseRatePerHour: number;
+        boostRatePerHour: number;
+        totalRatePerHour: number;
+        unclaimedPoops: bigint;
+        lastSettledAt: Date;
+        maxAccumulationHours: number;
+      } | null;
+      balance?: bigint;
+    }
+  ): Promise<HourlySettlementResult> {
+    let settlement = preloadedData?.settlement;
+    if (!settlement) {
+      settlement = await prisma.miningSettlement.findUnique({
+        where: { userId },
+      });
+    }
 
     if (!settlement) {
       settlement = await prisma.miningSettlement.create({
@@ -53,16 +69,20 @@ export class MiningService {
 
     if (completedHours < 1 && settlement.unclaimedPoops === 0n) {
       // 0 full hours completed; current hour is still in progress
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { poopsBalance: true },
-      });
+      let currentBalance = preloadedData?.balance;
+      if (currentBalance === undefined) {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { poopsBalance: true },
+        });
+        currentBalance = user?.poopsBalance || 0n;
+      }
 
       return {
         settled: false,
         completedHours: 0,
         amountSettled: 0,
-        newBalance: Number(user?.poopsBalance || 0),
+        newBalance: Number(currentBalance),
         totalRatePerHour: settlement.totalRatePerHour,
         lastSettledAt: settlement.lastSettledAt,
         msUntilNextHour,
@@ -75,16 +95,20 @@ export class MiningService {
     const totalToSettle = settlement.unclaimedPoops + newlyMined;
 
     if (totalToSettle <= 0n) {
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { poopsBalance: true },
-      });
+      let currentBalance = preloadedData?.balance;
+      if (currentBalance === undefined) {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { poopsBalance: true },
+        });
+        currentBalance = user?.poopsBalance || 0n;
+      }
 
       return {
         settled: false,
         completedHours: 0,
         amountSettled: 0,
-        newBalance: Number(user?.poopsBalance || 0),
+        newBalance: Number(currentBalance),
         totalRatePerHour: settlement.totalRatePerHour,
         lastSettledAt: settlement.lastSettledAt,
         msUntilNextHour,

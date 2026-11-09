@@ -7,10 +7,26 @@ import { sendSuccess, sendError } from '../../utils/apiResponse.js';
 import { AuthenticatedRequest } from '../../middleware/auth.js';
 import { logger } from '../../utils/logger.js';
 import { LedgerService } from '../ledger/ledgerService.js';
+import { MiningService } from '../mining/miningService.js';
 
 const telegramAuthSchema = z.object({
   initData: z.string().min(1, 'initData is required'),
 });
+
+// In-memory 5-minute cache for biscuit products catalogue to eliminate redundant DB calls
+let cachedBiscuitProducts: any[] | null = null;
+let lastBiscuitProductsFetch = 0;
+async function getCachedBiscuitProducts() {
+  if (cachedBiscuitProducts && Date.now() - lastBiscuitProductsFetch < 300_000) {
+    return cachedBiscuitProducts;
+  }
+  cachedBiscuitProducts = await prisma.biscuitProduct.findMany({
+    where: { isActive: true },
+    orderBy: { costPoops: 'asc' },
+  });
+  lastBiscuitProductsFetch = Date.now();
+  return cachedBiscuitProducts;
+}
 
 export class AuthController {
   /**
@@ -41,7 +57,13 @@ export class AuthController {
       const result = await prisma.$transaction(async (tx) => {
         let user = await tx.user.findUnique({
           where: { telegramId: tgId },
-          include: { miningSettlement: true, spinState: true },
+          include: {
+            miningSettlement: true,
+            spinState: true,
+            _count: {
+              select: { referees: true, feedingEvents: true },
+            },
+          },
         });
 
         let isNewUser = false;
@@ -90,7 +112,13 @@ export class AuthController {
               referralCode,
               referredById: referrerId,
             },
-            include: { miningSettlement: true, spinState: true },
+            include: {
+              miningSettlement: true,
+              spinState: true,
+              _count: {
+                select: { referees: true, feedingEvents: true },
+              },
+            },
           });
 
           // Initialize default mining engine for new player (10 Poops/hr base)
@@ -151,16 +179,29 @@ export class AuthController {
             user.poopsBalance = newPlayerBalance;
           }
         } else {
-          // Update profile info on return if changed in Telegram
-          user = await tx.user.update({
-            where: { id: user.id },
-            data: {
-              username: tgUser.username || user.username,
-              firstName: tgUser.first_name || user.firstName,
-              lastName: tgUser.last_name || user.lastName,
-            },
-            include: { miningSettlement: true, spinState: true },
-          });
+          // Update profile info on return ONLY if changed in Telegram
+          const needsProfileUpdate =
+            (tgUser.username && tgUser.username !== user.username) ||
+            (tgUser.first_name && tgUser.first_name !== user.firstName) ||
+            (tgUser.last_name !== undefined && tgUser.last_name !== user.lastName);
+
+          if (needsProfileUpdate) {
+            user = await tx.user.update({
+              where: { id: user.id },
+              data: {
+                username: tgUser.username || user.username,
+                firstName: tgUser.first_name || user.firstName,
+                lastName: tgUser.last_name || user.lastName,
+              },
+              include: {
+                miningSettlement: true,
+                spinState: true,
+                _count: {
+                  select: { referees: true, feedingEvents: true },
+                },
+              },
+            });
+          }
         }
 
         // Issue JWT access and refresh tokens
@@ -188,6 +229,101 @@ export class AuthController {
         return { user, accessToken, refreshToken, isNewUser };
       });
 
+      // 1. Auto-settle any completed hourly mining additions immediately (Option A) using preloaded state
+      const settleResult = await MiningService.settleUserHourlyEarnings(result.user.id, {
+        settlement: result.user.miningSettlement,
+        balance: result.user.poopsBalance,
+      });
+
+      // 2. Fetch inventory and active missions in parallel (biscuits are cached in-memory)
+      const [inventories, activeBiscuits, missions] = await Promise.all([
+        prisma.userInventory.findMany({ where: { userId: result.user.id } }),
+        getCachedBiscuitProducts(),
+        prisma.mission.findMany({
+          where: { isActive: true },
+          include: {
+            userMissions: { where: { userId: result.user.id } },
+          },
+        }),
+      ]);
+
+      const userStats = result.user;
+
+      const inventoryMap: Record<string, number> = {
+        common: 0,
+        silver: 0,
+        gold: 0,
+        diamond: 0,
+      };
+      for (const p of activeBiscuits) {
+        inventoryMap[p.id] = 0;
+      }
+      for (const item of inventories) {
+        inventoryMap[item.biscuitId] = item.quantity;
+      }
+
+      const now = new Date();
+      const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+
+      const mappedMissions = missions.map((m) => {
+        const userProgress = m.userMissions[0];
+        let status = userProgress?.status ? (userProgress.status.toLowerCase() as string) : 'start';
+        let progress = userProgress?.progress ?? 0;
+        let total = userProgress?.total ?? 1;
+
+        const isDaily = m.category === 'DAILY';
+        const claimedBeforeToday = userProgress?.claimedAt && new Date(userProgress.claimedAt) < startOfToday;
+
+        if (isDaily && claimedBeforeToday) {
+          status = 'start';
+          progress = 0;
+        }
+
+        if (status === 'start' || status === 'in_progress') {
+          if (m.id === 'm4_invite_3') {
+            total = 3;
+            progress = Math.min(3, userStats?._count.referees ?? 0);
+            if (progress >= total) status = 'completed';
+          } else if (m.id === 'm5_feed_5_biscuits') {
+            total = 5;
+            progress = Math.min(5, userStats?._count.feedingEvents ?? 0);
+            if (progress >= total) status = 'completed';
+          } else if (m.id === 'm6_reach_level_5') {
+            total = 5;
+            progress = Math.min(5, result.user.level ?? 1);
+            if (progress >= total) status = 'completed';
+          }
+        }
+
+        return {
+          id: m.id,
+          title: m.title,
+          description: m.description,
+          rewardPoops: Number(m.rewardPoops),
+          category: m.category.toLowerCase(),
+          icon: m.icon,
+          badge: m.badge || undefined,
+          actionUrl: m.actionUrl || undefined,
+          status,
+          progress,
+          total,
+        };
+      });
+
+      const mappedBiscuits = activeBiscuits.map((b) => ({
+        id: b.id,
+        name: b.name,
+        costPoops: Number(b.costPoops),
+        productionBoostPerHour: b.productionBoostPerHour,
+        currencyType: b.currencyType,
+        badge: b.badge,
+        color: b.color,
+        borderColor: b.borderColor,
+        glowColor: b.glowColor,
+        description: b.description,
+        isActive: b.isActive,
+      }));
+
       sendSuccess(res, {
         token: result.accessToken,
         refreshToken: result.refreshToken,
@@ -204,20 +340,28 @@ export class AuthController {
           createdAt: result.user.createdAt.toISOString(),
         },
         initialState: {
-          balancePoops: Number(result.user.poopsBalance),
-          mining: result.user.miningSettlement ? {
-            baseRatePerHour: result.user.miningSettlement.baseRatePerHour,
-            boostRatePerHour: result.user.miningSettlement.boostRatePerHour,
-            totalRatePerHour: result.user.miningSettlement.totalRatePerHour,
-            unclaimedPoops: Number(result.user.miningSettlement.unclaimedPoops),
-            lastSettledAt: result.user.miningSettlement.lastSettledAt.toISOString(),
-          } : null,
+          balancePoops: settleResult.newBalance,
+          mining: {
+            baseRatePerHour: result.user.miningSettlement?.baseRatePerHour ?? 10,
+            boostRatePerHour: result.user.miningSettlement?.boostRatePerHour ?? 0,
+            totalRatePerHour: settleResult.totalRatePerHour,
+            unclaimedPoops: 0,
+            settledAmount: settleResult.amountSettled,
+            completedHoursSettled: settleResult.completedHours,
+            newBalance: settleResult.newBalance,
+            lastSettledAt: settleResult.lastSettledAt.toISOString(),
+            msUntilNextHour: settleResult.msUntilNextHour,
+            nextAdditionAt: settleResult.nextAdditionAt.toISOString(),
+          },
           spinState: result.user.spinState ? {
             currentMilestone: result.user.spinState.currentMilestone,
             targetTimestamp: result.user.spinState.nextUnlockAt.getTime(),
             claimedMilestones: JSON.parse(result.user.spinState.claimedMilestones || '[]'),
             cycleCount: result.user.spinState.cycleCount,
           } : null,
+          inventory: inventoryMap,
+          missions: mappedMissions,
+          biscuits: mappedBiscuits,
         },
       });
     } catch (err: unknown) {

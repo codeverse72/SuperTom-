@@ -138,14 +138,22 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Cached initial state for instant 0ms first render (stale-while-revalidate)
   const [balance, setBalanceState] = useState<number | null>(() => {
     const cached = localStorage.getItem('supertom_cache_balance');
-    return cached !== null ? Number(cached) : null;
+    return cached !== null ? Number(cached) : 1000;
   });
   const [productionRate, setProductionRateState] = useState<number | null>(() => {
     const cached = localStorage.getItem('supertom_cache_rate');
     return cached !== null ? Number(cached) : 10;
   });
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return !!localStorage.getItem('supertom_auth_token');
+  });
+  const [user, setUserState] = useState<UserProfile | null>(() => {
+    try {
+      const cached = localStorage.getItem('supertom_cache_user');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return null;
+  });
   const [biscuitCatalog, setBiscuitCatalog] = useState<BiscuitConfig[]>(() => {
     try {
       const cached = localStorage.getItem('supertom_cache_biscuits');
@@ -153,7 +161,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {}
     return Object.values(BISCUIT_CONFIGS);
   });
-  const [biscuitInventory, setBiscuitInventory] = useState<Record<string, number> | null>(null);
+  const [biscuitInventory, setBiscuitInventoryState] = useState<Record<string, number> | null>(() => {
+    try {
+      const cached = localStorage.getItem('supertom_cache_inventory');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return DEFAULT_FED;
+  });
   const [biscuitFedCount, setBiscuitFedCount] = useState<Record<string, number>>(DEFAULT_FED);
 
   // Spin timer milestones (starts with cached or default milestone)
@@ -171,6 +185,30 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       cycleCount: 1
     };
   });
+
+  const setUser = useCallback((val: UserProfile | null | ((prev: UserProfile | null) => UserProfile | null)) => {
+    setUserState((prev) => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      try {
+        if (next) {
+          localStorage.setItem('supertom_cache_user', JSON.stringify(next));
+        }
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  const setBiscuitInventory = useCallback((val: Record<string, number> | null | ((prev: Record<string, number> | null) => Record<string, number> | null)) => {
+    setBiscuitInventoryState((prev) => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      try {
+        if (next) {
+          localStorage.setItem('supertom_cache_inventory', JSON.stringify(next));
+        }
+      } catch {}
+      return next;
+    });
+  }, []);
 
   const setBalance = useCallback((val: number | null | ((prev: number | null) => number | null)) => {
     setBalanceState((prev) => {
@@ -202,8 +240,26 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, []);
 
-  // Clean initial missions catalogue
-  const [missions, setMissions] = useState<Mission[]>(INITIAL_MISSIONS);
+  // Clean initial missions catalogue (cached or default)
+  const [missions, setMissionsState] = useState<Mission[]>(() => {
+    try {
+      const cached = localStorage.getItem('supertom_cache_missions');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return INITIAL_MISSIONS;
+  });
+
+  const setMissions = useCallback((val: Mission[] | ((prev: Mission[]) => Mission[])) => {
+    setMissionsState((prev) => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      try {
+        if (next) {
+          localStorage.setItem('supertom_cache_missions', JSON.stringify(next));
+        }
+      } catch {}
+      return next;
+    });
+  }, []);
 
   // Clean empty withdrawals and deposits list
   const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>([]);
@@ -258,14 +314,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveToast(null);
   }, []);
 
-  // Live Backend Connection & Cryptographic InitData Pipeline
+  // Live Backend Connection & Single-Trip Cryptographic Bootstrap Pipeline
   useEffect(() => {
     const rawInitData = getRawTelegramInitData();
     if (rawInitData && isFeatureAvailable('auth')) {
       authService.authenticateTelegram(rawInitData).then((authRes) => {
         if (authRes.success && authRes.data) {
           setIsAuthenticated(true);
-          setUser({
+          const userData: UserProfile = {
             id: authRes.data.userId,
             telegramId: authRes.data.telegramId,
             username: authRes.data.username,
@@ -279,60 +335,52 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             totalMissionsDone: 0,
             totalBiscuitsFed: 0,
             createdAt: authRes.data.createdAt,
-          });
+          };
+          setUser(userData);
 
-          // 1. INSTANT HYDRATION FROM AUTH (0 additional roundtrips!)
-          if (authRes.data.initialState) {
-            setBalance(authRes.data.initialState.balancePoops);
-            if (authRes.data.initialState.mining) {
-              setProductionRate(authRes.data.initialState.mining.totalRatePerHour);
+          const init = authRes.data.initialState;
+          if (init) {
+            // 1. Instantly set settled balance
+            setBalance(init.balancePoops);
+
+            // 2. Mining rate & countdown
+            if (init.mining) {
+              setProductionRate(init.mining.totalRatePerHour);
+              if (init.mining.msUntilNextHour !== undefined) {
+                setNextMiningAdditionTimestamp(Date.now() + init.mining.msUntilNextHour);
+              }
+              if (init.mining.settledAmount && init.mining.settledAmount > 0) {
+                showToast(
+                  'Hourly Mining Added!',
+                  `+${init.mining.settledAmount.toLocaleString()} Poops added to main balance (${init.mining.completedHoursSettled || 1} hr${(init.mining.completedHoursSettled || 1) > 1 ? 's' : ''})!`,
+                  'reward'
+                );
+              }
             }
-            if (authRes.data.initialState.spinState) {
+
+            // 3. Spin timer state
+            if (init.spinState) {
               setSpinState({
-                currentMilestone: (authRes.data.initialState.spinState.currentMilestone as 1 | 2 | 3) || 1,
-                targetTimestamp: authRes.data.initialState.spinState.targetTimestamp,
-                claimedMilestones: authRes.data.initialState.spinState.claimedMilestones,
-                cycleCount: authRes.data.initialState.spinState.cycleCount,
+                currentMilestone: (init.spinState.currentMilestone as 1 | 2 | 3) || 1,
+                targetTimestamp: init.spinState.targetTimestamp,
+                claimedMilestones: init.spinState.claimedMilestones,
+                cycleCount: init.spinState.cycleCount,
               });
             }
-          }
 
-          // Auto-settle completed hours into main balance on app open (Option A - 24 additions/day)
-          if (isFeatureAvailable('mining')) {
-            miningService.getMiningStatus().then((mRes) => {
-              if (mRes.success && mRes.data) {
-                setProductionRate(mRes.data.totalRatePerHour);
-                if (mRes.data.settledAmount && mRes.data.settledAmount > 0 && mRes.data.newBalance !== undefined) {
-                  setBalance(mRes.data.newBalance);
-                  showToast(
-                    'Hourly Mining Added!',
-                    `+${mRes.data.settledAmount.toLocaleString()} Poops added to main balance (${mRes.data.completedHoursSettled} hr${(mRes.data.completedHoursSettled || 1) > 1 ? 's' : ''})!`,
-                    'reward'
-                  );
-                }
-                if (mRes.data.msUntilNextHour !== undefined) {
-                  setNextMiningAdditionTimestamp(Date.now() + mRes.data.msUntilNextHour);
-                }
-              }
-            });
-          }
-
-          // 2. PARALLEL SECONDARY DATA (Inventory, Missions, & Biscuits Catalogue)
-          Promise.allSettled([
-            isFeatureAvailable('biscuit_purchases') ? storeService.getInventory() : Promise.resolve(null),
-            missionService.getMissions(),
-            storeService.getBiscuits(),
-          ]).then(([invRes, misRes, bisRes]) => {
-            if (invRes.status === 'fulfilled' && invRes.value && 'data' in invRes.value && invRes.value.data) {
-              setBiscuitInventory(invRes.value.data as Record<string, number>);
+            // 4. Biscuit inventory (hydrated in 0 extra roundtrips!)
+            if (init.inventory) {
+              setBiscuitInventory(init.inventory);
             }
-            if (misRes.status === 'fulfilled' && misRes.value && 'data' in misRes.value && misRes.value.data && (misRes.value.data as any[]).length > 0) {
+
+            // 5. Missions catalogue (hydrated in 0 extra roundtrips!)
+            if (init.missions && init.missions.length > 0) {
               setMissions(
-                (misRes.value.data as any[]).map((m: any) => ({
+                init.missions.map((m: any) => ({
                   id: m.id,
                   title: m.title,
                   description: m.description,
-                  reward: m.rewardPoops,
+                  reward: m.rewardPoops ?? m.reward,
                   category: m.category,
                   icon: m.icon,
                   status: m.status,
@@ -343,8 +391,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }))
               );
             }
-            if (bisRes.status === 'fulfilled' && bisRes.value && 'data' in bisRes.value && bisRes.value.data && (bisRes.value.data as any[]).length > 0) {
-              const mapped: BiscuitConfig[] = (bisRes.value.data as any[]).map((b: any) => {
+
+            // 6. Biscuit store catalog (hydrated in 0 extra roundtrips!)
+            if (init.biscuits && init.biscuits.length > 0) {
+              const mapped: BiscuitConfig[] = init.biscuits.map((b: any) => {
                 const staticConf = BISCUIT_CONFIGS[b.id];
                 return {
                   id: b.id,
@@ -363,7 +413,57 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 localStorage.setItem('supertom_cache_biscuits', JSON.stringify(mapped));
               } catch {}
             }
-          });
+          }
+
+          // Fallback only if secondary data was missing from legacy backend response:
+          if (!init?.inventory || !init?.missions || !init?.biscuits) {
+            Promise.allSettled([
+              !init?.inventory && isFeatureAvailable('biscuit_purchases') ? storeService.getInventory() : Promise.resolve(null),
+              !init?.missions ? missionService.getMissions() : Promise.resolve(null),
+              !init?.biscuits ? storeService.getBiscuits() : Promise.resolve(null),
+            ]).then(([invRes, misRes, bisRes]) => {
+              if (invRes.status === 'fulfilled' && invRes.value && 'data' in invRes.value && invRes.value.data) {
+                setBiscuitInventory(invRes.value.data as Record<string, number>);
+              }
+              if (misRes.status === 'fulfilled' && misRes.value && 'data' in misRes.value && misRes.value.data && (misRes.value.data as any[]).length > 0) {
+                setMissions(
+                  (misRes.value.data as any[]).map((m: any) => ({
+                    id: m.id,
+                    title: m.title,
+                    description: m.description,
+                    reward: m.rewardPoops,
+                    category: m.category,
+                    icon: m.icon,
+                    status: m.status,
+                    progress: m.progress,
+                    total: m.total,
+                    badge: m.badge,
+                    actionUrl: m.actionUrl,
+                  }))
+                );
+              }
+              if (bisRes.status === 'fulfilled' && bisRes.value && 'data' in bisRes.value && bisRes.value.data && (bisRes.value.data as any[]).length > 0) {
+                const mapped: BiscuitConfig[] = (bisRes.value.data as any[]).map((b: any) => {
+                  const staticConf = BISCUIT_CONFIGS[b.id];
+                  return {
+                    id: b.id,
+                    name: b.name,
+                    cost: b.costPoops,
+                    productionBoost: b.productionBoostPerHour,
+                    color: b.color || staticConf?.color || 'from-purple-600 to-pink-600',
+                    borderColor: b.borderColor || staticConf?.borderColor || 'border-purple-500/40',
+                    glowColor: b.glowColor || staticConf?.glowColor || 'rgba(168, 85, 247, 0.4)',
+                    description: b.description || staticConf?.description || 'Royal feline snack.',
+                    badge: b.badge || staticConf?.badge || 'Treat',
+                  };
+                });
+                setBiscuitCatalog(mapped);
+                try {
+                  localStorage.setItem('supertom_cache_biscuits', JSON.stringify(mapped));
+                } catch {}
+              }
+            });
+          }
         }
       });
     }

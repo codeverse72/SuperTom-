@@ -109,13 +109,16 @@ export class MissionController {
     }
 
     try {
-      // Ensure seed missions exist in database
-      for (const m of SEED_MISSIONS) {
-        await prisma.mission.upsert({
-          where: { id: m.id },
-          create: m,
-          update: {},
-        });
+      // Fast check: seed missions only if table is completely empty
+      const missionCount = await prisma.mission.count();
+      if (missionCount === 0) {
+        for (const m of SEED_MISSIONS) {
+          await prisma.mission.upsert({
+            where: { id: m.id },
+            create: m,
+            update: {},
+          });
+        }
       }
 
       const missions = await prisma.mission.findMany({

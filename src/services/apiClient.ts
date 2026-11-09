@@ -16,14 +16,27 @@ const API_BASE_URL = (RAW_BASE_URL && RAW_BASE_URL.trim().length > 0)
   : PRODUCTION_BACKEND_URL;
 
 class ApiClient {
-  private authToken: string | null = null;
+  private authToken: string | null = (() => {
+    try {
+      return localStorage.getItem('supertom_auth_token');
+    } catch {
+      return null;
+    }
+  })();
   private rawInitData: string | null = null;
 
   /**
-   * Sets the bearer session token returned from backend auth verification.
+   * Sets the bearer session token returned from backend auth verification and persists to storage.
    */
   public setAuthToken(token: string | null) {
     this.authToken = token;
+    try {
+      if (token) {
+        localStorage.setItem('supertom_auth_token', token);
+      } else {
+        localStorage.removeItem('supertom_auth_token');
+      }
+    } catch {}
   }
 
   public getAuthToken(): string | null {
