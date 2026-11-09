@@ -61,7 +61,7 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
     symbol: 'GRAM',
     networkType: 'TON',
     minDepositUsd: 1.0,
-    minWithdrawUsd: 0.1,
+    minWithdrawUsd: 1.0,
     placeholder: 'e.g. UQBG6dgDogaxatpbFiVzAFNiByU3E3P1Xsdkt_xyuG4S-gzv',
     hint: 'TON addresses start with "EQ" or "UQ" and contain 48 characters.',
     defaultTreasuryAddress: 'UQBG6dgDogaxatpbFiVzAFNiByU3E3P1Xsdkt_xyuG4S-gzv',
@@ -84,7 +84,7 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
     symbol: 'USDT',
     networkType: 'EVM',
     minDepositUsd: 1.0,
-    minWithdrawUsd: 0.1,
+    minWithdrawUsd: 1.0,
     placeholder: 'e.g. 0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1',
     hint: 'BEP20 addresses start with "0x" and contain 42 characters.',
     defaultTreasuryAddress: '0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1',
@@ -104,7 +104,7 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
     symbol: 'USDT',
     networkType: 'TRON',
     minDepositUsd: 1.0,
-    minWithdrawUsd: 0.1,
+    minWithdrawUsd: 1.0,
     placeholder: 'e.g. TJLEgXHdQG3fxwn1UiHVpDoqz29FmJshCv',
     hint: 'TRON addresses start with "T" and contain 34 characters.',
     defaultTreasuryAddress: 'TJLEgXHdQG3fxwn1UiHVpDoqz29FmJshCv',
@@ -124,7 +124,7 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
     symbol: 'BNB',
     networkType: 'EVM',
     minDepositUsd: 1.0,
-    minWithdrawUsd: 0.1,
+    minWithdrawUsd: 1.0,
     placeholder: 'e.g. 0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1',
     hint: 'BNB addresses start with "0x" and contain 42 characters.',
     defaultTreasuryAddress: '0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1',
@@ -146,7 +146,7 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
     symbol: 'TRX',
     networkType: 'TRON',
     minDepositUsd: 1.0,
-    minWithdrawUsd: 0.1,
+    minWithdrawUsd: 1.0,
     placeholder: 'e.g. TJLEgXHdQG3fxwn1UiHVpDoqz29FmJshCv',
     hint: 'TRON addresses start with "T" and contain 34 characters.',
     defaultTreasuryAddress: 'TJLEgXHdQG3fxwn1UiHVpDoqz29FmJshCv',
@@ -168,7 +168,7 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
     symbol: 'SOL',
     networkType: 'SOLANA',
     minDepositUsd: 1.0,
-    minWithdrawUsd: 0.1,
+    minWithdrawUsd: 1.0,
     placeholder: 'e.g. ER74j5s2PgVPx9dsT7wqyMSM7RgY4LKzfT9c1NFp92Qk',
     hint: 'Solana addresses are 32-44 characters Base58 encoded.',
     defaultTreasuryAddress: 'ER74j5s2PgVPx9dsT7wqyMSM7RgY4LKzfT9c1NFp92Qk',
@@ -190,7 +190,7 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
     symbol: 'BASE',
     networkType: 'EVM',
     minDepositUsd: 1.0,
-    minWithdrawUsd: 0.1,
+    minWithdrawUsd: 1.0,
     placeholder: 'e.g. 0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1',
     hint: 'Base addresses start with "0x" and contain 42 characters.',
     defaultTreasuryAddress: '0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1',
@@ -1063,7 +1063,7 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
       {/* 1. Header Title matching Screenshot 2 & 4 */}
       <div className="text-center">
         <h2 className="text-lg font-black text-white font-display tracking-tight">
-          {activeTab === 'deposit' ? 'Deposit' : 'Payout'}
+          {activeTab === 'deposit' ? 'Deposit' : 'Withdraw'}
         </h2>
       </div>
 
@@ -1094,7 +1094,7 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
         </div>
       </div>
 
-      {/* 3. Segmented Pill Tab Switcher: "↗ Payout" | "↙ Deposit" matching Screenshot 2, 3, 4 */}
+      {/* 3. Segmented Pill Tab Switcher: "↗ Withdraw" | "↙ Deposit" matching Screenshot 2, 3, 4 */}
       <div className="p-1 rounded-2xl bg-[#090e1c] border border-cyan-500/20 flex items-center gap-1 shadow-xl">
         <button
           type="button"
@@ -1112,7 +1112,7 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
           }`}
         >
           <span className="text-cyan-400">↗</span>
-          <span>Payout</span>
+          <span>Withdraw</span>
         </button>
 
         <button
@@ -1307,7 +1307,7 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
       <div className="rounded-2xl bg-[#090e1c] border border-cyan-500/20 p-4 shadow-xl space-y-3">
         <div className="flex items-center justify-between">
           <h4 className="text-xs font-bold text-white uppercase tracking-wider font-display">
-            {activeTab === 'deposit' ? 'Recent Deposits' : 'Recent Payout Requests'}
+            {activeTab === 'deposit' ? 'Recent Deposits' : 'Recent Withdrawals'}
           </h4>
           <button
             type="button"

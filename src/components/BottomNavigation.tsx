@@ -18,7 +18,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, o
     { id: 'home', label: 'Home', icon: Home, badge: isSpinReady },
     { id: 'missions', label: 'Missions', icon: Trophy, badge: claimableMissionsCount > 0 ? claimableMissionsCount : false },
     { id: 'store', label: 'Store', icon: ShoppingBag },
-    { id: 'payout', label: 'Payout', icon: Wallet },
+    { id: 'payout', label: 'Withdraw', icon: Wallet },
     { id: 'profile', label: 'Profile', icon: User },
   ];
 
