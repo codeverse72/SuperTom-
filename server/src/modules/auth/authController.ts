@@ -9,7 +9,7 @@ import { logger } from '../../utils/logger.js';
 import { LedgerService } from '../ledger/ledgerService.js';
 import { MiningService } from '../mining/miningService.js';
 import { ReferralService } from '../referrals/referralService.js';
-import { WithdrawalAccessService } from '../payouts/withdrawalAccessService.js';
+import { WithdrawalEntitlementService } from '../payouts/withdrawalEntitlementService.js';
 
 const telegramAuthSchema = z.object({
   initData: z.string().min(1, 'initData is required'),
@@ -142,13 +142,13 @@ export class AuthController {
             },
           });
 
-          // Initialize progressive lucky spin state (starts at milestone 1, 2-hour cooldown)
+          // Initialize progressive lucky spin state (starts at milestone 1, first spin READY IMMEDIATELY)
           await tx.spinState.create({
             data: {
               userId: user.id,
               currentMilestone: 1,
               cycleCount: 1,
-              nextUnlockAt: new Date(Date.now() + 2 * 3600 * 1000), // 2h from now
+              nextUnlockAt: new Date(), // Immediate free spin on join!
               claimedMilestones: '[]',
             },
           });
@@ -328,7 +328,7 @@ export class AuthController {
         isActive: b.isActive,
       }));
 
-      const withdrawalAccess = await WithdrawalAccessService.getUserWithdrawalAccess(result.user.id);
+      const withdrawalEntitlement = await WithdrawalEntitlementService.getUserEntitlement(result.user.id);
 
       sendSuccess(res, {
         token: result.accessToken,
@@ -368,7 +368,7 @@ export class AuthController {
           inventory: inventoryMap,
           missions: mappedMissions,
           biscuits: mappedBiscuits,
-          withdrawalAccess,
+          withdrawalEntitlement,
         },
       });
     } catch (err: unknown) {

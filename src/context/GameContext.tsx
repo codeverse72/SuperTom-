@@ -104,6 +104,7 @@ interface GameContextType {
   } | null) => void;
   executeSpin: () => { reward: SpinRewardConfig; index: number };
   claimSpinMilestone: (reward: SpinRewardConfig) => void;
+  refreshSpinStatus: () => Promise<void>;
   performSpin: () => Promise<{
     success: boolean;
     reward?: SpinRewardConfig;
@@ -569,6 +570,23 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: false, error: 'Biscuits can only be purchased via USDT deposit.' };
   };
 
+  // Refresh spin milestone status and timers from server
+  const refreshSpinStatus = useCallback(async () => {
+    try {
+      const res = await spinService.getSpinStatus();
+      if (res.success && res.data) {
+        setSpinState({
+          currentMilestone: res.data.currentMilestone as 1 | 2 | 3,
+          targetTimestamp: res.data.nextUnlockTimestamp,
+          claimedMilestones: res.data.claimedMilestones,
+          cycleCount: res.data.cycleCount,
+        });
+      }
+    } catch {
+      // ignore
+    }
+  }, [setSpinState]);
+
   // Spin Wheel Execution (Direct Server-Authoritative)
   const performSpin = async (): Promise<{
     success: boolean;
@@ -894,6 +912,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         buyAndFeedBiscuit,
         executeSpin,
         claimSpinMilestone,
+        refreshSpinStatus,
         performSpin,
         startMission,
         verifyMission,

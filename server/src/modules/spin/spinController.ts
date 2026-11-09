@@ -4,6 +4,7 @@ import { AuthenticatedRequest } from '../../middleware/auth.js';
 import { sendSuccess, sendError } from '../../utils/apiResponse.js';
 import { secureRandomFloat } from '../../utils/crypto.js';
 import { LedgerService } from '../ledger/ledgerService.js';
+import { logger } from '../../utils/logger.js';
 
 interface SpinRewardDefinition {
   id: string;
@@ -15,14 +16,7 @@ interface SpinRewardDefinition {
 }
 
 /**
- * EXACT probability distribution from specifications:
- * 100 Poops: 99.0% (990/1000)
- * 250 Poops: 0.2% (2/1000)
- * 500 Poops: 0.2% (2/1000)
- * 1000 Poops: 0.2% (2/1000)
- * 2000 Poops: 0.2% (2/1000)
- * Gold Biscuit: 0.1% (1/1000)
- * Diamond Biscuit: 0.1% (1/1000)
+ * Default fallback reward distribution (sums to 1000 / 100%)
  */
 const SPIN_REWARDS_CUMULATIVE: SpinRewardDefinition[] = [
   { id: 'poop-100', label: '100 Poops', rewardType: 'poops', amount: 100, cumulativeWeight: 250 },
@@ -41,6 +35,32 @@ const MILESTONE_COOLDOWNS: Record<number, number> = {
 };
 
 export class SpinController {
+  private static cachedRewards: Array<{
+    id: string;
+    label: string;
+    rewardType: 'poops' | 'biscuit';
+    amount?: number;
+    biscuitId?: string;
+    percentage: number;
+  }> | null = null;
+  private static cacheExpiry = 0;
+
+  /**
+   * Invalidates in-memory rewards cache so admin changes take effect in real-time.
+   */
+  public static invalidateRewardsCache(): void {
+    SpinController.cachedRewards = null;
+    SpinController.cacheExpiry = 0;
+  }
+
+  /**
+   * Updates in-memory rewards cache directly.
+   */
+  public static setRewardsCache(rewards: any[]): void {
+    SpinController.cachedRewards = rewards;
+    SpinController.cacheExpiry = Date.now() + 10 * 60 * 1000; // 10 minutes cache
+  }
+
   /**
    * Helper to fetch dynamic cooldown in ms from DB system settings
    */
@@ -60,59 +80,107 @@ export class SpinController {
   }
 
   /**
-   * Cryptographically secure weighted reward selection.
-   * Reads active dynamic distribution from SystemSetting if present.
+   * Retrieves active reward distribution (cached or from SystemSetting).
    */
-  private static async drawReward(): Promise<SpinRewardDefinition> {
+  public static async getActiveRewards(): Promise<Array<{
+    id: string;
+    label: string;
+    rewardType: 'poops' | 'biscuit';
+    amount?: number;
+    biscuitId?: string;
+    percentage: number;
+  }>> {
+    const now = Date.now();
+    if (SpinController.cachedRewards && SpinController.cacheExpiry > now) {
+      return SpinController.cachedRewards;
+    }
+
     try {
       const setting = await prisma.systemSetting.findUnique({
         where: { key: 'spin_rewards_distribution' },
       });
       if (setting) {
-        const rewards: Array<{
-          id: string;
-          label: string;
-          rewardType: 'poops' | 'biscuit';
-          amount?: number;
-          biscuitId?: string;
-          percentage: number;
-        }> = JSON.parse(setting.value);
-        if (Array.isArray(rewards) && rewards.length > 0) {
-          const roll = secureRandomFloat() * 100;
-          let cumulative = 0;
-          for (const r of rewards) {
-            cumulative += Number(r.percentage);
-            if (roll <= cumulative) {
-              return {
-                id: r.id,
-                label: r.label,
-                rewardType: r.rewardType,
-                amount: r.amount,
-                biscuitId: r.biscuitId,
-                cumulativeWeight: 100,
-              };
-            }
-          }
-          const last = rewards[rewards.length - 1];
-          return {
-            id: last.id,
-            label: last.label,
-            rewardType: last.rewardType,
-            amount: last.amount,
-            biscuitId: last.biscuitId,
-            cumulativeWeight: 100,
-          };
+        const parsed = JSON.parse(setting.value);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          SpinController.setRewardsCache(parsed);
+          return parsed;
         }
       }
-    } catch {}
+    } catch (err) {
+      logger.warn('[SpinController] Failed to query spin_rewards_distribution, falling back:', err);
+    }
 
-    const roll = secureRandomFloat() * 1000;
-    for (const reward of SPIN_REWARDS_CUMULATIVE) {
-      if (roll < reward.cumulativeWeight) {
-        return reward;
+    const fallback = [
+      { id: 'poop-100', label: '100 Poops', rewardType: 'poops' as const, amount: 100, percentage: 25.0 },
+      { id: 'poop-300', label: '300 Poops', rewardType: 'poops' as const, amount: 300, percentage: 6.0 },
+      { id: 'poop-250', label: '250 Poops', rewardType: 'poops' as const, amount: 250, percentage: 15.0 },
+      { id: 'poop-750', label: '750 Poops', rewardType: 'poops' as const, amount: 750, percentage: 3.0 },
+      { id: 'poop-0', label: '0 Poops', rewardType: 'poops' as const, amount: 0, percentage: 30.0 },
+      { id: 'poop-525', label: '525 Poops', rewardType: 'poops' as const, amount: 525, percentage: 20.0 },
+      { id: 'poop-1000', label: '1,000 Poops', rewardType: 'poops' as const, amount: 1000, percentage: 1.0 },
+    ];
+    SpinController.setRewardsCache(fallback);
+    return fallback;
+  }
+
+  /**
+   * Cryptographically secure weighted reward selection.
+   * Reads active dynamic distribution configured by the Admin panel.
+   */
+  public static async drawReward(): Promise<SpinRewardDefinition> {
+    const rewards = await SpinController.getActiveRewards();
+
+    // 1. Calculate total positive weight across active sectors
+    let totalWeight = 0;
+    for (const r of rewards) {
+      const weight = Math.max(0, Number(r.percentage) || 0);
+      totalWeight += weight;
+    }
+
+    if (totalWeight <= 0) {
+      const first = rewards[0] || SPIN_REWARDS_CUMULATIVE[0];
+      return {
+        id: first.id,
+        label: first.label,
+        rewardType: first.rewardType,
+        amount: first.amount,
+        biscuitId: first.biscuitId,
+        cumulativeWeight: 100,
+      };
+    }
+
+    // 2. Cryptographically secure random roll in [0, totalWeight)
+    const roll = secureRandomFloat() * totalWeight;
+    let cumulative = 0;
+
+    for (const r of rewards) {
+      const weight = Math.max(0, Number(r.percentage) || 0);
+      if (weight <= 0) continue; // Zero probability items are NEVER selected
+
+      cumulative += weight;
+      if (roll < cumulative) {
+        return {
+          id: r.id,
+          label: r.label,
+          rewardType: r.rewardType,
+          amount: r.amount,
+          biscuitId: r.biscuitId,
+          cumulativeWeight: totalWeight,
+        };
       }
     }
-    return SPIN_REWARDS_CUMULATIVE[0];
+
+    // Fallback: pick the highest-weighted valid non-zero item
+    const valid = rewards.filter((r) => (Number(r.percentage) || 0) > 0);
+    const chosen = valid[valid.length - 1] || rewards[0];
+    return {
+      id: chosen.id,
+      label: chosen.label,
+      rewardType: chosen.rewardType,
+      amount: chosen.amount,
+      biscuitId: chosen.biscuitId,
+      cumulativeWeight: totalWeight,
+    };
   }
 
   /**

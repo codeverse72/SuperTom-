@@ -91,7 +91,7 @@ adminRouter.delete(
 adminRouter.get('/spin', AdminSpinController.getSpinConfig);
 adminRouter.put(
   '/spin/probabilities',
-  requireAdminRole(['SUPER_ADMIN']),
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
   AdminSpinController.updateProbabilities
 );
 adminRouter.put(

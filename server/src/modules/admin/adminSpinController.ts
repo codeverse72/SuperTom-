@@ -3,13 +3,14 @@ import { z } from 'zod';
 import { prisma } from '../../config/database.js';
 import { sendSuccess, sendError } from '../../utils/apiResponse.js';
 import { AuthenticatedAdminRequest, recordAuditLog } from '../../middleware/adminAuth.js';
+import { SpinController } from '../spin/spinController.js';
 
 const spinRewardSchema = z.object({
   id: z.string(),
   label: z.string(),
   rewardType: z.enum(['poops', 'biscuit']),
-  amount: z.number().optional(),
-  biscuitId: z.string().optional(),
+  amount: z.number().nullable().optional(),
+  biscuitId: z.string().nullable().optional(),
   percentage: z.number().min(0).max(100), // e.g. 99 for 99%
 });
 
@@ -62,7 +63,8 @@ export class AdminSpinController {
 
   /**
    * PUT /api/v1/admin/spin/probabilities
-   * Strictly enforces that all probabilities sum to exactly 100%.
+   * Saves and auto-normalizes probabilities so they equal exactly 100.00%.
+   * Updates in-memory execution cache immediately for real-time player spins.
    */
   public static async updateProbabilities(req: AuthenticatedAdminRequest, res: Response): Promise<void> {
     const adminId = req.admin?.adminId;
@@ -79,29 +81,55 @@ export class AdminSpinController {
 
     const { rewards } = parse.data;
 
-    // Validate sum = 100.0% within floating precision tolerance
-    const sum = rewards.reduce((acc, r) => acc + r.percentage, 0);
-    if (Math.abs(sum - 100) > 0.001) {
-      sendError(res, `Reward probabilities must sum to exactly 100%. Current sum: ${sum.toFixed(3)}%`, 400, 'INVALID_SUM');
+    // Validate sum is strictly positive
+    const rawSum = rewards.reduce((acc, r) => acc + (Number(r.percentage) || 0), 0);
+    if (rawSum <= 0) {
+      sendError(res, 'Total probabilities must be greater than 0%', 400, 'INVALID_SUM');
       return;
+    }
+
+    // Auto-normalize percentages so sum is always mathematically 100.00%
+    const normalizedRewards = rewards.map((r) => {
+      const p = Math.max(0, Number(r.percentage) || 0);
+      return {
+        ...r,
+        amount: r.amount ?? (r.id === 'poop-0' ? 0 : undefined),
+        percentage: Number(((p / rawSum) * 100).toFixed(2)),
+      };
+    });
+
+    // Absorb any +/-0.01% rounding residue onto the largest segment
+    const currentSum = normalizedRewards.reduce((acc, r) => acc + r.percentage, 0);
+    const remainder = Number((100 - currentSum).toFixed(2));
+    if (remainder !== 0 && normalizedRewards.length > 0) {
+      let maxIdx = 0;
+      for (let i = 1; i < normalizedRewards.length; i++) {
+        if (normalizedRewards[i].percentage > normalizedRewards[maxIdx].percentage) {
+          maxIdx = i;
+        }
+      }
+      normalizedRewards[maxIdx].percentage = Number((normalizedRewards[maxIdx].percentage + remainder).toFixed(2));
     }
 
     try {
       await prisma.systemSetting.upsert({
         where: { key: 'spin_rewards_distribution' },
-        create: { key: 'spin_rewards_distribution', value: JSON.stringify(rewards) },
-        update: { value: JSON.stringify(rewards) },
+        create: { key: 'spin_rewards_distribution', value: JSON.stringify(normalizedRewards) },
+        update: { value: JSON.stringify(normalizedRewards) },
       });
+
+      // Synchronize in-memory execution cache immediately
+      SpinController.setRewardsCache(normalizedRewards);
 
       await recordAuditLog({
         adminId,
         action: 'UPDATE_SPIN_PROBABILITIES',
         targetEntity: 'SystemSetting',
-        newValue: rewards,
+        newValue: normalizedRewards,
         req,
       });
 
-      sendSuccess(res, { message: 'Spin probabilities updated successfully', rewards });
+      sendSuccess(res, { message: 'Spin probabilities updated successfully', rewards: normalizedRewards });
     } catch {
       sendError(res, 'Failed to update probabilities', 500, 'SERVER_ERROR');
     }

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { X, Sparkles, Trophy, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
@@ -12,6 +12,7 @@ export const SpinWheelModal: React.FC = () => {
     isWheelOpen, 
     setIsWheelOpen, 
     performSpin, 
+    refreshSpinStatus,
     isSpinReady, 
     remainingSpinTimeMs 
   } = useGame();
@@ -22,6 +23,12 @@ export const SpinWheelModal: React.FC = () => {
   const [wonClaimData, setWonClaimData] = useState<SpinClaimResultDto | null>(null);
   const [showRewardModal, setShowRewardModal] = useState(false);
   const [spinError, setSpinError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isWheelOpen) {
+      refreshSpinStatus();
+    }
+  }, [isWheelOpen, refreshSpinStatus]);
 
   const numSectors = SPIN_REWARDS.length;
   const sectorAngle = 360 / numSectors;
