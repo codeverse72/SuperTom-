@@ -35,7 +35,7 @@ import { storeService } from '../services/storeService';
 import { spinService } from '../services/spinService';
 import { missionService } from '../services/missionService';
 import { paymentService } from '../services/paymentService';
-import { SpinClaimResultDto, WithdrawalAccessDto } from '../services/types';
+import { SpinClaimResultDto } from '../services/types';
 
 interface SpinState {
   currentMilestone: 1 | 2 | 3;
@@ -76,8 +76,6 @@ interface GameContextType {
   missions: Mission[];
   withdrawals: WithdrawalRecord[];
   deposits: DepositRecord[];
-  withdrawalAccess: WithdrawalAccessDto | null;
-  refreshWithdrawalAccess: () => Promise<void>;
   user: UserProfile | null;
   soundEnabled: boolean;
   activeToast: ToastMessage | null;
@@ -116,7 +114,7 @@ interface GameContextType {
   startMission: (missionId: string) => void;
   verifyMission: (missionId: string) => void;
   claimMission: (missionId: string) => { success: boolean; reward?: number; title?: string };
-  requestWithdrawal: (address: string, amount: number, network?: string) => Promise<{ success: boolean; error?: string }>;
+  requestWithdrawal: (address: string, amount: number, network?: string) => Promise<{ success: boolean; error?: string; code?: string }>;
   refreshWithdrawals: () => Promise<void>;
   submitDeposit: (amountUsdt: number, network: string, txHash: string, notes?: string) => Promise<{ success: boolean; error?: string }>;
   refreshDeposits: () => Promise<void>;
@@ -267,40 +265,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>([]);
   const [deposits, setDeposits] = useState<DepositRecord[]>([]);
 
-  // Withdrawal Access Pass state ($3 for 3 withdrawals, $5 for unlimited)
-  const [withdrawalAccess, setWithdrawalAccessState] = useState<WithdrawalAccessDto | null>(() => {
-    try {
-      const cached = localStorage.getItem('supertom_cache_wd_access');
-      if (cached) return JSON.parse(cached);
-    } catch {}
-    return null;
-  });
-
-  const setWithdrawalAccess = useCallback((val: WithdrawalAccessDto | null | ((prev: WithdrawalAccessDto | null) => WithdrawalAccessDto | null)) => {
-    setWithdrawalAccessState((prev) => {
-      const next = typeof val === 'function' ? val(prev) : val;
-      try {
-        if (next) {
-          localStorage.setItem('supertom_cache_wd_access', JSON.stringify(next));
-        } else {
-          localStorage.removeItem('supertom_cache_wd_access');
-        }
-      } catch {}
-      return next;
-    });
-  }, []);
-
-  const refreshWithdrawalAccess = useCallback(async (): Promise<void> => {
-    try {
-      const res = await paymentService.getWithdrawalAccess();
-      if (res.success && res.data) {
-        setWithdrawalAccess(res.data);
-      }
-    } catch {
-      // non-blocking
-    }
-  }, [setWithdrawalAccess]);
-
   // Selected mining plan package for deposit flow
   const [selectedPlanForDeposit, setSelectedPlanForDeposit] = useState<{
     id: string;
@@ -450,15 +414,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 localStorage.setItem('supertom_cache_biscuits', JSON.stringify(mapped));
               } catch {}
             }
-
-            // 7. Withdrawal Access pass status (hydrated in 0 extra roundtrips!)
-            if (init.withdrawalAccess) {
-              setWithdrawalAccess(init.withdrawalAccess);
-            }
-          }
-
-          if (!init?.withdrawalAccess) {
-            refreshWithdrawalAccess();
           }
 
           // Fallback only if secondary data was missing from legacy backend response:
@@ -793,11 +748,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }))
         );
       }
-      refreshWithdrawalAccess();
     } catch {
       // non-blocking
     }
-  }, [refreshWithdrawalAccess]);
+  }, []);
 
   const submitDeposit = async (
     amountUsdt: number,
@@ -836,7 +790,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           notes: res.data.notes,
         };
         setDeposits((prev) => [record, ...prev]);
-        refreshWithdrawalAccess();
         showToast('Deposit Submitted', 'Your deposit has been submitted for on-chain verification.', 'success');
         return { success: true };
       } else {
@@ -884,13 +837,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         setWithdrawals((prev) => [record, ...prev]);
         setBalance((prev) => (prev !== null ? Math.max(0, prev - amount) : 0));
-        refreshWithdrawalAccess();
         showToast('Withdrawal Submitted', 'Your payout request is pending manual admin approval.', 'success');
         return { success: true };
       } else {
         const msg = res.error?.message || 'Submission failed';
         showToast('Withdrawal Error', msg, 'error');
-        return { success: false, error: msg };
+        return { success: false, error: msg, code: res.error?.code };
       }
     } catch (e: any) {
       const err = e?.message || 'Failed to submit withdrawal request';
@@ -930,8 +882,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         missions,
         withdrawals,
         deposits,
-        withdrawalAccess,
-        refreshWithdrawalAccess,
         selectedPlanForDeposit,
         setSelectedPlanForDeposit,
         buyAndActivatePlan,

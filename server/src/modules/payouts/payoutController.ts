@@ -7,7 +7,7 @@ import { validateNetworkAddress } from '../../utils/crypto.js';
 import { LedgerService } from '../ledger/ledgerService.js';
 import { env } from '../../config/env.js';
 import { DepositVerificationService } from './depositVerificationService.js';
-import { WithdrawalAccessService } from './withdrawalAccessService.js';
+import { WithdrawalEntitlementService } from './withdrawalEntitlementService.js';
 
 const withdrawalRequestSchema = z.object({
   walletAddress: z.string().min(10, 'Wallet address is required'),
@@ -83,12 +83,10 @@ export class PayoutController {
   }
 
   /**
-   * GET /api/v1/payouts/access-status
-   * Checks whether player qualifies to request a withdrawal:
-   * - Requires $3.00 deposit for next 3 free withdrawals
-   * - Requires $5.00 deposit for unlimited lifetime withdrawals
+   * GET /api/v1/payouts/entitlement
+   * Returns whether user can withdraw, quota remaining, or unlimited status.
    */
-  public static async getAccessStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
+  public static async getEntitlement(req: AuthenticatedRequest, res: Response): Promise<void> {
     const userId = req.user?.userId;
     if (!userId) {
       sendError(res, 'Unauthorized', 401, 'UNAUTHORIZED');
@@ -96,10 +94,10 @@ export class PayoutController {
     }
 
     try {
-      const access = await WithdrawalAccessService.getUserWithdrawalAccess(userId);
-      sendSuccess(res, access);
+      const entitlement = await WithdrawalEntitlementService.getUserEntitlement(userId);
+      sendSuccess(res, entitlement);
     } catch {
-      sendError(res, 'Failed to fetch withdrawal access status', 500, 'WITHDRAWAL_ACCESS_ERROR');
+      sendError(res, 'Failed to fetch withdrawal entitlement', 500, 'ENTITLEMENT_ERROR');
     }
   }
 
@@ -112,19 +110,6 @@ export class PayoutController {
     const userId = req.user?.userId;
     if (!userId) {
       sendError(res, 'Unauthorized', 401, 'UNAUTHORIZED');
-      return;
-    }
-
-    // Strict Gate: Verify player has an active deposit qualification pass ($3 for 3, or $5 for unlimited)
-    const access = await WithdrawalAccessService.getUserWithdrawalAccess(userId);
-    if (!access.canWithdraw) {
-      sendError(
-        res,
-        'Withdrawal locked: A minimum deposit of $3 is required for next 3 withdrawals, or $5 for unlimited withdrawals.',
-        403,
-        'DEPOSIT_REQUIRED_FOR_WITHDRAWAL',
-        access
-      );
       return;
     }
 
@@ -166,6 +151,10 @@ export class PayoutController {
         if (user.poopsBalance < amountBig) {
           throw new Error(`Insufficient balance. Available: ${user.poopsBalance} Poops, Requested: ${amountBig} Poops`);
         }
+
+        // 1.5 Strictly enforce deposit requirement for withdrawals:
+        // $3 deposit unlocks 3 withdrawals, $5 deposit unlocks unlimited withdrawals
+        await WithdrawalEntitlementService.validateAndConsumeWithdrawal(tx, userId);
 
         // 2. Reserve balance via LedgerService (atomic deduction)
         await LedgerService.executeBalanceTransaction(tx, {
@@ -221,6 +210,16 @@ export class PayoutController {
         message: 'Withdrawal request submitted successfully. Pending administrative review.',
       });
     } catch (err: unknown) {
+      if ((err as any)?.code === 'WITHDRAWAL_DEPOSIT_REQUIRED') {
+        sendError(
+          res,
+          'A deposit of $3.00 (for 3 withdrawals) or $5.00 (for unlimited withdrawals) is required to unlock payouts.',
+          403,
+          'WITHDRAWAL_DEPOSIT_REQUIRED',
+          { requiresDeposit: true }
+        );
+        return;
+      }
       const msg = err instanceof Error ? err.message : 'Withdrawal submission failed';
       sendError(res, msg, 400, 'WITHDRAWAL_FAILED');
     }

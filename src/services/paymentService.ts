@@ -14,8 +14,7 @@ import {
   TreasuryWalletsResponseDto,
   CreateDepositIntentRequestDto,
   CreateDepositIntentResponseDto,
-  DepositStatusResponseDto,
-  WithdrawalAccessDto
+  DepositStatusResponseDto
 } from './types';
 
 export const paymentService = {
@@ -51,7 +50,7 @@ export const paymentService = {
     return apiClient.post<{ success: boolean; message: string; newBalance?: number }>(`/payouts/deposits/${depositId}/verify`, { txHash, amountUsdt });
   },
 
-  getWithdrawalAccess: async (): Promise<ApiResponse<WithdrawalAccessDto>> => {
-    return apiClient.get<WithdrawalAccessDto>('/payouts/access-status');
+  getWithdrawalEntitlement: async (): Promise<ApiResponse<import('./types').WithdrawalEntitlementDto>> => {
+    return apiClient.get<import('./types').WithdrawalEntitlementDto>('/payouts/entitlement');
   },
 };

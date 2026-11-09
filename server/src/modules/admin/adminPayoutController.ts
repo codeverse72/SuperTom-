@@ -7,6 +7,7 @@ import { LedgerService } from '../ledger/ledgerService.js';
 import { CampaignService } from '../campaign/campaignService.js';
 import { PayoutAutomationService } from '../payoutAutomation/payoutAutomationService.js';
 import { DepositVerificationService } from '../payouts/depositVerificationService.js';
+import { WithdrawalEntitlementService } from '../payouts/withdrawalEntitlementService.js';
 import { logger } from '../../utils/logger.js';
 import { WithdrawalStatus, DepositStatus } from '@prisma/client';
 
@@ -499,6 +500,16 @@ export class AdminPayoutController {
           });
         } catch (cErr) {
           console.error('[AdminPayout] Campaign processing error in confirmDeposit:', cErr);
+        }
+
+        // 1.6 Grant withdrawal entitlement ($3 for 3 withdrawals, $5 for unlimited)
+        try {
+          await WithdrawalEntitlementService.processDepositConfirmed(tx, {
+            userId: deposit.userId,
+            amountUsdt: Number(deposit.amountUsdt),
+          });
+        } catch (wErr) {
+          console.error('[AdminPayout] Withdrawal entitlement error in confirmDeposit:', wErr);
         }
 
         // 2. Adjust mining speed if a plan boost applies

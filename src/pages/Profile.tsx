@@ -410,7 +410,7 @@ export const Profile: React.FC = () => {
               <div className="p-3 rounded-2xl bg-purple-950/60 border border-purple-500/20">
                 <h4 className="font-bold text-amber-300">What is the USDT conversion?</h4>
                 <p className="text-purple-200/80 mt-1">
-                  2,000 Poops = 1 USDT. You can request withdrawals to your TRC20 wallet in the Payout tab starting from 2,000 Poops.
+                  2,000 Poops = 1 USDT. You can request withdrawals in the Withdraw tab starting from $1.00 USD (2,000 Poops).
                 </p>
               </div>
               <div className="p-3 rounded-2xl bg-purple-950/60 border border-purple-500/20">

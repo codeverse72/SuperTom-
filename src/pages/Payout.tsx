@@ -25,8 +25,8 @@ import {
   Send,
   X,
   Lock,
-  Crown,
-  ShieldAlert
+  Unlock,
+  Crown
 } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { formatNumber, poopsToUsdt } from '../utils/probability';
@@ -34,7 +34,7 @@ import { MIN_WITHDRAWAL_POOPS } from '../config/gameConfig';
 import { validateNetworkAddress } from '../utils/validation';
 import { paymentService } from '../services/paymentService';
 import { QRCode } from '../components/QRCode';
-import { DepositDto } from '../services/types';
+import { DepositDto, WithdrawalEntitlementDto } from '../services/types';
 import { CampaignBanner } from '../components/CampaignBanner';
 import { sound } from '../utils/sound';
 
@@ -216,8 +216,6 @@ export const Payout: React.FC = () => {
     balance, 
     withdrawals, 
     deposits, 
-    withdrawalAccess,
-    refreshWithdrawalAccess,
     requestWithdrawal, 
     refreshWithdrawals, 
     submitDeposit, 
@@ -251,6 +249,10 @@ export const Payout: React.FC = () => {
   const [withdrawAmountUsd, setWithdrawAmountUsd] = useState('');
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+
+  // Entitlement State ($3 for 3 withdrawals, $5 for unlimited)
+  const [entitlement, setEntitlement] = useState<WithdrawalEntitlementDto | null>(null);
+  const [showUnlockModal, setShowUnlockModal] = useState<boolean>(false);
 
   // Treasury dynamic addresses map
   const [treasuryWallets, setTreasuryWallets] = useState<Record<string, string>>({});
@@ -330,6 +332,46 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
     return list.sort((a, b) => a - b);
   }, [selectedPlanForDeposit]);
 
+  const fetchEntitlement = async () => {
+    try {
+      const res = await paymentService.getWithdrawalEntitlement();
+      if (res.success && res.data) {
+        setEntitlement(res.data);
+      }
+    } catch {
+      // fallback
+    }
+  };
+
+  const handleSelectUnlockTier = (amount: number, label: string) => {
+    setShowUnlockModal(false);
+    setActiveTab('deposit');
+    const defaultCur = SUPPORTED_CURRENCIES[2]; // USDT TRC20 by default
+    setActiveDepositCurrency(defaultCur);
+    setDepositAmountUsd(amount);
+    setCustomAmountInput(amount.toFixed(2));
+    setDepositTxHash('');
+    setDepositError(null);
+    setDepositStatus('WAITING_FOR_PAYMENT');
+
+    paymentService.createDepositIntent({
+      amountUsdt: amount,
+      currency: defaultCur.symbol,
+      network: defaultCur.network,
+      notes: `[Withdrawal Activation: ${label}]`,
+    }).then((res) => {
+      if (res.success && res.data) {
+        setActiveDepositId(res.data.id);
+      }
+    });
+
+    showToast(
+      'Activation Deposit Selected',
+      `Deposit $${amount.toFixed(2)} to unlock ${amount >= 5 ? 'Unlimited Lifetime' : '3 Free'} Withdrawals!`,
+      'reward'
+    );
+  };
+
   // Fetch Treasury Wallets & refresh user payout data on mount
   useEffect(() => {
     paymentService.getTreasuryWallets().then((res) => {
@@ -343,8 +385,8 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
     });
     refreshWithdrawals();
     refreshDeposits();
-    refreshWithdrawalAccess();
-  }, [refreshWithdrawals, refreshDeposits, refreshWithdrawalAccess]);
+    fetchEntitlement();
+  }, [refreshWithdrawals, refreshDeposits]);
 
   // When selectedPlanForDeposit is set from Store (Buy Biscuit), open deposit view with that exact amount
   useEffect(() => {
@@ -478,13 +520,13 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
     e.preventDefault();
     setWithdrawError(null);
 
-    // Enforce Deposit Pass Gate: $3 for 3 withdrawals, $5 for unlimited
-    if (!withdrawalAccess?.canWithdraw) {
-      const msg = withdrawalAccess?.tier === 'THREE_PACK'
-        ? 'You have used all 3 withdrawals included in your $3 pass. Deposit $3 for 3 more withdrawals, or $5 for lifetime unlimited withdrawals.'
-        : 'Deposit required: To request withdrawals, make a $3 deposit for your next 3 withdrawals, or a $5 deposit for lifetime unlimited withdrawals.';
-      setWithdrawError(msg);
-      showToast('Deposit Required', msg, 'error');
+    // Strictly enforce deposit requirement for withdrawals:
+    // Deposit $3 for 3 withdrawals or $5 for unlimited lifetime withdrawals.
+    if (!entitlement || !entitlement.canWithdraw) {
+      if (window.Telegram?.WebApp?.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
+      }
+      setShowUnlockModal(true);
       return;
     }
 
@@ -501,7 +543,7 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
     }
 
     if (amountUsdNum < currency.minWithdrawUsd) {
-      setWithdrawError(`Minimum withdrawal is $${currency.minWithdrawUsd.toFixed(2)} USD.`);
+      setWithdrawError(`Minimum withdrawal is $${currency.minWithdrawUsd.toFixed(2)} USD (2,000 Poops).`);
       return;
     }
 
@@ -529,14 +571,18 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
       setActiveWithdrawCurrencyId(null);
       showToast('Withdrawal Requested', `Submitted for admin approval: $${amountUsdNum.toFixed(2)} USD`, 'success');
       refreshWithdrawals();
+      fetchEntitlement();
     } else {
+      if (res.code === 'WITHDRAWAL_DEPOSIT_REQUIRED') {
+        setShowUnlockModal(true);
+      }
       setWithdrawError(res.error || 'Failed to submit withdrawal request.');
     }
   };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await Promise.all([refreshWithdrawals(), refreshDeposits(), refreshWithdrawalAccess()]);
+    await Promise.all([refreshWithdrawals(), refreshDeposits(), fetchEntitlement()]);
     setIsRefreshing(false);
   };
 
@@ -812,13 +858,17 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
                     <span className="block text-[8px] text-amber-300 font-mono font-bold uppercase tracking-tight">
                       Biscuit Price
                     </span>
-                  ) : amt === 10 ? (
-                    <span className="block text-[8px] text-amber-300 font-mono font-bold">
-                      +30% + 13d Daily
+                  ) : amt === 3 ? (
+                    <span className="block text-[8px] text-cyan-300 font-mono font-bold">
+                      3 Withdrawals
                     </span>
                   ) : amt === 5 ? (
                     <span className="block text-[8px] text-amber-300 font-mono font-bold">
-                      +30% + 5d Daily
+                      Unlimited Payouts
+                    </span>
+                  ) : amt === 10 ? (
+                    <span className="block text-[8px] text-amber-300 font-mono font-bold">
+                      +30% + 13d Daily
                     </span>
                   ) : null}
                 </button>
@@ -1190,138 +1240,78 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
         </div>
       </a>
 
-      {/* 5b. Withdrawal Access Pass Status Banner (Only on Withdraw tab) */}
-      {activeTab === 'payout' && (
-        <div className="space-y-2">
-          {withdrawalAccess?.tier === 'UNLIMITED' ? (
-            <div className="rounded-2xl p-3.5 bg-gradient-to-r from-amber-500/20 via-purple-900/40 to-amber-500/20 border border-amber-400/50 shadow-lg flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-slate-950 font-black shadow-md shrink-0">
-                  <Crown className="w-5 h-5 text-slate-950" />
+      {/* 5.5. Withdrawal Entitlement Status Banner */}
+      {activeTab === 'payout' && entitlement && (
+        <div className="animate-in fade-in duration-200">
+          {entitlement.hasUnlimitedWithdrawals ? (
+            <div className="rounded-2xl p-3 bg-gradient-to-r from-amber-500/20 via-emerald-500/15 to-amber-500/20 border border-amber-400/50 shadow-lg flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 shrink-0">
+                  <Crown className="w-4 h-4 text-amber-400 fill-amber-400/30" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-xs font-black text-white font-display uppercase tracking-wider">
-                      VIP Unlimited Pass
-                    </h4>
-                    <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[9px] font-mono font-bold uppercase">
-                      Active
-                    </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-white font-display">UNLIMITED WITHDRAWALS</span>
+                    <span className="px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 text-[9px] font-black uppercase tracking-wider">VIP ACTIVE</span>
                   </div>
-                  <p className="text-[11px] text-amber-200/90 leading-tight mt-0.5">
-                    Lifetime withdrawals unlocked! Total deposited: <span className="font-mono font-bold text-white">${withdrawalAccess.totalDepositedUsd.toFixed(2)} USD</span>
+                  <p className="text-[10px] text-amber-200/80">Lifetime withdrawal access unlocked. No quota limits.</p>
+                </div>
+              </div>
+              <div className="px-2.5 py-1 rounded-xl bg-amber-500/20 border border-amber-400/40 text-[10px] font-black text-amber-300 font-mono shrink-0">
+                ∞ SLOTS
+              </div>
+            </div>
+          ) : entitlement.remainingWithdrawals > 0 ? (
+            <div className="rounded-2xl p-3 bg-gradient-to-r from-cyan-950/60 via-blue-950/60 to-cyan-950/60 border border-cyan-500/40 shadow-lg flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 shrink-0">
+                  <Sparkles className="w-4 h-4 text-cyan-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-white font-display">WITHDRAWAL QUOTA ACTIVE</span>
+                    <span className="px-1.5 py-0.2 rounded bg-cyan-400/20 text-cyan-300 text-[9px] font-black uppercase tracking-wider">READY</span>
+                  </div>
+                  <p className="text-[10px] text-cyan-200/80">
+                    You have {entitlement.remainingWithdrawals} free withdrawal{entitlement.remainingWithdrawals > 1 ? 's' : ''} available.
                   </p>
                 </div>
               </div>
-            </div>
-          ) : withdrawalAccess?.tier === 'THREE_PACK' ? (
-            <div className="rounded-2xl p-3.5 bg-gradient-to-r from-cyan-950/60 via-[#0d1f33] to-cyan-950/60 border border-cyan-500/40 shadow-lg space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 shrink-0">
-                    <Zap className="w-4 h-4 text-cyan-400" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-xs font-black text-white font-display uppercase tracking-wider">
-                        3-Withdrawal Pass
-                      </h4>
-                      <span className="px-2 py-0.5 rounded-full bg-cyan-400/20 text-cyan-300 border border-cyan-400/40 text-[9px] font-mono font-bold uppercase">
-                        {withdrawalAccess.remainingWithdrawals} Left
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-cyan-200/80 leading-tight mt-0.5">
-                      {withdrawalAccess.remainingWithdrawals} of {withdrawalAccess.totalAllowedWithdrawals} free withdrawals remaining.
-                    </p>
-                  </div>
-                </div>
-
+              <div className="text-right shrink-0">
+                <span className="text-xs font-black text-cyan-300 font-mono block">
+                  {entitlement.remainingWithdrawals} LEFT
+                </span>
                 <button
                   type="button"
-                  onClick={() => handleOpenDepositDetails(SUPPORTED_CURRENCIES[2], 5)}
-                  className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:brightness-110 active:scale-95 text-slate-950 font-black text-[10px] uppercase tracking-wide transition-all cursor-pointer shadow-md shrink-0 flex items-center gap-1"
+                  onClick={() => setShowUnlockModal(true)}
+                  className="text-[9px] text-cyan-400 underline hover:text-white cursor-pointer"
                 >
-                  <Crown className="w-3 h-3 text-slate-950" />
-                  <span>Get VIP $5</span>
+                  Upgrade to Unlimited
                 </button>
               </div>
             </div>
           ) : (
-            <div className="rounded-2xl p-3.5 bg-gradient-to-b from-rose-950/40 via-[#180d1e] to-[#0d1024] border border-amber-500/40 shadow-xl space-y-3">
-              <div className="flex items-start gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 shrink-0 mt-0.5">
-                  <Lock className="w-4 h-4 text-amber-400" />
+            <div
+              onClick={() => setShowUnlockModal(true)}
+              className="rounded-2xl p-3.5 bg-gradient-to-r from-rose-950/60 via-purple-950/60 to-amber-950/50 border border-rose-500/40 shadow-lg flex items-center justify-between cursor-pointer hover:border-amber-400/60 transition-all active:scale-[0.99]"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-rose-500/20 border border-rose-400/40 flex items-center justify-center text-rose-300 shrink-0">
+                  <Lock className="w-4 h-4 text-rose-400" />
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-black text-white font-display uppercase tracking-wider flex items-center gap-1.5">
-                      <span>Deposit Pass Required to Withdraw</span>
-                    </h4>
-                    <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[9px] font-mono font-bold uppercase">
-                      Locked
-                    </span>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-white font-display">WITHDRAWALS LOCKED</span>
+                    <span className="px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 text-[9px] font-black uppercase tracking-wider">DEPOSIT REQUIRED</span>
                   </div>
-                  <p className="text-[11px] text-slate-300 leading-relaxed mt-1">
-                    To prevent bot abuse and guarantee fast on-chain payouts, players must deposit to activate withdrawals:
+                  <p className="text-[10px] text-slate-300">
+                    Deposit $3 (for 3 withdrawals) or $5 (for unlimited).
                   </p>
                 </div>
               </div>
-
-              {/* 2 Pass Offer Options */}
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                {/* 3-Pack Option */}
-                <div
-                  onClick={() => handleOpenDepositDetails(SUPPORTED_CURRENCIES[2], 3)}
-                  className="p-3 rounded-xl bg-[#0a1224] border border-cyan-500/40 hover:border-cyan-400 transition-all cursor-pointer active:scale-[0.98] flex flex-col justify-between group shadow-md"
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-bold text-cyan-300 uppercase tracking-wider">Starter Pass</span>
-                      <span className="text-xs font-black text-white font-mono">$3</span>
-                    </div>
-                    <div className="text-[11px] font-bold text-white group-hover:text-cyan-300 transition-colors">
-                      3 Withdrawals
-                    </div>
-                    <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">
-                      Free next 3 payouts
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="mt-2.5 w-full py-1.5 rounded-lg bg-cyan-500/20 group-hover:bg-cyan-500 text-cyan-300 group-hover:text-black font-black text-[10px] uppercase transition-all tracking-wider text-center"
-                  >
-                    Deposit $3
-                  </button>
-                </div>
-
-                {/* Unlimited VIP Option */}
-                <div
-                  onClick={() => handleOpenDepositDetails(SUPPORTED_CURRENCIES[2], 5)}
-                  className="p-3 rounded-xl bg-gradient-to-b from-amber-950/40 to-[#171024] border border-amber-400/50 hover:border-amber-300 transition-all cursor-pointer active:scale-[0.98] flex flex-col justify-between group shadow-md relative overflow-hidden"
-                >
-                  <div className="absolute top-0 right-0 bg-gradient-to-l from-amber-400 to-amber-500 text-slate-950 text-[8px] font-black uppercase px-2 py-0.5 rounded-bl-lg font-mono">
-                    VIP Best
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider">VIP Pass</span>
-                      <span className="text-xs font-black text-white font-mono">$5</span>
-                    </div>
-                    <div className="text-[11px] font-bold text-white group-hover:text-amber-300 transition-colors flex items-center gap-1">
-                      <span>Unlimited</span>
-                      <Crown className="w-3 h-3 text-amber-400" />
-                    </div>
-                    <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">
-                      Lifetime unlimited payouts
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="mt-2.5 w-full py-1.5 rounded-lg bg-amber-400/20 group-hover:bg-amber-400 text-amber-300 group-hover:text-black font-black text-[10px] uppercase transition-all tracking-wider text-center"
-                  >
-                    Deposit $5
-                  </button>
-                </div>
+              <div className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black text-[11px] shadow-md flex items-center gap-1 shrink-0">
+                <span>Unlock</span>
+                <ChevronRight className="w-3.5 h-3.5" />
               </div>
             </div>
           )}
@@ -1399,7 +1389,7 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
                       <div className="flex items-center justify-between text-[11px] font-bold text-slate-300 mb-1">
                         <span>Withdraw Amount (USD):</span>
                         <span className="text-slate-400 font-mono">
-                          Max: ${balanceUsd}
+                          Min: $1.00 • Max: ${balanceUsd}
                         </span>
                       </div>
 
@@ -1414,7 +1404,7 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
                             setWithdrawAmountUsd(e.target.value);
                             setWithdrawError(null);
                           }}
-                          placeholder="0.00"
+                          placeholder="1.00"
                           className="w-full pl-3 pr-14 py-2.5 rounded-xl bg-[#090e1c] border border-cyan-900/60 text-white font-mono font-bold text-xs focus:outline-none focus:border-cyan-400"
                         />
                         <button
@@ -1425,41 +1415,28 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
                           MAX
                         </button>
                       </div>
+
+                      <p className="text-[10px] text-cyan-400 font-mono mt-1 font-semibold flex items-center justify-between">
+                        <span>Minimum withdrawal is $1.00 USD (2,000 Poops)</span>
+                        {parseFloat(withdrawAmountUsd) > 0 && (
+                          <span className="text-amber-300">≈ {Math.round(parseFloat(withdrawAmountUsd) * 2000).toLocaleString()} Poops 💩</span>
+                        )}
+                      </p>
                     </div>
 
-                    {/* Minimum Withdrawal Notice & Deposit Gate Alert (Matching Screenshot 3) */}
-                    {!withdrawalAccess?.canWithdraw ? (
-                      <div className="p-3 rounded-xl bg-amber-950/50 border border-amber-500/40 space-y-2">
-                        <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
+                    {/* Deposit Required Callout if locked */}
+                    {(!entitlement || !entitlement.canWithdraw) && (
+                      <div
+                        onClick={() => setShowUnlockModal(true)}
+                        className="p-2.5 rounded-xl bg-gradient-to-r from-amber-950/70 to-rose-950/70 border border-amber-500/40 text-amber-200 text-xs flex items-center justify-between cursor-pointer hover:border-amber-400 transition-colors shadow-sm"
+                      >
+                        <div className="flex items-center gap-2">
                           <Lock className="w-4 h-4 text-amber-400 shrink-0" />
-                          <span>Deposit Pass Required to Withdraw</span>
+                          <span className="text-[11px] font-bold">Deposit required: $3 (3 payouts) or $5 (Unlimited)</span>
                         </div>
-                        <p className="text-[11px] text-slate-300 leading-snug">
-                          {withdrawalAccess?.tier === 'THREE_PACK'
-                            ? 'You have used all 3 withdrawals included in your $3 pass. Deposit $3 to unlock 3 more withdrawals, or $5 for lifetime unlimited withdrawals.'
-                            : 'To prevent bot abuse and secure network payouts, deposit $3 for your next 3 withdrawals or $5 for lifetime unlimited withdrawals.'}
-                        </p>
-                        <div className="grid grid-cols-2 gap-2 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenDepositDetails(SUPPORTED_CURRENCIES[2], 3)}
-                            className="py-1.5 px-2 rounded-lg bg-cyan-950 border border-cyan-500/40 text-cyan-300 hover:text-white font-bold text-[10px] text-center transition-all cursor-pointer"
-                          >
-                            Deposit $3 (3-Pack)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenDepositDetails(SUPPORTED_CURRENCIES[2], 5)}
-                            className="py-1.5 px-2 rounded-lg bg-amber-950 border border-amber-500/40 text-amber-300 hover:text-white font-bold text-[10px] text-center transition-all cursor-pointer"
-                          >
-                            Deposit $5 (Unlimited)
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-[11px] text-rose-300 flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                        <span>Minimum withdrawal is 2,000 Poops (1.00 USDT).</span>
+                        <span className="px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 font-black text-[10px] uppercase shrink-0">
+                          Unlock Now
+                        </span>
                       </div>
                     )}
 
@@ -1470,32 +1447,30 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
                       </div>
                     )}
 
-                    {/* Action Button: Adapts to Unlock when locked or Confirm when unlocked */}
-                    {!withdrawalAccess?.canWithdraw ? (
-                      <button
-                        type="button"
-                        onClick={() => handleOpenDepositDetails(SUPPORTED_CURRENCIES[2], 3)}
-                        className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-600 via-rose-600 to-amber-600 hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-all cursor-pointer flex items-center justify-center gap-2"
-                      >
-                        <Lock className="w-4 h-4" />
-                        <span>UNLOCK WITHDRAWAL (DEPOSIT $3 OR $5)</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="submit"
-                        disabled={isWithdrawing || !withdrawAddress.trim() || !withdrawAmountUsd}
-                        className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-cyan-500 hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-                      >
-                        {isWithdrawing ? (
-                          <>
-                            <RefreshCw className="w-4 h-4 animate-spin text-cyan-200" />
-                            <span>Submitting Request...</span>
-                          </>
-                        ) : (
-                          <span>CONFIRM WITHDRAWAL (${parseFloat(withdrawAmountUsd) > 0 ? parseFloat(withdrawAmountUsd).toFixed(2) : '0.00'})</span>
-                        )}
-                      </button>
-                    )}
+                    {/* Big Cyan Confirm Button - Clicking when not entitled opens activation popup */}
+                    <button
+                      type="submit"
+                      onClick={(e) => {
+                        if (!entitlement || !entitlement.canWithdraw) {
+                          e.preventDefault();
+                          if (window.Telegram?.WebApp?.HapticFeedback) {
+                            window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
+                          }
+                          setShowUnlockModal(true);
+                        }
+                      }}
+                      disabled={isWithdrawing || (entitlement?.canWithdraw ? (!withdrawAddress.trim() || !withdrawAmountUsd) : false)}
+                      className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-cyan-500 hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {isWithdrawing ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin text-cyan-200" />
+                          <span>Submitting Request...</span>
+                        </>
+                      ) : (
+                        <span>CONFIRM WITHDRAWAL ({parseFloat(withdrawAmountUsd) > 0 ? `$${parseFloat(withdrawAmountUsd).toFixed(2)}` : '$1.00'})</span>
+                      )}
+                    </button>
                   </form>
                 </div>
               )}
@@ -1572,14 +1547,14 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
             </div>
           ) : (
             <p className="text-xs text-slate-500 text-center py-4 font-mono">
-              No payout requests yet.
+              No withdrawal requests yet.
             </p>
           )
         )}
 
         {/* 24/7 Official Support Link */}
         <div className="pt-3 border-t border-cyan-900/30 flex items-center justify-between text-xs text-slate-400">
-          <span className="text-[11px] text-slate-400">Questions about deposits or payouts?</span>
+          <span className="text-[11px] text-slate-400">Questions about deposits or withdrawals?</span>
           <a
             href="https://t.me/SuperTomCare"
             target="_blank"
@@ -1597,6 +1572,138 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
           </a>
         </div>
       </div>
+
+      {/* 8. Withdrawal Unlock & Activation Modal ($3 for 3 payouts, $5 for Unlimited) */}
+      {showUnlockModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-3xl bg-[#090e1c] border border-cyan-500/40 p-4 space-y-3.5 shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={() => setShowUnlockModal(false)}
+              className="absolute top-3.5 right-3.5 p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all cursor-pointer z-10"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Header */}
+            <div className="text-center pt-1 space-y-1">
+              <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-amber-400/25 via-purple-500/20 to-cyan-400/25 border border-amber-400/50 flex items-center justify-center shadow-lg mb-1.5">
+                <Crown className="w-6 h-6 text-amber-400 fill-amber-400/30" />
+              </div>
+              <h3 className="text-base font-black text-white font-display tracking-tight">
+                Activate Withdrawals
+              </h3>
+              <p className="text-[11px] text-slate-300 leading-snug px-1">
+                To guarantee security and instant blockchain payouts, choose an activation deposit to unlock your withdrawals:
+              </p>
+            </div>
+
+            {/* Plan Options */}
+            <div className="space-y-2.5">
+              {/* Option 1: $3 Deposit */}
+              <div className="rounded-2xl bg-gradient-to-br from-[#0c162c] to-[#070b15] border border-cyan-500/40 p-3 space-y-2 shadow-md hover:border-cyan-400 transition-all">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 shrink-0">
+                      <Check className="w-4 h-4 stroke-[3]" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-white">Starter Access</h4>
+                      <span className="text-[10px] text-cyan-300 font-bold">3 Free Withdrawals</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-black text-cyan-400 font-mono">$3.00</span>
+                    <span className="block text-[8px] text-slate-400 font-mono">USDT / Crypto</span>
+                  </div>
+                </div>
+
+                <div className="p-2 rounded-xl bg-[#040711] border border-cyan-950/80 text-[10px] text-slate-300 space-y-1">
+                  <div className="flex items-center gap-1.5 text-cyan-200">
+                    <Check className="w-3 h-3 text-cyan-400 shrink-0" />
+                    <span>Unlocks your next 3 withdrawal requests</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-slate-300">
+                    <Check className="w-3 h-3 text-cyan-400 shrink-0" />
+                    <span>Full $3.00 (6,000 Poops) credited to balance</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelectUnlockTier(3, '3 Free Withdrawals ($3.00)')}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <span>Deposit $3 (Get 3 Withdrawals)</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Option 2: $5 Deposit - RECOMMENDED / UNLIMITED */}
+              <div className="rounded-2xl bg-gradient-to-br from-[#1a1202] via-[#100e26] to-[#0c162c] border-2 border-amber-400/70 p-3 space-y-2 shadow-[0_0_20px_rgba(245,158,11,0.25)] relative overflow-hidden">
+                <div className="absolute top-0 right-0 bg-gradient-to-l from-amber-400 to-amber-500 text-slate-950 font-black text-[8px] uppercase px-2.5 py-0.5 rounded-bl-lg tracking-wider shadow-md">
+                  RECOMMENDED • UNLIMITED
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-300 shrink-0">
+                      <Crown className="w-4 h-4 text-amber-400 fill-amber-400/30" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-amber-300 font-display">King VIP Pass</h4>
+                      <span className="text-[10px] text-amber-200/90 font-bold">Unlimited Lifetime Withdrawals</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-black text-amber-400 font-mono">$5.00</span>
+                    <span className="block text-[8px] text-slate-400 font-mono">USDT / Crypto</span>
+                  </div>
+                </div>
+
+                <div className="p-2 rounded-xl bg-[#08070d] border border-amber-500/20 text-[10px] space-y-1">
+                  <div className="flex items-center gap-1.5 text-amber-200 font-bold">
+                    <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
+                    <span>Unlimited Withdrawals Forever (Never locked)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-slate-300">
+                    <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                    <span>Full $5.00 (10,000 Poops) credited to balance</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-slate-300">
+                    <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                    <span>+30% Mining Boost + 5 Days Daily Bonus</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelectUnlockTier(5, 'Unlimited Lifetime Withdrawals ($5.00)')}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:brightness-110 active:scale-95 text-slate-950 font-black text-xs uppercase tracking-wider shadow-[0_0_15px_rgba(245,158,11,0.4)] transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <span>Deposit $5 (Unlock Unlimited)</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Note */}
+            <p className="text-[10px] text-slate-400 text-center leading-tight">
+              ✨ 100% of your deposit is credited to your Poops balance and can be mined or withdrawn!
+            </p>
+
+            {/* Dismiss */}
+            <button
+              type="button"
+              onClick={() => setShowUnlockModal(false)}
+              className="w-full py-1.5 text-center text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+            >
+              Maybe Later
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

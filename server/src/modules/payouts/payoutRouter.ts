@@ -9,7 +9,7 @@ const withdrawalLimiter = createRateLimiter(60000, 3); // Max 3 withdrawal attem
 const depositLimiter = createRateLimiter(60000, 5); // Max 5 deposit submissions per minute
 
 payoutRouter.get('/history', requireAuth, PayoutController.getHistory);
-payoutRouter.get('/access-status', requireAuth, PayoutController.getAccessStatus);
+payoutRouter.get('/entitlement', requireAuth, PayoutController.getEntitlement);
 payoutRouter.post('/request', requireAuth, withdrawalLimiter, PayoutController.requestWithdrawal);
 payoutRouter.get('/wallets', requireAuth, PayoutController.getWallets);
 payoutRouter.post('/wallets', requireAuth, PayoutController.saveWallet);

@@ -112,6 +112,8 @@ model User {
   levelTitle      String         @default("Feline Cadet")
   referralCode    String         @unique
   referredById    String?
+  remainingWithdrawals Int      @default(0)
+  hasUnlimitedWithdrawals Boolean @default(false)
   accountStatus   AccountStatus  @default(ACTIVE)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt

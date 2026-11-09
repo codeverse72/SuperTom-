@@ -59,18 +59,7 @@ export interface UserSessionDto {
       total: number;
     }>;
     biscuits?: Array<any>;
-    withdrawalAccess?: WithdrawalAccessDto;
   };
-}
-
-export interface WithdrawalAccessDto {
-  canWithdraw: boolean;
-  isUnlimited: boolean;
-  remainingWithdrawals: number;
-  totalDepositedUsd: number;
-  completedWithdrawalsCount: number;
-  tier: 'LOCKED' | 'THREE_PACK' | 'UNLIMITED';
-  message: string;
 }
 
 export interface BalanceDto {
@@ -308,4 +297,13 @@ export interface CampaignStatusResponseDto {
   campaign: CampaignConfigDto;
   isParticipating: boolean;
   participation: UserCampaignParticipationDto | null;
+}
+
+export interface WithdrawalEntitlementDto {
+  canWithdraw: boolean;
+  hasUnlimitedWithdrawals: boolean;
+  remainingWithdrawals: number;
+  totalDepositedUsd: number;
+  requiredDepositTier1: number; // $3.00 for 3 withdrawals
+  requiredDepositTier2: number; // $5.00 for unlimited withdrawals
 }

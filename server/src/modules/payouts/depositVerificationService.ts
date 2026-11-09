@@ -3,6 +3,7 @@ import { env } from '../../config/env.js';
 import { LedgerService } from '../ledger/ledgerService.js';
 import { logger } from '../../utils/logger.js';
 import { CampaignService } from '../campaign/campaignService.js';
+import { WithdrawalEntitlementService } from './withdrawalEntitlementService.js';
 
 export interface CryptoPriceMap {
   [currency: string]: number; // price in USD
@@ -189,6 +190,16 @@ Your account balance has been updated immediately!`;
         });
       } catch (cErr) {
         logger.error('[DepositVerification] Campaign processing error:', cErr);
+      }
+
+      // 2.6 Grant withdrawal entitlement ($3 for 3 withdrawals, $5 for unlimited)
+      try {
+        await WithdrawalEntitlementService.processDepositConfirmed(tx, {
+          userId: deposit.userId,
+          amountUsdt: amountUsdtNum,
+        });
+      } catch (wErr) {
+        logger.error('[DepositVerification] Withdrawal entitlement error:', wErr);
       }
 
       // 3. Dispatch Telegram Notification
