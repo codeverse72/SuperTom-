@@ -89,8 +89,17 @@ export const SPIN_REWARDS: SpinRewardConfig[] = [
     label: '100 Poops',
     rewardType: 'poops',
     amount: 100,
-    probability: 99.0,
+    probability: 25.0,
     color: '#8b5cf6', // neon purple
+    textColor: '#ffffff'
+  },
+  {
+    id: 'poop-300',
+    label: '300 Poops',
+    rewardType: 'poops',
+    amount: 300,
+    probability: 6.0,
+    color: '#06b6d4', // cyan
     textColor: '#ffffff'
   },
   {
@@ -98,16 +107,34 @@ export const SPIN_REWARDS: SpinRewardConfig[] = [
     label: '250 Poops',
     rewardType: 'poops',
     amount: 250,
-    probability: 0.2,
-    color: '#3b82f6', // blue
+    probability: 15.0,
+    color: '#3b82f6', // electric blue
     textColor: '#ffffff'
   },
   {
-    id: 'poop-500',
-    label: '500 Poops',
+    id: 'poop-750',
+    label: '750 Poops',
     rewardType: 'poops',
-    amount: 500,
-    probability: 0.2,
+    amount: 750,
+    probability: 3.0,
+    color: '#f59e0b', // amber orange
+    textColor: '#ffffff'
+  },
+  {
+    id: 'poop-0',
+    label: '0 Poops',
+    rewardType: 'poops',
+    amount: 0,
+    probability: 30.0,
+    color: '#475569', // slate / neutral
+    textColor: '#ffffff'
+  },
+  {
+    id: 'poop-525',
+    label: '525 Poops',
+    rewardType: 'poops',
+    amount: 525,
+    probability: 20.0,
     color: '#10b981', // emerald
     textColor: '#ffffff'
   },
@@ -116,38 +143,9 @@ export const SPIN_REWARDS: SpinRewardConfig[] = [
     label: '1,000 Poops',
     rewardType: 'poops',
     amount: 1000,
-    probability: 0.2,
-    color: '#f59e0b', // amber
-    textColor: '#ffffff'
-  },
-  {
-    id: 'poop-2000',
-    label: '2,000 Poops',
-    rewardType: 'poops',
-    amount: 2000,
-    probability: 0.2,
-    color: '#ec4899', // pink
-    textColor: '#ffffff'
-  },
-  {
-    id: 'biscuit-gold',
-    label: 'Gold Biscuit',
-    rewardType: 'biscuit',
-    biscuitId: 'gold',
-    amount: 1,
-    probability: 0.1,
+    probability: 1.0,
     color: '#eab308', // gold
     textColor: '#422006'
-  },
-  {
-    id: 'biscuit-diamond',
-    label: 'Diamond Biscuit',
-    rewardType: 'biscuit',
-    biscuitId: 'diamond',
-    amount: 1,
-    probability: 0.1,
-    color: '#06b6d4', // cyan diamond
-    textColor: '#ffffff'
   }
 ];
 

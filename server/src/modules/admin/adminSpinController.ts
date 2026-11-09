@@ -36,13 +36,13 @@ export class AdminSpinController {
       ]);
 
       const defaultRewards = [
-        { id: 'poop-100', label: '100 Poops', rewardType: 'poops', amount: 100, percentage: 99.0 },
-        { id: 'poop-250', label: '250 Poops', rewardType: 'poops', amount: 250, percentage: 0.2 },
-        { id: 'poop-500', label: '500 Poops', rewardType: 'poops', amount: 500, percentage: 0.2 },
-        { id: 'poop-1000', label: '1,000 Poops', rewardType: 'poops', amount: 1000, percentage: 0.2 },
-        { id: 'poop-2000', label: '2,000 Poops', rewardType: 'poops', amount: 2000, percentage: 0.2 },
-        { id: 'biscuit-gold', label: 'Gold Biscuit', rewardType: 'biscuit', biscuitId: 'gold', percentage: 0.1 },
-        { id: 'biscuit-diamond', label: 'Diamond Biscuit', rewardType: 'biscuit', biscuitId: 'diamond', percentage: 0.1 },
+        { id: 'poop-100', label: '100 Poops', rewardType: 'poops', amount: 100, percentage: 25.0 },
+        { id: 'poop-300', label: '300 Poops', rewardType: 'poops', amount: 300, percentage: 6.0 },
+        { id: 'poop-250', label: '250 Poops', rewardType: 'poops', amount: 250, percentage: 15.0 },
+        { id: 'poop-750', label: '750 Poops', rewardType: 'poops', amount: 750, percentage: 3.0 },
+        { id: 'poop-0', label: '0 Poops', rewardType: 'poops', amount: 0, percentage: 30.0 },
+        { id: 'poop-525', label: '525 Poops', rewardType: 'poops', amount: 525, percentage: 20.0 },
+        { id: 'poop-1000', label: '1,000 Poops', rewardType: 'poops', amount: 1000, percentage: 1.0 },
       ];
 
       const rewards = settingProbabilities ? JSON.parse(settingProbabilities.value) : defaultRewards;

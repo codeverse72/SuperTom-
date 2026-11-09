@@ -513,7 +513,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // 3. Match with wheel sector configuration
       let targetIndex = SPIN_REWARDS.findIndex((r) => r.id === claimData.rewardId);
-      if (targetIndex === -1 && claimData.amount) {
+      if (targetIndex === -1 && claimData.amount !== undefined) {
         targetIndex = SPIN_REWARDS.findIndex((r) => r.amount === claimData.amount);
       }
       if (targetIndex === -1) {

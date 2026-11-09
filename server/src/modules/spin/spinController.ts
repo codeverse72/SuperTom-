@@ -25,13 +25,13 @@ interface SpinRewardDefinition {
  * Diamond Biscuit: 0.1% (1/1000)
  */
 const SPIN_REWARDS_CUMULATIVE: SpinRewardDefinition[] = [
-  { id: 'poop-100', label: '100 Poops', rewardType: 'poops', amount: 100, cumulativeWeight: 990 },
-  { id: 'poop-250', label: '250 Poops', rewardType: 'poops', amount: 250, cumulativeWeight: 992 },
-  { id: 'poop-500', label: '500 Poops', rewardType: 'poops', amount: 500, cumulativeWeight: 994 },
-  { id: 'poop-1000', label: '1,000 Poops', rewardType: 'poops', amount: 1000, cumulativeWeight: 996 },
-  { id: 'poop-2000', label: '2,000 Poops', rewardType: 'poops', amount: 2000, cumulativeWeight: 998 },
-  { id: 'biscuit-gold', label: 'Gold Biscuit', rewardType: 'biscuit', biscuitId: 'gold', cumulativeWeight: 999 },
-  { id: 'biscuit-diamond', label: 'Diamond Biscuit', rewardType: 'biscuit', biscuitId: 'diamond', cumulativeWeight: 1000 },
+  { id: 'poop-100', label: '100 Poops', rewardType: 'poops', amount: 100, cumulativeWeight: 250 },
+  { id: 'poop-300', label: '300 Poops', rewardType: 'poops', amount: 300, cumulativeWeight: 310 },
+  { id: 'poop-250', label: '250 Poops', rewardType: 'poops', amount: 250, cumulativeWeight: 460 },
+  { id: 'poop-750', label: '750 Poops', rewardType: 'poops', amount: 750, cumulativeWeight: 490 },
+  { id: 'poop-0', label: '0 Poops', rewardType: 'poops', amount: 0, cumulativeWeight: 790 },
+  { id: 'poop-525', label: '525 Poops', rewardType: 'poops', amount: 525, cumulativeWeight: 990 },
+  { id: 'poop-1000', label: '1,000 Poops', rewardType: 'poops', amount: 1000, cumulativeWeight: 1000 },
 ];
 
 const MILESTONE_COOLDOWNS: Record<number, number> = {
@@ -245,7 +245,7 @@ export class SpinController {
         // 2. Distribute reward
         let newBalance = 0;
 
-        if (drawnReward.rewardType === 'poops' && drawnReward.amount) {
+        if (drawnReward.rewardType === 'poops' && drawnReward.amount && drawnReward.amount > 0) {
           const { balanceAfter } = await LedgerService.executeBalanceTransaction(tx, {
             userId,
             type: 'SPIN_REWARD',
@@ -261,6 +261,13 @@ export class SpinController {
             update: { quantity: { increment: 1 } },
           });
 
+          const user = await tx.user.findUnique({
+            where: { id: userId },
+            select: { poopsBalance: true },
+          });
+          newBalance = Number(user?.poopsBalance ?? 0);
+        } else {
+          // 0 Poops / No reward
           const user = await tx.user.findUnique({
             where: { id: userId },
             select: { poopsBalance: true },

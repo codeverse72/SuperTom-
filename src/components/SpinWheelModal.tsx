@@ -85,18 +85,21 @@ export const SpinWheelModal: React.FC = () => {
       setWonReward(reward);
       setWonClaimData(claimData);
       setShowRewardModal(true);
-      sound.playWin();
-
-      // Trigger Confetti
-      try {
-        confetti({
-          particleCount: 90,
-          spread: 75,
-          origin: { y: 0.6 },
-          colors: ['#eab308', '#a855f7', '#ec4899', '#3b82f6', '#10b981']
-        });
-      } catch {
-        // ignore
+      if (claimData.amount && claimData.amount > 0) {
+        sound.playWin();
+        // Trigger Confetti for wins
+        try {
+          confetti({
+            particleCount: 90,
+            spread: 75,
+            origin: { y: 0.6 },
+            colors: ['#eab308', '#a855f7', '#ec4899', '#3b82f6', '#10b981']
+          });
+        } catch {
+          // ignore
+        }
+      } else {
+        sound.playTap();
       }
     }, 4500);
   };
@@ -138,7 +141,7 @@ export const SpinWheelModal: React.FC = () => {
             Spin King Tom’s Wheel
           </h2>
           <p className="text-[11px] text-purple-300/80">
-            Win up to 2,000 Poops or Mythic Biscuits!
+            Win up to 1,000 Poops!
           </p>
         </div>
 
@@ -225,11 +228,6 @@ export const SpinWheelModal: React.FC = () => {
           </motion.div>
         </div>
 
-        {/* Probabilities Note */}
-        <div className="w-full mt-2 text-[10px] text-purple-300/70 text-center flex items-center justify-center gap-1">
-          <span>Real-time odds: 100 Poops (99%) · Rare / Biscuits (1%)</span>
-        </div>
-
         {/* Spin Error Banner */}
         {spinError && (
           <div className="w-full mt-2 p-2 rounded-xl bg-rose-950/80 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-1.5 animate-in fade-in">
@@ -286,7 +284,7 @@ export const SpinWheelModal: React.FC = () => {
               </div>
 
               <span className="text-xs font-black text-amber-300 tracking-widest uppercase">
-                🎉 Congratulations!
+                {wonClaimData.amount === 0 ? '💫 Better Luck Next Time' : '🎉 Congratulations!'}
               </span>
 
               <h3 className="text-2xl font-black text-white font-display mt-1">
@@ -294,9 +292,9 @@ export const SpinWheelModal: React.FC = () => {
               </h3>
 
               <p className="text-xs text-purple-200/90 mt-1.5 leading-relaxed">
-                {wonClaimData.rewardType === 'poops'
-                  ? `Wheel landed on ${wonClaimData.label}! The reward has been directly credited to your live balance.`
-                  : `Wheel landed on ${wonClaimData.label}! Added directly to your biscuit inventory.`}
+                {wonClaimData.amount === 0
+                  ? 'No poops won this round. Don’t worry, your next free spin will be ready soon!'
+                  : `Wheel landed on ${wonClaimData.label}! The reward has been directly credited to your live balance.`}
               </p>
 
               {/* Verified Account Balance Update Banner */}
