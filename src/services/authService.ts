@@ -17,10 +17,10 @@ interface AuthResponseData {
 
 export const authService = {
   /**
-   * Transmits raw Telegram initData to backend for cryptographic signature verification.
+   * Transmits raw Telegram initData and optional startParam to backend for cryptographic signature verification.
    */
-  authenticateTelegram: async (initData: string): Promise<ApiResponse<UserSessionDto>> => {
-    const res = await apiClient.post<AuthResponseData>('/auth/telegram', { initData });
+  authenticateTelegram: async (initData: string, startParam?: string | null): Promise<ApiResponse<UserSessionDto>> => {
+    const res = await apiClient.post<AuthResponseData>('/auth/telegram', { initData, startParam });
 
     if (res.success && res.data) {
       if (res.data.token) {

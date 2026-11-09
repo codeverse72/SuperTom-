@@ -27,7 +27,7 @@ import { validateWithdrawal } from '../utils/validation';
 import { BackendNoticeModal } from '../components/BackendNoticeModal';
 import { UserProfile } from '../types/user';
 import { WithdrawalRecord, DepositRecord } from '../types/payment';
-import { getRawTelegramInitData } from '../utils/telegram';
+import { getRawTelegramInitData, getTelegramStartParam } from '../utils/telegram';
 import { authService } from '../services/authService';
 import { userService } from '../services/userService';
 import { miningService } from '../services/miningService';
@@ -317,8 +317,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Live Backend Connection & Single-Trip Cryptographic Bootstrap Pipeline
   useEffect(() => {
     const rawInitData = getRawTelegramInitData();
+    const startParam = getTelegramStartParam();
     if (rawInitData && isFeatureAvailable('auth')) {
-      authService.authenticateTelegram(rawInitData).then((authRes) => {
+      authService.authenticateTelegram(rawInitData, startParam).then((authRes) => {
         if (authRes.success && authRes.data) {
           setIsAuthenticated(true);
           const userData: UserProfile = {

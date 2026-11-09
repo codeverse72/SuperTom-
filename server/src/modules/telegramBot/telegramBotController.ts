@@ -4,6 +4,7 @@ import { env } from '../../config/env.js';
 import { logger } from '../../utils/logger.js';
 import { sendSuccess, sendError } from '../../utils/apiResponse.js';
 import { PayoutAutomationService } from '../payoutAutomation/payoutAutomationService.js';
+import { ReferralService } from '../referrals/referralService.js';
 
 interface TelegramUser {
   id: number | bigint;
@@ -133,24 +134,57 @@ export class TelegramBotController {
     // 2. Check if user already exists in Supabase
     let user = await prisma.user.findUnique({
       where: { telegramId: fromId },
-      select: {
-        id: true,
-        telegramId: true,
-        username: true,
-        firstName: true,
-        lastName: true,
-        poopsBalance: true,
-        level: true,
-        referralCode: true,
-        accountStatus: true,
-        createdAt: true,
-      },
+      include: { miningSettlement: true, spinState: true },
     });
 
     const isReturningUser = !!user;
 
-    // 3. Referral handling for new users
-    if (!isReturningUser && rawRefCode) {
+    // If new user, create user record in Supabase immediately upon clicking Start
+    if (!user) {
+      const referralCode = `TOM${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+      user = await prisma.user.create({
+        data: {
+          telegramId: fromId,
+          username: params.from.username || `tom_${params.from.id}`,
+          firstName: params.from.first_name,
+          lastName: params.from.last_name,
+          languageCode: params.from.language_code || 'en',
+          poopsBalance: 0n,
+          level: 1,
+          levelTitle: 'Feline Cadet',
+          referralCode,
+        },
+        include: { miningSettlement: true, spinState: true },
+      });
+
+      // Initialize default mining engine for new player (10 Poops/hr base)
+      await prisma.miningSettlement.create({
+        data: {
+          userId: user.id,
+          baseRatePerHour: 10,
+          boostRatePerHour: 0,
+          totalRatePerHour: 10,
+          unclaimedPoops: 0n,
+          lastSettledAt: new Date(),
+        },
+      });
+
+      // Initialize progressive lucky spin state (starts at milestone 1, 2-hour cooldown)
+      await prisma.spinState.create({
+        data: {
+          userId: user.id,
+          currentMilestone: 1,
+          cycleCount: 1,
+          nextUnlockAt: new Date(Date.now() + 2 * 3600 * 1000),
+          claimedMilestones: '[]',
+        },
+      });
+
+      logger.info(`[TelegramBot] New user registered via Telegram /start: ID ${user.id}, TG ${fromId}`);
+    }
+
+    // 3. Referral handling: immediately credit Referrer when referent opens the bot
+    if (rawRefCode && !user.referredById) {
       try {
         const referrer = await prisma.user.findUnique({
           where: { referralCode: rawRefCode },
@@ -161,18 +195,15 @@ export class TelegramBotController {
           validReferralCode = rawRefCode;
           referrerName = referrer.firstName || (referrer.username ? `@${referrer.username}` : 'a fellow feline miner');
 
-          // Record pending referral attribution in Supabase
-          await prisma.pendingReferral.upsert({
-            where: { telegramId: fromId },
-            create: {
-              telegramId: fromId,
-              referralCode: validReferralCode,
-            },
-            update: {
-              referralCode: validReferralCode,
-            },
+          // Immediately credit Referrer with +2,000 Poops and update in Supabase!
+          await ReferralService.attributeAndCreditReferral({
+            referrerId: referrer.id,
+            refereeId: user.id,
+            refereeName: params.from.first_name || (params.from.username ? `@${params.from.username}` : `Miner ${fromId}`),
+            refereeTelegramId: fromId,
           });
-          logger.info(`[TelegramBot] Pending referral stored: TG ${fromId} -> Code ${validReferralCode}`);
+
+          logger.info(`[TelegramBot] Referrer ${referrer.id} immediately credited +2,000 Poops for referee ${user.id} opening bot via /start!`);
         }
       } catch (refErr) {
         logger.warn('[TelegramBot] Referral lookup failed:', refErr);

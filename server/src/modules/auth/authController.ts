@@ -8,9 +8,11 @@ import { AuthenticatedRequest } from '../../middleware/auth.js';
 import { logger } from '../../utils/logger.js';
 import { LedgerService } from '../ledger/ledgerService.js';
 import { MiningService } from '../mining/miningService.js';
+import { ReferralService } from '../referrals/referralService.js';
 
 const telegramAuthSchema = z.object({
   initData: z.string().min(1, 'initData is required'),
+  startParam: z.string().optional().nullable(),
 });
 
 // In-memory 5-minute cache for biscuit products catalogue to eliminate redundant DB calls
@@ -41,7 +43,7 @@ export class AuthController {
       return;
     }
 
-    const { initData } = parseResult.data;
+    const { initData, startParam } = parseResult.data;
     const verification = verifyTelegramInitData(initData);
 
     if (!verification.isValid || !verification.data) {
@@ -51,6 +53,12 @@ export class AuthController {
 
     const { user: tgUser, start_param } = verification.data;
     const tgId = BigInt(tgUser.id);
+
+    const inputStartParam = (start_param && start_param.trim().length > 0)
+      ? start_param.trim().toUpperCase()
+      : (startParam && startParam.trim().length > 0)
+      ? startParam.trim().toUpperCase()
+      : null;
 
     try {
       // Find existing user or create a new player inside a transaction
@@ -68,35 +76,35 @@ export class AuthController {
 
         let isNewUser = false;
 
+        // Check if input parameter represents a referrer's referralCode, or if a pending attribution exists from Telegram chat /start
+        let effectiveReferralCode: string | null = inputStartParam;
+
+        if (!effectiveReferralCode) {
+          const pending = await tx.pendingReferral.findUnique({
+            where: { telegramId: tgId },
+          });
+          if (pending) {
+            effectiveReferralCode = pending.referralCode;
+            await tx.pendingReferral.delete({ where: { telegramId: tgId } }).catch(() => {});
+          }
+        }
+
+        let referrerId: string | null = null;
+        if (effectiveReferralCode) {
+          const referrer = await tx.user.findUnique({
+            where: { referralCode: effectiveReferralCode },
+            select: { id: true, telegramId: true },
+          });
+          // Strictly enforce no self-referral
+          if (referrer && referrer.telegramId !== tgId) {
+            referrerId = referrer.id;
+          }
+        }
+
         if (!user) {
           isNewUser = true;
           // Generate unique 8-character uppercase referral code
           const referralCode = `TOM${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
-
-          // Check if start_param represents a referrer's referralCode, or if a pending attribution exists from Telegram chat /start
-          let effectiveReferralCode: string | null = start_param ? start_param.trim().toUpperCase() : null;
-
-          if (!effectiveReferralCode) {
-            const pending = await tx.pendingReferral.findUnique({
-              where: { telegramId: tgId },
-            });
-            if (pending) {
-              effectiveReferralCode = pending.referralCode;
-              await tx.pendingReferral.delete({ where: { telegramId: tgId } }).catch(() => {});
-            }
-          }
-
-          let referrerId: string | null = null;
-          if (effectiveReferralCode) {
-            const referrer = await tx.user.findUnique({
-              where: { referralCode: effectiveReferralCode },
-              select: { id: true, telegramId: true },
-            });
-            // Strictly enforce no self-referral
-            if (referrer && referrer.telegramId !== tgId) {
-              referrerId = referrer.id;
-            }
-          }
 
           user = await tx.user.create({
             data: {
@@ -143,42 +151,22 @@ export class AuthController {
               claimedMilestones: '[]',
             },
           });
-
-          // Attribute referral bonus ONLY NOW that the referent user has actually opened the bot
-          if (referrerId) {
-            await tx.referral.create({
-              data: {
-                referrerId,
-                refereeId: user.id,
-                rewardPoops: 2000n,
-                commissionPercent: 10,
-                totalCommissionPoops: 0n,
-                status: 'REWARDED',
+        } else {
+          // If existing user has no referrer linked yet and a valid referral code was passed
+          if (!user.referredById && referrerId) {
+            user = await tx.user.update({
+              where: { id: user.id },
+              data: { referredById: referrerId },
+              include: {
+                miningSettlement: true,
+                spinState: true,
+                _count: {
+                  select: { referees: true, feedingEvents: true },
+                },
               },
             });
-
-            // Credit referrer with 2,000 Poops bonus via double-entry Ledger
-            await LedgerService.executeBalanceTransaction(tx, {
-              userId: referrerId,
-              type: 'REFERRAL_BONUS',
-              amount: 2000n,
-              description: `Referral bonus: @${tgUser.username || tgUser.id} opened SuperTom via your invite`,
-              idempotencyKey: `ref_bonus_${referrerId}_${user.id}`,
-            });
-
-            // Credit the new player who opened the bot with a 1,000 Poop welcome starter bonus!
-            const welcomeBonus = 1000n;
-            const { balanceAfter: newPlayerBalance } = await LedgerService.executeBalanceTransaction(tx, {
-              userId: user.id,
-              type: 'REFERRAL_BONUS',
-              amount: welcomeBonus,
-              description: `Welcome bonus for joining via referral code ${effectiveReferralCode}`,
-              idempotencyKey: `ref_welcome_${user.id}_${referrerId}`,
-            });
-
-            user.poopsBalance = newPlayerBalance;
           }
-        } else {
+
           // Update profile info on return ONLY if changed in Telegram
           const needsProfileUpdate =
             (tgUser.username && tgUser.username !== user.username) ||
@@ -226,8 +214,23 @@ export class AuthController {
           },
         });
 
-        return { user, accessToken, refreshToken, isNewUser };
+        return { user, accessToken, refreshToken, isNewUser, referrerId };
       });
+
+      // Immediately process & credit referral reward if applicable (idempotent, skips if already credited)
+      const targetReferrerId = result.referrerId || result.user.referredById;
+      if (targetReferrerId) {
+        const rewardRes = await ReferralService.attributeAndCreditReferral({
+          referrerId: targetReferrerId,
+          refereeId: result.user.id,
+          refereeName: tgUser.first_name || (tgUser.username ? `@${tgUser.username}` : `Miner ${tgId}`),
+          refereeTelegramId: tgId,
+        });
+
+        if (rewardRes.success) {
+          result.user.poopsBalance += 1000n;
+        }
+      }
 
       // 1. Auto-settle any completed hourly mining additions immediately (Option A) using preloaded state
       const settleResult = await MiningService.settleUserHourlyEarnings(result.user.id, {
