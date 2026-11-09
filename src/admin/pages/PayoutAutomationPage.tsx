@@ -255,10 +255,17 @@ export const PayoutAutomationPage: React.FC = () => {
         });
         loadConfig();
         loadAnnouncements();
+      } else if (res.success && res.data) {
+        setActionMessage({
+          type: 'info',
+          text: res.data.message || 'All reference payouts are up to date.',
+        });
+        loadConfig();
+        loadAnnouncements();
       } else {
         setActionMessage({
           type: 'error',
-          text: res.data?.message || res.error || 'No new reference payout could be reflected at this moment.',
+          text: res.data?.message || res.error || 'Failed to sync reference payouts.',
         });
       }
     } catch (err: any) {

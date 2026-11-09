@@ -531,13 +531,19 @@ export class PayoutAutomationService {
 
     if (!html) return [];
 
-    const blockRegex = /<div[^>]*class="[^"]*tgme_widget_message\b[^"]*"[^>]*data-post="([^"]+)"[\s\S]*?<div[^>]*class="[^"]*tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/g;
+    // Split HTML into message blocks to strictly isolate each message
+    const messageChunks = html.split(/<div[^>]*class="[^"]*tgme_widget_message\b/i);
     const posts: Array<any> = [];
-    let match;
 
-    while ((match = blockRegex.exec(html)) !== null) {
-      const postId = match[1];
-      const rawBlock = match[2];
+    for (let i = 1; i < messageChunks.length; i++) {
+      const chunk = messageChunks[i];
+      const postMatch = chunk.match(/data-post="([^"]+)"/);
+      if (!postMatch) continue;
+      const postId = postMatch[1];
+
+      const textMatch = chunk.match(/<div[^>]*class="[^"]*tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+      if (!textMatch) continue;
+      const rawBlock = textMatch[1];
 
       const adaptedHtml = this.adaptReferencePostText(rawBlock);
       const cleanText = adaptedHtml.replace(/<[^>]+>/g, '').trim();
@@ -550,7 +556,8 @@ export class PayoutAutomationService {
 
       // Extract Amount & Currency
       const amountMatch = cleanText.match(/Amount:\s*([\d.]+)\s*([A-Za-z0-9]+)/i);
-      const amount = amountMatch ? parseFloat(amountMatch[1]) : 1.0;
+      const rawAmount = amountMatch ? parseFloat(amountMatch[1]) : 1.0;
+      const amount = typeof rawAmount === 'number' && !isNaN(rawAmount) ? rawAmount : 1.0;
       const currency = amountMatch ? amountMatch[2] : 'USDT';
 
       let network = 'TRC20';
@@ -584,18 +591,10 @@ export class PayoutAutomationService {
   }
 
   /**
-   * Sync and Reflect Reference Channel Payouts into SuperTom Payout Channel
-   * Uses the exact reference message format (changing 'Tesla' to 'SuperTom') and prevents duplication!
+   * Helper: Reflects a single reference post and publishes it if automation is enabled.
    */
-  public static async syncAndReflectReferencePayout(sampleText?: string): Promise<{
-    reflected: boolean;
-    announcement?: any;
-    published?: boolean;
-    message: string;
-  }> {
-    const config = await this.getOrCreateConfig();
-
-    let targetPost: {
+  public static async reflectAndPublishSinglePost(
+    targetPost: {
       postId: string;
       adaptedHtml: string;
       explorerUrl?: string;
@@ -603,83 +602,20 @@ export class PayoutAutomationService {
       amount?: number;
       currency?: string;
       network?: string;
-    } | null = null;
-
-    if (sampleText && sampleText.trim().length > 5) {
-      const adapted = this.adaptReferencePostText(sampleText);
-      const linkMatch = sampleText.match(/href="([^"]+)"/i)
-        || sampleText.match(/https?:\/\/[^\s"]*(?:scan|viewer)[^\s"]*\/tx(?:action)?\/([a-zA-Z0-9_x]+)/i)
-        || sampleText.match(/https?:\/\/[^\s"]+/i);
-      const explorerUrl = linkMatch ? linkMatch[1] || linkMatch[0] : undefined;
-      const txMatch = explorerUrl?.match(/\/tx(?:action)?\/([a-zA-Z0-9_x]+)/i);
-      const detectedTxHash = txMatch ? txMatch[1] : `manual_tx_${Date.now()}`;
-
-      const amountMatch = sampleText.match(/Amount:\s*([\d.]+)\s*([A-Za-z0-9]+)/i);
-      const amount = amountMatch ? parseFloat(amountMatch[1]) : 10.0;
-      const currency = amountMatch ? amountMatch[2] : 'USDT';
-
-      targetPost = {
-        postId: `manual_${Date.now()}`,
-        adaptedHtml: adapted,
-        explorerUrl,
-        detectedTxHash,
-        amount,
-        currency,
-        network: 'TRC20',
-      };
-    } else if (config.referenceChannel) {
-      const posts = await this.fetchPublicReferencePosts(config.referenceChannel);
-
-      if (posts.length > 0) {
-        // Query which reference posts or txHashes have already been reflected
-        const existing = await prisma.payoutAnnouncement.findMany({
-          where: { source: 'REFERENCE_CHANNEL' },
-          select: { referencePostId: true, txHash: true },
-        });
-
-        const existingPostIds = new Set(existing.map((e) => e.referencePostId).filter(Boolean));
-        const existingHashes = new Set(existing.map((e) => e.txHash).filter(Boolean));
-
-        // Find posts not yet reflected (ordered newest-first)
-        const unreflected = posts.filter(
-          (p) => !existingPostIds.has(p.postId) && (!p.detectedTxHash || !existingHashes.has(p.detectedTxHash))
-        );
-
-        if (unreflected.length > 0) {
-          // Always pick the LATEST unreflected post (index 0 is the newest since posts are sorted descending)
-          targetPost = unreflected[0];
-        } else {
-          // All recent posts currently reflected; take the newest/latest post with a fresh unique marker so manual test broadcasts always succeed
-          const latest = posts[0];
-          targetPost = {
-            ...latest,
-            postId: `${latest.postId}_ref_${Date.now()}`,
-            detectedTxHash: latest.detectedTxHash ? `${latest.detectedTxHash}_${Date.now().toString().slice(-4)}` : `tx_${Date.now()}`,
-          };
-        }
-      }
-    }
-
-    if (!targetPost) {
-      const fallbackHtml = this.adaptReferencePostText(
-        `<b>✅ SuperTom Withdrawal Complete</b>\n\n🔹 Amount: 10.00 USDT\n🔹 In USD: $10.00\n🌐 TxId: <a href="https://bscscan.com/tx/0x13604380d4edaae49a8b999204efe46b6437116fbee388e68c6fdc417cca239e">0x136 ... a239e</a>`
-      );
-      targetPost = {
-        postId: `fallback_${Date.now()}`,
-        adaptedHtml: fallbackHtml,
-        explorerUrl: 'https://bscscan.com/tx/0x13604380d4edaae49a8b999204efe46b6437116fbee388e68c6fdc417cca239e',
-        detectedTxHash: `0x1360_${Date.now()}`,
-        amount: 10.0,
-        currency: 'USDT',
-        network: 'BEP20',
-      };
-    }
-
-    const amountUsdt = targetPost.amount || 10.0;
+    },
+    config: any,
+    operator: string = 'AUTOMATED_REFLECTOR'
+  ): Promise<{
+    announcement: any;
+    published: boolean;
+    publishError?: string;
+  }> {
+    const rawAmount = targetPost.amount;
+    const amountUsdt = typeof rawAmount === 'number' && !isNaN(rawAmount) ? rawAmount : 1.0;
     const amountPoops = Math.round(amountUsdt * 2000);
     const network = targetPost.network || 'BEP20';
     const currency = targetPost.currency || 'USDT';
-    const txHash = targetPost.detectedTxHash || `tx_${Date.now()}`;
+    const txHash = targetPost.detectedTxHash || `tx_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const explorerUrl = targetPost.explorerUrl;
 
     let finalMessage = targetPost.adaptedHtml;
@@ -693,7 +629,7 @@ export class PayoutAutomationService {
           network,
           amountUsdt,
           amountPoops,
-          walletAddress: 'TJLEgXHdGG3fxwn1UiHvpDoqz29FmJshCv',
+          walletAddress: 'ReferenceChannelVerified',
           txHash,
           recipientIdentifier: '@super_miner',
         });
@@ -701,15 +637,15 @@ export class PayoutAutomationService {
       }
     }
 
-    // Create Announcement Record marked as REFERENCE_CHANNEL
+    // Create Announcement Record marked as REFERENCE_CHANNEL with safe 4-decimal precision
     const announcement = await prisma.payoutAnnouncement.create({
       data: {
         source: 'REFERENCE_CHANNEL',
         referencePostId: targetPost.postId,
         network,
         currency,
-        amountCrypto: new Decimal(amountUsdt),
-        amountUsdt: new Decimal(amountUsdt),
+        amountCrypto: new Decimal(amountUsdt.toFixed(4)),
+        amountUsdt: new Decimal(amountUsdt.toFixed(4)),
         amountPoops: BigInt(amountPoops),
         walletAddress: 'ReferenceChannelVerified',
         txHash,
@@ -733,7 +669,7 @@ export class PayoutAutomationService {
     let published = false;
     let publishError: string | undefined;
     if (config.automationEnabled && config.publishingMode === 'AUTOMATIC') {
-      const pubRes = await this.publishAnnouncement(announcement.id, 'AUTOMATED_REFLECTOR');
+      const pubRes = await this.publishAnnouncement(announcement.id, operator);
       published = pubRes.success;
       if (!pubRes.success) {
         publishError = pubRes.error;
@@ -741,23 +677,151 @@ export class PayoutAutomationService {
     }
 
     return {
-      reflected: true,
       announcement,
       published,
-      message: published
-        ? `Payout announcement (${amountUsdt} ${currency}) broadcasted directly to SuperTom Payout Channel!`
-        : publishError
-        ? `Reference payout queued, but broadcast failed: ${publishError}`
-        : `Reference payout (${amountUsdt} ${currency}) reflected and queued for 1-click admin approval.`,
+      publishError,
+    };
+  }
+
+  /**
+   * Sync and Reflect Reference Channel Payouts into SuperTom Payout Channel
+   * Batches all unreflected posts in chronological order (oldest to newest).
+   */
+  public static async syncAndReflectReferencePayout(sampleText?: string): Promise<{
+    reflected: boolean;
+    announcement?: any;
+    count?: number;
+    published?: boolean;
+    message: string;
+  }> {
+    const config = await this.getOrCreateConfig();
+
+    if (sampleText && sampleText.trim().length > 5) {
+      const adapted = this.adaptReferencePostText(sampleText);
+      const linkMatch = sampleText.match(/href="([^"]+)"/i)
+        || sampleText.match(/https?:\/\/[^\s"]*(?:scan|viewer)[^\s"]*\/tx(?:action)?\/([a-zA-Z0-9_x]+)/i)
+        || sampleText.match(/https?:\/\/[^\s"]+/i);
+      const explorerUrl = linkMatch ? linkMatch[1] || linkMatch[0] : undefined;
+      const txMatch = explorerUrl?.match(/\/tx(?:action)?\/([a-zA-Z0-9_x]+)/i);
+      const detectedTxHash = txMatch ? txMatch[1] : `manual_tx_${Date.now()}`;
+
+      const amountMatch = sampleText.match(/Amount:\s*([\d.]+)\s*([A-Za-z0-9]+)/i);
+      const amount = amountMatch ? parseFloat(amountMatch[1]) : 10.0;
+      const currency = amountMatch ? amountMatch[2] : 'USDT';
+
+      const targetPost = {
+        postId: `manual_${Date.now()}`,
+        adaptedHtml: adapted,
+        explorerUrl,
+        detectedTxHash,
+        amount,
+        currency,
+        network: 'TRC20',
+      };
+
+      const res = await this.reflectAndPublishSinglePost(targetPost, config, 'MANUAL_SAMPLE_REFLECTOR');
+      return {
+        reflected: true,
+        announcement: res.announcement,
+        published: res.published,
+        count: 1,
+        message: res.published
+          ? `Sample payout broadcasted directly to SuperTom Payout Channel!`
+          : res.publishError
+          ? `Sample payout queued, but broadcast failed: ${res.publishError}`
+          : `Sample payout reflected and queued for 1-click admin approval.`,
+      };
+    }
+
+    if (!config.referenceChannel) {
+      return {
+        reflected: false,
+        published: false,
+        count: 0,
+        message: 'No reference channel configured.',
+      };
+    }
+
+    const posts = await this.fetchPublicReferencePosts(config.referenceChannel);
+    if (posts.length === 0) {
+      return {
+        reflected: false,
+        published: false,
+        count: 0,
+        message: 'Unable to fetch posts from reference channel feed at this moment. Please verify channel link.',
+      };
+    }
+
+    // Query which reference posts or txHashes have already been reflected
+    const existing = await prisma.payoutAnnouncement.findMany({
+      where: { source: 'REFERENCE_CHANNEL' },
+      select: { referencePostId: true, txHash: true },
+    });
+
+    const existingPostIds = new Set(existing.map((e) => e.referencePostId).filter(Boolean));
+    const existingHashes = new Set(existing.map((e) => e.txHash).filter(Boolean));
+
+    // Find all unreflected posts
+    const unreflected = posts.filter(
+      (p) => !existingPostIds.has(p.postId) && (!p.detectedTxHash || !existingHashes.has(p.detectedTxHash))
+    );
+
+    if (unreflected.length === 0) {
+      await prisma.payoutChannelConfig.update({
+        where: { id: config.id },
+        data: { lastSyncAt: new Date() },
+      });
+      return {
+        reflected: false,
+        published: false,
+        count: 0,
+        message: 'All recent reference channel payouts are already up to date! No unreflected payouts found.',
+      };
+    }
+
+    // Sort ASCENDING by post ID (oldest first so payouts appear in chronological sequence)
+    unreflected.sort((a, b) => {
+      const idA = parseInt(a.postId.split('/').pop() || '0', 10);
+      const idB = parseInt(b.postId.split('/').pop() || '0', 10);
+      return idA - idB;
+    });
+
+    // Process batch of up to 15 unreflected posts
+    const batch = unreflected.slice(0, 15);
+    let successCount = 0;
+    let lastAnnouncement: any = null;
+
+    for (const post of batch) {
+      try {
+        const res = await this.reflectAndPublishSinglePost(post, config, 'MANUAL_SYNC_REFLECTOR');
+        lastAnnouncement = res.announcement;
+        if (res.published) {
+          successCount++;
+        }
+        if (batch.length > 1) {
+          await new Promise((r) => setTimeout(r, 1200));
+        }
+      } catch (err) {
+        logger.error(`[PayoutAutomation] Error in manual sync for ${post.postId}:`, err);
+      }
+    }
+
+    return {
+      reflected: true,
+      announcement: lastAnnouncement,
+      count: successCount,
+      published: successCount > 0,
+      message: `Synchronized and broadcasted ${successCount} missing payout(s) to SuperTom Payout Channel!`,
     };
   }
 
   /**
    * Periodic Automated Worker: Checks the reference channel for new payout posts
-   * and automatically reflects & broadcasts them to the SuperTom Payout Channel.
+   * and automatically reflects & broadcasts ALL unreflected payouts in chronological order.
    */
   public static async checkAndPublishLatestReferencePayout(): Promise<{
     processed: boolean;
+    count?: number;
     postId?: string;
     message?: string;
   }> {
@@ -775,37 +839,98 @@ export class PayoutAutomationService {
       return { processed: false, message: 'No posts retrieved from reference channel.' };
     }
 
-    // posts[0] is the LATEST post on the reference channel (sorted descending)
-    const latestPost = posts[0];
-
-    // Check if this latest post was already reflected/published
-    const existing = await prisma.payoutAnnouncement.findFirst({
-      where: {
-        source: 'REFERENCE_CHANNEL',
-        OR: [
-          { referencePostId: latestPost.postId },
-          ...(latestPost.detectedTxHash ? [{ txHash: latestPost.detectedTxHash }] : []),
-        ],
-      },
+    // Query which reference posts or txHashes have already been reflected
+    const existing = await prisma.payoutAnnouncement.findMany({
+      where: { source: 'REFERENCE_CHANNEL' },
+      select: { referencePostId: true, txHash: true },
     });
 
-    if (existing) {
-      // Latest post is already processed; touch lastSyncAt
+    const existingPostIds = new Set(existing.map((e) => e.referencePostId).filter(Boolean));
+    const existingHashes = new Set(existing.map((e) => e.txHash).filter(Boolean));
+
+    // Find ALL posts not yet reflected
+    const unreflected = posts.filter(
+      (p) => !existingPostIds.has(p.postId) && (!p.detectedTxHash || !existingHashes.has(p.detectedTxHash))
+    );
+
+    if (unreflected.length === 0) {
+      // Latest posts already processed; touch lastSyncAt
       await prisma.payoutChannelConfig.update({
         where: { id: config.id },
         data: { lastSyncAt: new Date() },
       });
-      return { processed: false, postId: latestPost.postId, message: 'Latest reference post already broadcasted.' };
+
+      // Periodically attempt to retry any transiently failed announcements
+      await this.retryFailedAnnouncements(2);
+
+      return { processed: false, count: 0, message: 'Latest reference posts already broadcasted.' };
     }
 
-    // A brand new payout announcement has appeared in the reference channel!
-    logger.info(`[PayoutAutomation] Detected new reference payout (${latestPost.postId}). Broadcasting to SuperTom Payout Channel...`);
-    const result = await this.syncAndReflectReferencePayout();
+    // Sort unreflected posts ASCENDING by post ID (oldest first so payouts appear in chronological sequence)
+    unreflected.sort((a, b) => {
+      const idA = parseInt(a.postId.split('/').pop() || '0', 10);
+      const idB = parseInt(b.postId.split('/').pop() || '0', 10);
+      return idA - idB;
+    });
+
+    // Process a batch of up to 5 unreflected posts per cycle to respect Telegram's rate limit
+    const batch = unreflected.slice(0, 5);
+    const publishedPostIds: string[] = [];
+
+    for (const post of batch) {
+      try {
+        const res = await this.reflectAndPublishSinglePost(post, config, 'AUTOMATED_REFLECTOR');
+        if (res.published) {
+          publishedPostIds.push(post.postId);
+        }
+        if (batch.length > 1) {
+          // 1.5s delay between messages to respect Telegram channel rate limits
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+      } catch (postErr) {
+        logger.error(`[PayoutAutomation] Error reflecting reference post ${post.postId}:`, postErr);
+      }
+    }
+
     return {
-      processed: result.published ?? false,
-      postId: latestPost.postId,
-      message: result.message,
+      processed: publishedPostIds.length > 0,
+      count: publishedPostIds.length,
+      postId: publishedPostIds.join(', '),
+      message: `Broadcasted ${publishedPostIds.length} reference payout(s): ${publishedPostIds.join(', ')}`,
     };
+  }
+
+  /**
+   * Auto-retry worker for failed announcements with backoff
+   */
+  public static async retryFailedAnnouncements(limit: number = 3): Promise<{ retried: number; succeeded: number }> {
+    try {
+      const failed = await prisma.payoutAnnouncement.findMany({
+        where: {
+          status: 'FAILED',
+          createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        },
+        orderBy: { createdAt: 'asc' },
+        take: limit,
+      });
+
+      if (failed.length === 0) return { retried: 0, succeeded: 0 };
+
+      let succeeded = 0;
+      for (const ann of failed) {
+        const res = await this.publishAnnouncement(ann.id, 'AUTOMATED_RETRY');
+        if (res.success) {
+          succeeded++;
+          logger.info(`[PayoutAutomation] Successfully retried and broadcasted failed announcement ${ann.id}`);
+        }
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+
+      return { retried: failed.length, succeeded };
+    } catch (err) {
+      logger.error('[PayoutAutomation] Error in retryFailedAnnouncements:', err);
+      return { retried: 0, succeeded: 0 };
+    }
   }
 
   /**
@@ -1026,7 +1151,7 @@ export class PayoutAutomationService {
       // 3. Load Automation Config
       const config = await this.getOrCreateConfig();
 
-      // 4. Load Active or Default Template
+      // 4. Load Active or Default Template (with robust built-in fallback)
       await this.ensureDefaultTemplates();
       let template = config.activeTemplateId
         ? await prisma.payoutMessageTemplate.findUnique({ where: { id: config.activeTemplateId } })
@@ -1037,9 +1162,20 @@ export class PayoutAutomationService {
           || await prisma.payoutMessageTemplate.findFirst();
       }
 
-      if (!template) {
-        throw new Error('No payout message template available in database.');
-      }
+      // Built-in clean template fallback so withdrawals NEVER fail even with empty template table:
+      const effectiveTemplate = template || {
+        id: 'built-in-default',
+        name: 'SuperTom Clean Payout',
+        heading: '✅ SuperTom Withdrawal Complete',
+        successMessage: 'Payment verified and transferred on-chain!',
+        footer: '🐱 Thank you for mining with SuperTom! 24/7 Support: @SuperTomCare',
+        emojis: '💎,💰,🚀,🐱,✅',
+        currencyDisplay: 'USDT',
+        showUsd: true,
+        showPoops: true,
+        showExplorerLink: true,
+        maskUserAddress: true,
+      };
 
       // 5. Generate Rendered Message
       const recipientIdentifier = withdrawal.user.username
@@ -1047,7 +1183,7 @@ export class PayoutAutomationService {
         : `User #${withdrawal.user.telegramId.toString()}`;
 
       const { message, explorerUrl } = this.renderMessage({
-        template,
+        template: effectiveTemplate,
         network: withdrawal.network,
         amountUsdt: Number(withdrawal.amountUsdt),
         amountPoops: withdrawal.amountPoops,
@@ -1056,17 +1192,20 @@ export class PayoutAutomationService {
         recipientIdentifier,
       });
 
+      const amountUsdtNum = Number(withdrawal.amountUsdt);
+      const safeAmountUsdt = !isNaN(amountUsdtNum) ? amountUsdtNum : 0;
+
       // 6. Create Announcement Record
       const announcement = await prisma.payoutAnnouncement.create({
         data: {
           withdrawalId: withdrawal.id,
           source: 'SUPERTOM_PAYOUT',
           userId: withdrawal.userId,
-          templateId: template.id,
+          templateId: template?.id || null,
           network: withdrawal.network,
-          currency: template.currencyDisplay || 'USDT',
-          amountCrypto: withdrawal.amountUsdt,
-          amountUsdt: withdrawal.amountUsdt,
+          currency: effectiveTemplate.currencyDisplay || 'USDT',
+          amountCrypto: new Decimal(safeAmountUsdt.toFixed(4)),
+          amountUsdt: new Decimal(safeAmountUsdt.toFixed(4)),
           amountPoops: withdrawal.amountPoops,
           walletAddress: withdrawal.walletAddress,
           txHash: withdrawal.txHash,
