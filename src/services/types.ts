@@ -59,7 +59,18 @@ export interface UserSessionDto {
       total: number;
     }>;
     biscuits?: Array<any>;
+    withdrawalAccess?: WithdrawalAccessDto;
   };
+}
+
+export interface WithdrawalAccessDto {
+  canWithdraw: boolean;
+  isUnlimited: boolean;
+  remainingWithdrawals: number;
+  totalDepositedUsd: number;
+  completedWithdrawalsCount: number;
+  tier: 'LOCKED' | 'THREE_PACK' | 'UNLIMITED';
+  message: string;
 }
 
 export interface BalanceDto {

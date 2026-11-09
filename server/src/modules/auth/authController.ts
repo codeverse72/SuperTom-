@@ -9,6 +9,7 @@ import { logger } from '../../utils/logger.js';
 import { LedgerService } from '../ledger/ledgerService.js';
 import { MiningService } from '../mining/miningService.js';
 import { ReferralService } from '../referrals/referralService.js';
+import { WithdrawalAccessService } from '../payouts/withdrawalAccessService.js';
 
 const telegramAuthSchema = z.object({
   initData: z.string().min(1, 'initData is required'),
@@ -327,6 +328,8 @@ export class AuthController {
         isActive: b.isActive,
       }));
 
+      const withdrawalAccess = await WithdrawalAccessService.getUserWithdrawalAccess(result.user.id);
+
       sendSuccess(res, {
         token: result.accessToken,
         refreshToken: result.refreshToken,
@@ -365,6 +368,7 @@ export class AuthController {
           inventory: inventoryMap,
           missions: mappedMissions,
           biscuits: mappedBiscuits,
+          withdrawalAccess,
         },
       });
     } catch (err: unknown) {

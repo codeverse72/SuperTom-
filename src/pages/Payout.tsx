@@ -23,7 +23,10 @@ import {
   Headphones,
   Wallet,
   Send,
-  X
+  X,
+  Lock,
+  Crown,
+  ShieldAlert
 } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { formatNumber, poopsToUsdt } from '../utils/probability';
@@ -213,6 +216,8 @@ export const Payout: React.FC = () => {
     balance, 
     withdrawals, 
     deposits, 
+    withdrawalAccess,
+    refreshWithdrawalAccess,
     requestWithdrawal, 
     refreshWithdrawals, 
     submitDeposit, 
@@ -338,7 +343,8 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
     });
     refreshWithdrawals();
     refreshDeposits();
-  }, [refreshWithdrawals, refreshDeposits]);
+    refreshWithdrawalAccess();
+  }, [refreshWithdrawals, refreshDeposits, refreshWithdrawalAccess]);
 
   // When selectedPlanForDeposit is set from Store (Buy Biscuit), open deposit view with that exact amount
   useEffect(() => {
@@ -472,6 +478,16 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
     e.preventDefault();
     setWithdrawError(null);
 
+    // Enforce Deposit Pass Gate: $3 for 3 withdrawals, $5 for unlimited
+    if (!withdrawalAccess?.canWithdraw) {
+      const msg = withdrawalAccess?.tier === 'THREE_PACK'
+        ? 'You have used all 3 withdrawals included in your $3 pass. Deposit $3 for 3 more withdrawals, or $5 for lifetime unlimited withdrawals.'
+        : 'Deposit required: To request withdrawals, make a $3 deposit for your next 3 withdrawals, or a $5 deposit for lifetime unlimited withdrawals.';
+      setWithdrawError(msg);
+      showToast('Deposit Required', msg, 'error');
+      return;
+    }
+
     const addressValidation = validateNetworkAddress(currency.network, withdrawAddress);
     if (!addressValidation.isValid) {
       setWithdrawError(addressValidation.error || `Invalid ${currency.name} address format.`);
@@ -520,7 +536,7 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await Promise.all([refreshWithdrawals(), refreshDeposits()]);
+    await Promise.all([refreshWithdrawals(), refreshDeposits(), refreshWithdrawalAccess()]);
     setIsRefreshing(false);
   };
 
@@ -1174,6 +1190,144 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
         </div>
       </a>
 
+      {/* 5b. Withdrawal Access Pass Status Banner (Only on Withdraw tab) */}
+      {activeTab === 'payout' && (
+        <div className="space-y-2">
+          {withdrawalAccess?.tier === 'UNLIMITED' ? (
+            <div className="rounded-2xl p-3.5 bg-gradient-to-r from-amber-500/20 via-purple-900/40 to-amber-500/20 border border-amber-400/50 shadow-lg flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-slate-950 font-black shadow-md shrink-0">
+                  <Crown className="w-5 h-5 text-slate-950" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-black text-white font-display uppercase tracking-wider">
+                      VIP Unlimited Pass
+                    </h4>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[9px] font-mono font-bold uppercase">
+                      Active
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-200/90 leading-tight mt-0.5">
+                    Lifetime withdrawals unlocked! Total deposited: <span className="font-mono font-bold text-white">${withdrawalAccess.totalDepositedUsd.toFixed(2)} USD</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : withdrawalAccess?.tier === 'THREE_PACK' ? (
+            <div className="rounded-2xl p-3.5 bg-gradient-to-r from-cyan-950/60 via-[#0d1f33] to-cyan-950/60 border border-cyan-500/40 shadow-lg space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 shrink-0">
+                    <Zap className="w-4 h-4 text-cyan-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs font-black text-white font-display uppercase tracking-wider">
+                        3-Withdrawal Pass
+                      </h4>
+                      <span className="px-2 py-0.5 rounded-full bg-cyan-400/20 text-cyan-300 border border-cyan-400/40 text-[9px] font-mono font-bold uppercase">
+                        {withdrawalAccess.remainingWithdrawals} Left
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-cyan-200/80 leading-tight mt-0.5">
+                      {withdrawalAccess.remainingWithdrawals} of {withdrawalAccess.totalAllowedWithdrawals} free withdrawals remaining.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenDepositDetails(SUPPORTED_CURRENCIES[2], 5)}
+                  className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:brightness-110 active:scale-95 text-slate-950 font-black text-[10px] uppercase tracking-wide transition-all cursor-pointer shadow-md shrink-0 flex items-center gap-1"
+                >
+                  <Crown className="w-3 h-3 text-slate-950" />
+                  <span>Get VIP $5</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl p-3.5 bg-gradient-to-b from-rose-950/40 via-[#180d1e] to-[#0d1024] border border-amber-500/40 shadow-xl space-y-3">
+              <div className="flex items-start gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 shrink-0 mt-0.5">
+                  <Lock className="w-4 h-4 text-amber-400" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-black text-white font-display uppercase tracking-wider flex items-center gap-1.5">
+                      <span>Deposit Pass Required to Withdraw</span>
+                    </h4>
+                    <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[9px] font-mono font-bold uppercase">
+                      Locked
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed mt-1">
+                    To prevent bot abuse and guarantee fast on-chain payouts, players must deposit to activate withdrawals:
+                  </p>
+                </div>
+              </div>
+
+              {/* 2 Pass Offer Options */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                {/* 3-Pack Option */}
+                <div
+                  onClick={() => handleOpenDepositDetails(SUPPORTED_CURRENCIES[2], 3)}
+                  className="p-3 rounded-xl bg-[#0a1224] border border-cyan-500/40 hover:border-cyan-400 transition-all cursor-pointer active:scale-[0.98] flex flex-col justify-between group shadow-md"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-bold text-cyan-300 uppercase tracking-wider">Starter Pass</span>
+                      <span className="text-xs font-black text-white font-mono">$3</span>
+                    </div>
+                    <div className="text-[11px] font-bold text-white group-hover:text-cyan-300 transition-colors">
+                      3 Withdrawals
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">
+                      Free next 3 payouts
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="mt-2.5 w-full py-1.5 rounded-lg bg-cyan-500/20 group-hover:bg-cyan-500 text-cyan-300 group-hover:text-black font-black text-[10px] uppercase transition-all tracking-wider text-center"
+                  >
+                    Deposit $3
+                  </button>
+                </div>
+
+                {/* Unlimited VIP Option */}
+                <div
+                  onClick={() => handleOpenDepositDetails(SUPPORTED_CURRENCIES[2], 5)}
+                  className="p-3 rounded-xl bg-gradient-to-b from-amber-950/40 to-[#171024] border border-amber-400/50 hover:border-amber-300 transition-all cursor-pointer active:scale-[0.98] flex flex-col justify-between group shadow-md relative overflow-hidden"
+                >
+                  <div className="absolute top-0 right-0 bg-gradient-to-l from-amber-400 to-amber-500 text-slate-950 text-[8px] font-black uppercase px-2 py-0.5 rounded-bl-lg font-mono">
+                    VIP Best
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider">VIP Pass</span>
+                      <span className="text-xs font-black text-white font-mono">$5</span>
+                    </div>
+                    <div className="text-[11px] font-bold text-white group-hover:text-amber-300 transition-colors flex items-center gap-1">
+                      <span>Unlimited</span>
+                      <Crown className="w-3 h-3 text-amber-400" />
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">
+                      Lifetime unlimited payouts
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="mt-2.5 w-full py-1.5 rounded-lg bg-amber-400/20 group-hover:bg-amber-400 text-amber-300 group-hover:text-black font-black text-[10px] uppercase transition-all tracking-wider text-center"
+                  >
+                    Deposit $5
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 6. CURRENCIES LIST (Matching Screenshot 2 for Deposit, Screenshot 4 for Payout) */}
       <div className="space-y-2">
         {SUPPORTED_CURRENCIES.map((cur) => {
@@ -1273,6 +1427,42 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
                       </div>
                     </div>
 
+                    {/* Minimum Withdrawal Notice & Deposit Gate Alert (Matching Screenshot 3) */}
+                    {!withdrawalAccess?.canWithdraw ? (
+                      <div className="p-3 rounded-xl bg-amber-950/50 border border-amber-500/40 space-y-2">
+                        <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
+                          <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+                          <span>Deposit Pass Required to Withdraw</span>
+                        </div>
+                        <p className="text-[11px] text-slate-300 leading-snug">
+                          {withdrawalAccess?.tier === 'THREE_PACK'
+                            ? 'You have used all 3 withdrawals included in your $3 pass. Deposit $3 to unlock 3 more withdrawals, or $5 for lifetime unlimited withdrawals.'
+                            : 'To prevent bot abuse and secure network payouts, deposit $3 for your next 3 withdrawals or $5 for lifetime unlimited withdrawals.'}
+                        </p>
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenDepositDetails(SUPPORTED_CURRENCIES[2], 3)}
+                            className="py-1.5 px-2 rounded-lg bg-cyan-950 border border-cyan-500/40 text-cyan-300 hover:text-white font-bold text-[10px] text-center transition-all cursor-pointer"
+                          >
+                            Deposit $3 (3-Pack)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenDepositDetails(SUPPORTED_CURRENCIES[2], 5)}
+                            className="py-1.5 px-2 rounded-lg bg-amber-950 border border-amber-500/40 text-amber-300 hover:text-white font-bold text-[10px] text-center transition-all cursor-pointer"
+                          >
+                            Deposit $5 (Unlimited)
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-[11px] text-rose-300 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                        <span>Minimum withdrawal is 2,000 Poops (1.00 USDT).</span>
+                      </div>
+                    )}
+
                     {withdrawError && (
                       <div className="p-2.5 rounded-xl bg-rose-950/80 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-1.5">
                         <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
@@ -1280,21 +1470,32 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
                       </div>
                     )}
 
-                    {/* Big Cyan Confirm Button matching Screenshot 3 */}
-                    <button
-                      type="submit"
-                      disabled={isWithdrawing || !withdrawAddress.trim() || !withdrawAmountUsd}
-                      className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-cyan-500 hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                      {isWithdrawing ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin text-cyan-200" />
-                          <span>Submitting Request...</span>
-                        </>
-                      ) : (
-                        <span>CONFIRM WITHDRAWAL (${parseFloat(withdrawAmountUsd) > 0 ? parseFloat(withdrawAmountUsd).toFixed(2) : '0.00'})</span>
-                      )}
-                    </button>
+                    {/* Action Button: Adapts to Unlock when locked or Confirm when unlocked */}
+                    {!withdrawalAccess?.canWithdraw ? (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDepositDetails(SUPPORTED_CURRENCIES[2], 3)}
+                        className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-600 via-rose-600 to-amber-600 hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-all cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Lock className="w-4 h-4" />
+                        <span>UNLOCK WITHDRAWAL (DEPOSIT $3 OR $5)</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="submit"
+                        disabled={isWithdrawing || !withdrawAddress.trim() || !withdrawAmountUsd}
+                        className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-cyan-500 hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {isWithdrawing ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin text-cyan-200" />
+                            <span>Submitting Request...</span>
+                          </>
+                        ) : (
+                          <span>CONFIRM WITHDRAWAL (${parseFloat(withdrawAmountUsd) > 0 ? parseFloat(withdrawAmountUsd).toFixed(2) : '0.00'})</span>
+                        )}
+                      </button>
+                    )}
                   </form>
                 </div>
               )}

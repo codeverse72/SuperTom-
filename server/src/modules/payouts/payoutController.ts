@@ -7,6 +7,7 @@ import { validateNetworkAddress } from '../../utils/crypto.js';
 import { LedgerService } from '../ledger/ledgerService.js';
 import { env } from '../../config/env.js';
 import { DepositVerificationService } from './depositVerificationService.js';
+import { WithdrawalAccessService } from './withdrawalAccessService.js';
 
 const withdrawalRequestSchema = z.object({
   walletAddress: z.string().min(10, 'Wallet address is required'),
@@ -82,6 +83,27 @@ export class PayoutController {
   }
 
   /**
+   * GET /api/v1/payouts/access-status
+   * Checks whether player qualifies to request a withdrawal:
+   * - Requires $3.00 deposit for next 3 free withdrawals
+   * - Requires $5.00 deposit for unlimited lifetime withdrawals
+   */
+  public static async getAccessStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
+    const userId = req.user?.userId;
+    if (!userId) {
+      sendError(res, 'Unauthorized', 401, 'UNAUTHORIZED');
+      return;
+    }
+
+    try {
+      const access = await WithdrawalAccessService.getUserWithdrawalAccess(userId);
+      sendSuccess(res, access);
+    } catch {
+      sendError(res, 'Failed to fetch withdrawal access status', 500, 'WITHDRAWAL_ACCESS_ERROR');
+    }
+  }
+
+  /**
    * POST /api/v1/payouts/request
    * Validates multi-network address, reserves balance atomically into pending payout queue.
    * STRICT SECURITY: Requires explicit administrative review. Never automates payouts.
@@ -90,6 +112,19 @@ export class PayoutController {
     const userId = req.user?.userId;
     if (!userId) {
       sendError(res, 'Unauthorized', 401, 'UNAUTHORIZED');
+      return;
+    }
+
+    // Strict Gate: Verify player has an active deposit qualification pass ($3 for 3, or $5 for unlimited)
+    const access = await WithdrawalAccessService.getUserWithdrawalAccess(userId);
+    if (!access.canWithdraw) {
+      sendError(
+        res,
+        'Withdrawal locked: A minimum deposit of $3 is required for next 3 withdrawals, or $5 for unlimited withdrawals.',
+        403,
+        'DEPOSIT_REQUIRED_FOR_WITHDRAWAL',
+        access
+      );
       return;
     }
 
