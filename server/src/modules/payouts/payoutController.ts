@@ -261,11 +261,23 @@ export class PayoutController {
 
       sendSuccess(res, {
         wallets: {
+          TON: {
+            currency: 'TON',
+            network: 'TON',
+            address: tonAddr,
+            hint: 'Send TON (Toncoin) on TON network to this official address',
+          },
+          'TON (Toncoin)': {
+            currency: 'TON (Toncoin)',
+            network: 'TON',
+            address: tonAddr,
+            hint: 'Send TON (Toncoin) on TON network to this official address',
+          },
           GRAM: {
             currency: 'GRAM',
             network: 'TON',
             address: tonAddr,
-            hint: 'Send GRAM on TON network to this official address',
+            hint: 'Send TON or GRAM on TON network to this official address',
           },
           'USDT (BEP20)': {
             currency: 'USDT (BEP20)',

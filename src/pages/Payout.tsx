@@ -58,10 +58,10 @@ export interface CurrencyConfig {
 
 export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
   {
-    id: 'GRAM',
-    name: 'GRAM',
+    id: 'TON',
+    name: 'TON (Toncoin)',
     network: 'TON',
-    symbol: 'GRAM',
+    symbol: 'TON',
     networkType: 'TON',
     minDepositUsd: 1.0,
     minWithdrawUsd: 1.0,
@@ -69,8 +69,8 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
     hint: 'TON addresses start with "EQ" or "UQ" and contain 48 characters.',
     defaultTreasuryAddress: 'UQBGdgDogsxtpbFIvzAFnIByU3E3PlXsdkt_xyuG4S-gzvgR',
     hasMemoSupport: true,
-    walletUriScheme: (addr, amt, memo) => `ton://transfer/${addr}?amount=${Math.round((amt || 1) * 1_000_000_000)}${memo ? `&text=${encodeURIComponent(memo)}` : ''}`,
-    getUniversalWalletUrl: (addr, amt, memo) => `https://app.tonkeeper.com/transfer/${addr}?amount=${Math.round((amt || 1) * 1_000_000_000)}${memo ? `&text=${encodeURIComponent(memo)}` : ''}`,
+    walletUriScheme: (addr, amt, memo) => `tonkeeper://transfer/${addr}?amount=${amt ? BigInt(Math.round(amt * 1_000_000_000)).toString() : '1000000000'}${memo ? `&text=${encodeURIComponent(memo)}` : ''}`,
+    getUniversalWalletUrl: (addr, amt, memo) => `https://app.tonkeeper.com/transfer/${addr}?amount=${amt ? BigInt(Math.round(amt * 1_000_000_000)).toString() : '1000000000'}${memo ? `&text=${encodeURIComponent(memo)}` : ''}`,
     getExplorerAddressUrl: (addr) => `https://tonviewer.com/${addr}`,
     renderIcon: () => (
       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0098EA] to-[#0077B5] flex items-center justify-center text-white shadow-md shrink-0">
@@ -271,38 +271,46 @@ export const Payout: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Safe Universal URL & Protocol Opener (Telegram WebApp & Mobile Browser Compatible)
-  const openSafeUrl = (universalUrl: string) => {
-    if (!universalUrl) return;
+  const openSafeUrl = (launcherUrl: string, tonkeeperDeepLink?: string) => {
+    if (!launcherUrl) return;
     const webApp = window.Telegram?.WebApp;
 
     // 1. If Telegram internal link (e.g. https://t.me/wallet)
-    if (universalUrl.startsWith('https://t.me/') || universalUrl.startsWith('tg:')) {
+    if (launcherUrl.startsWith('https://t.me/') || launcherUrl.startsWith('tg:')) {
       if (webApp?.openTelegramLink) {
-        webApp.openTelegramLink(universalUrl);
+        webApp.openTelegramLink(launcherUrl);
         return;
       }
     }
 
-    // 2. Telegram WebApp openLink (Only accepts https:// links, safely hands over to OS browser/Tonkeeper)
+    // 2. Telegram WebApp openLink (Only accepts https:// links, safely delegates to OS browser)
     // Note: NEVER pass custom schemes (like ton://) into Telegram WebApp or DOM navigation inside Telegram
     // to avoid net::ERR_UNKNOWN_URL_SCHEME errors in Android WebView.
     if (webApp?.openLink) {
       try {
-        webApp.openLink(universalUrl, { try_instant_view: false });
+        webApp.openLink(launcherUrl, { try_instant_view: false });
         return;
       } catch (e) {
         console.warn('Telegram openLink failed:', e);
       }
     }
 
-    // 3. Standard browser fallback (when running outside Telegram WebApp)
+    // 3. Mobile browser fallback outside Telegram: directly trigger native app scheme
+    if (tonkeeperDeepLink) {
+      try {
+        window.location.href = tonkeeperDeepLink;
+        return;
+      } catch {}
+    }
+
+    // 4. Standard browser fallback (when running outside Telegram WebApp)
     try {
-      const opened = window.open(universalUrl, '_blank', 'noopener,noreferrer');
+      const opened = window.open(launcherUrl, '_blank', 'noopener,noreferrer');
       if (!opened) {
-        window.location.assign(universalUrl);
+        window.location.assign(launcherUrl);
       }
     } catch {
-      window.location.assign(universalUrl);
+      window.location.assign(launcherUrl);
     }
   };
 
@@ -429,13 +437,18 @@ export const Payout: React.FC = () => {
     const currentPrice = activeDepositQuote?.tonPriceUsd || 5.20;
     const calculatedTon = Math.round((amt / currentPrice) * 10000) / 10000;
     const nanoTon = BigInt(Math.round(calculatedTon * 1_000_000_000)).toString();
-    const memo = activeDepositQuote?.paymentReference || `DEP-${telegramUserId}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+    const memo = activeDepositQuote?.paymentReference || telegramUserId || `DEP-${telegramUserId}`;
 
-    // Universal URL for Tonkeeper transfer
+    // Direct mobile app deep links
+    const tonkeeperDeepLink = `tonkeeper://transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
     const universalUrl = `https://app.tonkeeper.com/transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
+    
+    // Dedicated Web Launcher URL hosted with the Mini App (handles Android Intent + iOS tonkeeper://)
+    const baseOrigin = typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://super-tom.vercel.app';
+    const launcherUrl = `${baseOrigin}/open-tonkeeper.html?address=${encodeURIComponent(targetAddress)}&amount=${nanoTon}&text=${encodeURIComponent(memo)}&usd=${amt.toFixed(2)}`;
 
     // 2. Open wallet within synchronous user click event
-    openSafeUrl(universalUrl);
+    openSafeUrl(launcherUrl, tonkeeperDeepLink);
 
     // 3. Immediately display active status feedback to the user & open Wallet choice modal
     setPaymentFeedback('Payment pending verification.');
@@ -617,7 +630,15 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
   }, [selectedPlanForDeposit]);
 
   const getEffectiveTreasuryAddress = (currency: CurrencyConfig): string => {
-    return treasuryWallets[currency.name] || treasuryWallets[currency.id] || currency.defaultTreasuryAddress;
+    return (
+      treasuryWallets[currency.name] ||
+      treasuryWallets[currency.id] ||
+      treasuryWallets['TON'] ||
+      treasuryWallets['TON (Toncoin)'] ||
+      treasuryWallets['GRAM'] ||
+      currency.defaultTreasuryAddress ||
+      'UQBGdgDogsxtpbFIvzAFnIByU3E3PlXsdkt_xyuG4S-gzvgR'
+    );
   };
 
   const handleCopy = (text: string, key: string, label: string = 'Address') => {
@@ -795,6 +816,9 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
     const targetAddress = (cur.networkType === 'TON' ? getEffectiveTreasuryAddress(cur) : null) || activeDepositQuote?.depositAddress || officialTonAddress;
 
     const tonkeeperUniversalUrl = `https://app.tonkeeper.com/transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
+    const tonkeeperDeepLink = `tonkeeper://transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
+    const baseOrigin = typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://super-tom.vercel.app';
+    const launcherUrl = `${baseOrigin}/open-tonkeeper.html?address=${encodeURIComponent(targetAddress)}&amount=${nanoTon}&text=${encodeURIComponent(memo)}&usd=${amt.toFixed(2)}`;
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
@@ -861,14 +885,12 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
           <div className="space-y-2 pt-1">
             {/* Primary Action: Direct Tonkeeper Launch Link */}
             <a
-              href={tonkeeperUniversalUrl}
+              href={launcherUrl}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => {
-                if (window.Telegram?.WebApp?.openLink) {
-                  e.preventDefault();
-                  window.Telegram.WebApp.openLink(tonkeeperUniversalUrl, { try_instant_view: false });
-                }
+                e.preventDefault();
+                openSafeUrl(launcherUrl, tonkeeperDeepLink);
               }}
               className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#0098EA] via-[#00B4D8] to-[#0077B5] hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-[0_0_20px_rgba(0,180,216,0.35)] transition-all cursor-pointer border border-cyan-300/40 text-center select-none"
             >
@@ -1242,10 +1264,13 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
                     onClick={() => {
                       const officialTonAddress = 'UQBGdgDogsxtpbFIvzAFnIByU3E3PlXsdkt_xyuG4S-gzvgR';
                       const targetAddress = activeDepositQuote?.depositAddress || getEffectiveTreasuryAddress(cur) || officialTonAddress;
-                      const nanoTon = activeDepositQuote?.nanoTonAmount || BigInt(Math.round(((depositAmountUsd || 1) / 5.20) * 1_000_000_000)).toString();
-                      const memo = activeDepositQuote?.paymentReference || telegramUserId;
-                      const uUrl = `https://app.tonkeeper.com/transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
-                      openSafeUrl(uUrl);
+                      const currentPrice = activeDepositQuote?.tonPriceUsd || 5.20;
+                      const nanoTon = activeDepositQuote?.nanoTonAmount || BigInt(Math.round(((depositAmountUsd || 1) / currentPrice) * 1_000_000_000)).toString();
+                      const memo = activeDepositQuote?.paymentReference || telegramUserId || 'DEP-TON';
+                      const tonkeeperDeepLink = `tonkeeper://transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
+                      const baseOrigin = typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://super-tom.vercel.app';
+                      const launcherUrl = `${baseOrigin}/open-tonkeeper.html?address=${encodeURIComponent(targetAddress)}&amount=${nanoTon}&text=${encodeURIComponent(memo)}&usd=${(depositAmountUsd || 1).toFixed(2)}`;
+                      openSafeUrl(launcherUrl, tonkeeperDeepLink);
                       setShowTonWalletModal(true);
                     }}
                     className="py-2 px-3 rounded-xl bg-[#0d162b] hover:bg-[#121e3b] border border-cyan-500/40 text-cyan-300 font-bold text-[11px] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
