@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
-import { Sparkles, Cookie } from 'lucide-react';
 import { BalanceCard } from '../components/BalanceCard';
 import { CatCharacter } from '../components/CatCharacter';
-import { BiscuitShowcase } from '../components/BiscuitShowcase';
 import { SpinTimer } from '../components/SpinTimer';
 import { ProductionCard } from '../components/ProductionCard';
 import { FeedingModal } from '../components/FeedingModal';
@@ -23,12 +21,6 @@ export const Home: React.FC<HomeProps> = ({ onNavigateToStore }) => {
 
       {/* 2. Main 3D Royal Cat Character sitting on Throne with Speech Bubbles */}
       <CatCharacter />
-
-      {/* 2.5 Royal Biscuit Showcase & Inventory Tray */}
-      <BiscuitShowcase
-        onOpenStore={onNavigateToStore}
-        onOpenFeedingModal={() => setIsFeedingModalOpen(true)}
-      />
 
       {/* 3. FREE SPIN TIMER SYSTEM (3 Milestones: 2h, 4h, 8h) */}
       <SpinTimer />
