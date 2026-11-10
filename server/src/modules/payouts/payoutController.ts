@@ -432,25 +432,20 @@ export class PayoutController {
       else if (netUpper.includes('BNB') || netUpper.includes('BEP20') || netUpper.includes('BASE') || netUpper.includes('ETH')) depositAddress = evmAddr;
       else if (netUpper.includes('SOL')) depositAddress = solAddr;
 
-      // 2. Expected crypto amount & TON calculation
-      let expectedCrypto = 0;
-      let nanoTonAmount: string | undefined = undefined;
-      let tonPriceUsd: number | undefined = undefined;
-
-      if (isTon) {
-        const quote = await DepositVerificationService.calculateTonQuote(amountUsdt);
-        expectedCrypto = quote.tonAmount;
-        nanoTonAmount = quote.nanoTonAmount;
-        tonPriceUsd = quote.tonPriceUsd;
-      } else {
-        expectedCrypto = await DepositVerificationService.calculateCryptoAmount(amountUsdt, currency);
-      }
-      const amountPoops = BigInt(Math.round(amountUsdt * env.POOPS_PER_USDT));
-
-      // 3. Unique Payment Reference (DEP-[telegramId]-[randomHex])
+      // 2. Unique Payment Reference (DEP-[telegramId]-[randomHex])
       // Provides deterministic traceability and uniqueness across concurrent deposits
       const uniqueSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
       const paymentReference = `DEP-${user.telegramId}-${uniqueSuffix}`;
+
+      // 3. Centralized Multi-Chain Quote with Decimal-Safe Math
+      const quote = await DepositVerificationService.calculateMultiChainQuote(
+        amountUsdt,
+        currency,
+        network,
+        depositAddress,
+        paymentReference
+      );
+      const amountPoops = BigInt(Math.round(amountUsdt * env.POOPS_PER_USDT));
 
       // 4. Create deposit record with WAITING_FOR_PAYMENT status
       const expiryMinutes = tonConfig?.depositExpiryMinutes || 1440;
@@ -459,24 +454,16 @@ export class PayoutController {
           userId,
           amountUsdt,
           amountPoops,
-          currency,
+          currency: quote.currency,
           network,
           depositAddress,
           paymentReference,
-          expectedCryptoAmount: expectedCrypto,
+          expectedCryptoAmount: quote.cryptoAmount,
           status: 'WAITING_FOR_PAYMENT',
-          notes: notes ? notes.trim() : `Deposit intent for ${amountUsdt} USDT (${expectedCrypto} ${currency})`,
+          notes: notes ? notes.trim() : `Deposit intent for ${amountUsdt} USDT (${quote.cryptoAmount} ${quote.currency})`,
           expiresAt: new Date(Date.now() + expiryMinutes * 60 * 1000),
         },
       });
-
-      // Build official Tonkeeper Universal Link & Deep Link
-      const tonkeeperUniversalUrl = isTon && nanoTonAmount
-        ? `https://app.tonkeeper.com/transfer/${depositAddress}?amount=${nanoTonAmount}&text=${encodeURIComponent(paymentReference)}`
-        : undefined;
-      const tonDeepLink = isTon && nanoTonAmount
-        ? `ton://transfer/${depositAddress}?amount=${nanoTonAmount}&text=${encodeURIComponent(paymentReference)}`
-        : undefined;
 
       sendSuccess(res, {
         id: deposit.id,
@@ -487,11 +474,22 @@ export class PayoutController {
         network: deposit.network,
         depositAddress: deposit.depositAddress,
         paymentReference: deposit.paymentReference,
-        expectedCryptoAmount: Number(deposit.expectedCryptoAmount),
-        nanoTonAmount,
-        tonPriceUsd,
-        tonkeeperUniversalUrl,
-        tonDeepLink,
+        expectedCryptoAmount: quote.cryptoAmount,
+        cryptoPriceUsd: quote.cryptoPriceUsd,
+        rawUnits: quote.rawUnits,
+        decimals: quote.decimals,
+        tokenContract: quote.tokenContract,
+        nanoTonAmount: quote.currency === 'TON' ? quote.rawUnits : undefined,
+        tonPriceUsd: quote.currency === 'TON' ? quote.cryptoPriceUsd : undefined,
+        tonkeeperUniversalUrl: quote.walletLinks.tonkeeperUniversalUrl,
+        tonDeepLink: quote.walletLinks.tonDeepLink,
+        webLauncherUrl: quote.walletLinks.webLauncherUrl,
+        trustWalletUrl: quote.walletLinks.trustWalletUrl,
+        eip681Uri: quote.walletLinks.eip681Uri,
+        tronUri: quote.walletLinks.tronUri,
+        solanaPayUri: quote.walletLinks.solanaPayUri,
+        phantomUrl: quote.walletLinks.phantomUrl,
+        walletLinks: quote.walletLinks,
         minDeposit: 1.0,
         status: deposit.status,
         expiresAt: deposit.expiresAt?.getTime(),
@@ -622,7 +620,7 @@ export class PayoutController {
       const finalAmountUsdt = amountUsdt ? amountUsdt : Number(deposit.amountUsdt);
       const finalAmountPoops = BigInt(Math.round(finalAmountUsdt * env.POOPS_PER_USDT));
 
-      // Update deposit with submitted txHash and set status to PAYMENT_DETECTED for Admin confirmation
+      // Update deposit with submitted txHash and set status to PAYMENT_DETECTED
       const updated = await prisma.deposit.update({
         where: { id },
         data: {
@@ -630,14 +628,33 @@ export class PayoutController {
           amountUsdt: finalAmountUsdt,
           amountPoops: finalAmountPoops,
           status: 'PAYMENT_DETECTED',
-          notes: deposit.notes ? `${deposit.notes} | TX submitted by user for Admin review` : 'TX submitted for Admin review',
+          notes: deposit.notes ? `${deposit.notes} | TX submitted by user for verification` : 'TX submitted for verification',
         },
       });
 
+      // Attempt immediate on-chain blockchain verification
+      try {
+        const onChainRes = await DepositVerificationService.checkOnChainDeposit(id, userId);
+        if (onChainRes.success && onChainRes.isCompleted) {
+          sendSuccess(res, {
+            success: true,
+            isCompleted: true,
+            status: 'COMPLETED',
+            txHash: cleanTx,
+            newBalance: onChainRes.newBalance,
+            message: 'Transaction confirmed on blockchain! Balance credited successfully.',
+          });
+          return;
+        }
+      } catch {
+        // Fallback to PAYMENT_DETECTED state
+      }
+
       sendSuccess(res, {
         success: true,
+        isCompleted: false,
         status: updated.status,
-        message: 'Transaction proof submitted successfully! Your deposit is currently pending Admin verification and will be credited once confirmed on-chain.',
+        message: 'Transaction proof submitted successfully! Your deposit is currently pending verification and will be credited once confirmed on-chain.',
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Verification failed';
@@ -780,6 +797,142 @@ export class PayoutController {
       sendSuccess(res, wallet);
     } catch {
       sendError(res, 'Failed to save wallet', 500, 'WALLET_SAVE_ERROR');
+    }
+  }
+
+  /**
+   * GET /api/v1/payouts/payment-methods
+   * Returns live status and parameters of all 7 supported payment options.
+   */
+  public static async getPaymentMethods(_req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const tonConfig = await prisma.tonPaymentConfig.findUnique({ where: { id: 'singleton' } }).catch(() => null);
+      const dbSettings = await prisma.systemSetting.findMany({
+        where: {
+          key: {
+            in: [
+              'TRUST_WALLET_EVM_ADDRESS',
+              'TRUST_WALLET_TRON_ADDRESS',
+              'TRUST_WALLET_TON_ADDRESS',
+              'TRUST_WALLET_SOL_ADDRESS',
+            ],
+          },
+        },
+      });
+      const settingsMap: Record<string, string> = {};
+      dbSettings.forEach((s) => { settingsMap[s.key] = s.value; });
+
+      const evmAddr = settingsMap['TRUST_WALLET_EVM_ADDRESS'] || settingsMap['TREASURY_EVM_ADDRESS'] || process.env.TREASURY_EVM_ADDRESS || process.env.TRUST_WALLET_EVM_ADDRESS || '0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1';
+      const tronAddr = settingsMap['TRUST_WALLET_TRON_ADDRESS'] || settingsMap['TREASURY_TRON_ADDRESS'] || process.env.TREASURY_TRON_ADDRESS || process.env.TREASURY_TRON_ADORESS || process.env.TRUST_WALLET_TRON_ADDRESS || 'TJLEgXHdGG3fxwn1UiHvpDoqz29FmJshCv';
+      const tonAddr = tonConfig?.tonReceivingAddress || settingsMap['TRUST_WALLET_TON_ADDRESS'] || settingsMap['TREASURY_TON_ADDRESS'] || process.env.TREASURY_TON_ADDRESS || process.env.TRUST_WALLET_TON_ADDRESS || 'UQBGdgDogsxtpbFIvzAFnIByU3E3PlXsdkt_xyuG4S-gzvgR';
+      const solAddr = settingsMap['TRUST_WALLET_SOL_ADDRESS'] || settingsMap['TREASURY_SOL_ADDRESS'] || process.env.TREASURY_SOL_ADDRESS || process.env.TRUST_WALLET_SOL_ADDRESS || 'ER74j5s2PgVPx9dsT7wqyMSM7RgY4LKrFt9c1NFp92Qk';
+
+      const [tonPrice, bnbPrice, trxPrice, solPrice, ethPrice] = await Promise.all([
+        DepositVerificationService.getCryptoPrice('TON'),
+        DepositVerificationService.getCryptoPrice('BNB'),
+        DepositVerificationService.getCryptoPrice('TRX'),
+        DepositVerificationService.getCryptoPrice('SOL'),
+        DepositVerificationService.getCryptoPrice('ETH'),
+      ]);
+
+      const methods = [
+        {
+          id: 'TON',
+          name: 'TON (Toncoin)',
+          network: 'TON',
+          symbol: 'TON',
+          networkType: 'TON',
+          decimals: 9,
+          receivingAddress: tonAddr,
+          tokenContract: null,
+          minDepositUsd: tonConfig?.minDepositTon ? tonConfig.minDepositTon * tonPrice : 1.0,
+          currentPriceUsd: tonPrice,
+          isAvailable: Boolean(tonAddr && tonAddr.length >= 48),
+        },
+        {
+          id: 'USDT_BEP20',
+          name: 'USDT (BEP20)',
+          network: 'BNB',
+          symbol: 'USDT',
+          networkType: 'EVM',
+          decimals: 18,
+          receivingAddress: evmAddr,
+          tokenContract: '0x55d398326f99059fF775485246999027B3197955',
+          minDepositUsd: 1.0,
+          currentPriceUsd: 1.0,
+          isAvailable: Boolean(evmAddr && evmAddr.startsWith('0x')),
+        },
+        {
+          id: 'USDT_TRC20',
+          name: 'USDT (TRC20)',
+          network: 'Tron',
+          symbol: 'USDT',
+          networkType: 'TRON',
+          decimals: 6,
+          receivingAddress: tronAddr,
+          tokenContract: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+          minDepositUsd: 1.0,
+          currentPriceUsd: 1.0,
+          isAvailable: Boolean(tronAddr && tronAddr.startsWith('T')),
+        },
+        {
+          id: 'BNB',
+          name: 'BNB',
+          network: 'BNB',
+          symbol: 'BNB',
+          networkType: 'EVM',
+          decimals: 18,
+          receivingAddress: evmAddr,
+          tokenContract: null,
+          minDepositUsd: 1.0,
+          currentPriceUsd: bnbPrice,
+          isAvailable: Boolean(evmAddr && evmAddr.startsWith('0x')),
+        },
+        {
+          id: 'TRX',
+          name: 'TRX',
+          network: 'Tron',
+          symbol: 'TRX',
+          networkType: 'TRON',
+          decimals: 6,
+          receivingAddress: tronAddr,
+          tokenContract: null,
+          minDepositUsd: 1.0,
+          currentPriceUsd: trxPrice,
+          isAvailable: Boolean(tronAddr && tronAddr.startsWith('T')),
+        },
+        {
+          id: 'SOL',
+          name: 'SOL (Solana)',
+          network: 'Solana',
+          symbol: 'SOL',
+          networkType: 'SOLANA',
+          decimals: 9,
+          receivingAddress: solAddr,
+          tokenContract: null,
+          minDepositUsd: 1.0,
+          currentPriceUsd: solPrice,
+          isAvailable: Boolean(solAddr && solAddr.length >= 32),
+        },
+        {
+          id: 'BASE',
+          name: 'Base (USDC / ETH)',
+          network: 'Base',
+          symbol: 'BASE',
+          networkType: 'EVM',
+          decimals: 6,
+          receivingAddress: evmAddr,
+          tokenContract: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+          minDepositUsd: 1.0,
+          currentPriceUsd: 1.0,
+          isAvailable: Boolean(evmAddr && evmAddr.startsWith('0x')),
+        },
+      ];
+
+      sendSuccess(res, { methods });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to fetch payment methods';
+      sendError(res, msg, 500, 'PAYMENT_METHODS_ERROR');
     }
   }
 }

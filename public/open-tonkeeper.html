@@ -171,11 +171,19 @@
     (function() {
       var params = new URLSearchParams(window.location.search);
       var address = params.get('address') || 'UQBGdgDogsxtpbFIvzAFnIByU3E3PlXsdkt_xyuG4S-gzvgR';
-      var amountNano = params.get('amount') || '1923000000';
+      var amountNano = params.get('amount') || '1000000000';
       var memo = params.get('text') || params.get('memo') || 'DEP-PAYMENT';
       var usd = params.get('usd') || '';
 
-      var tonFloat = (Number(amountNano) / 1000000000).toFixed(4);
+      var tonFloat = '1.0000';
+      try {
+        var nanoBig = BigInt(amountNano.split('.')[0] || '0');
+        var wholeTon = nanoBig / 1000000000n;
+        var fracTon = (nanoBig % 1000000000n).toString().padStart(9, '0');
+        tonFloat = wholeTon.toString() + '.' + fracTon.slice(0, 4);
+      } catch(e) {
+        tonFloat = (Number(amountNano) / 1000000000).toFixed(4);
+      }
       document.getElementById('tonAmount').innerText = tonFloat + ' TON';
       if (usd) {
         document.getElementById('usdAmount').innerText = '≈ $' + Number(usd).toFixed(2) + ' USD';
