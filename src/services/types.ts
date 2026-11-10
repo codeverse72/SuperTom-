@@ -210,10 +210,23 @@ export interface CreateDepositIntentResponseDto {
   depositAddress: string;
   paymentReference: string;
   expectedCryptoAmount: number;
+  nanoTonAmount?: string;
+  tonPriceUsd?: number;
+  tonkeeperUniversalUrl?: string;
+  tonDeepLink?: string;
   minDeposit: number;
   status: string;
   expiresAt?: number;
   createdAt: number;
+}
+
+export interface CheckOnChainResponseDto {
+  success: boolean;
+  isCompleted: boolean;
+  status: string;
+  txHash?: string;
+  newBalance?: number;
+  message: string;
 }
 
 export interface DepositStatusResponseDto {
@@ -228,42 +241,6 @@ export interface DepositStatusResponseDto {
   txHash?: string;
   confirmedAt?: number;
   isCompleted: boolean;
-}
-
-export interface TonRateResponseDto {
-  priceUsd: number;
-  timestamp: number;
-}
-
-export interface CreateTonDepositRequestDto {
-  amountUsd: number;
-  notes?: string;
-}
-
-export interface CreateTonDepositResponseDto {
-  id: string;
-  depositReference: string;
-  telegramId: string;
-  amountUsd: number;
-  tonAmount: number;
-  nanoTon: string;
-  tonPriceUsd: number;
-  receivingAddress: string;
-  deepLinkTonkeeper: string;
-  deepLinkTon: string;
-  status: string;
-  expiresAt?: number;
-}
-
-export interface CheckTonDepositResponseDto {
-  verified: boolean;
-  status: string;
-  message: string;
-  txHash?: string;
-  senderAddress?: string;
-  amountTon?: number;
-  amountPoops?: number;
-  newBalance?: number;
 }
 
 export interface TreasuryWalletsResponseDto {

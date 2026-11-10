@@ -14,11 +14,7 @@ import {
   TreasuryWalletsResponseDto,
   CreateDepositIntentRequestDto,
   CreateDepositIntentResponseDto,
-  DepositStatusResponseDto,
-  TonRateResponseDto,
-  CreateTonDepositRequestDto,
-  CreateTonDepositResponseDto,
-  CheckTonDepositResponseDto
+  DepositStatusResponseDto
 } from './types';
 
 export const paymentService = {
@@ -50,23 +46,15 @@ export const paymentService = {
     return apiClient.get<DepositStatusResponseDto>(`/payouts/deposits/${depositId}/status`);
   },
 
+  checkOnChainDeposit: async (depositId: string): Promise<ApiResponse<import('./types').CheckOnChainResponseDto>> => {
+    return apiClient.post<import('./types').CheckOnChainResponseDto>(`/payouts/deposits/${depositId}/check-onchain`);
+  },
+
   verifyDeposit: async (depositId: string, txHash: string, amountUsdt?: number): Promise<ApiResponse<{ success: boolean; message: string; newBalance?: number }>> => {
     return apiClient.post<{ success: boolean; message: string; newBalance?: number }>(`/payouts/deposits/${depositId}/verify`, { txHash, amountUsdt });
   },
 
   getWithdrawalEntitlement: async (): Promise<ApiResponse<import('./types').WithdrawalEntitlementDto>> => {
     return apiClient.get<import('./types').WithdrawalEntitlementDto>('/payouts/entitlement');
-  },
-
-  getTonRate: async (): Promise<ApiResponse<TonRateResponseDto>> => {
-    return apiClient.get<TonRateResponseDto>('/payouts/ton-rate');
-  },
-
-  createTonDeposit: async (data: CreateTonDepositRequestDto): Promise<ApiResponse<CreateTonDepositResponseDto>> => {
-    return apiClient.post<CreateTonDepositResponseDto>('/payouts/deposits/ton/create', data);
-  },
-
-  checkTonDepositOnChain: async (depositId: string): Promise<ApiResponse<CheckTonDepositResponseDto>> => {
-    return apiClient.post<CheckTonDepositResponseDto>(`/payouts/deposits/${depositId}/check-ton`, {});
   },
 };

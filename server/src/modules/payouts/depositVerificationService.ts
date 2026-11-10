@@ -11,13 +11,20 @@ export interface CryptoPriceMap {
 
 export class DepositVerificationService {
   /**
+   * In-memory exchange rate cache with 60s TTL to prevent external rate-limiting
+   * and ensure zero unnecessary requests during frontend renders.
+   */
+  private static priceCache: Map<string, { price: number; expiresAt: number }> = new Map();
+  private static readonly PRICE_CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
+  /**
    * Fallback rates in USD per 1 unit of cryptocurrency
    */
   private static readonly FALLBACK_PRICES: CryptoPriceMap = {
     USDT: 1.0,
     USDC: 1.0,
     GRAM: 0.05,
-    TON: 2.5,
+    TON: 5.20,
     BNB: 650.0,
     TRX: 0.25,
     SOL: 180.0,
@@ -26,7 +33,9 @@ export class DepositVerificationService {
   };
 
   /**
-   * Fetch current market price in USD for a given currency
+   * Fetch current market price in USD for a given currency.
+   * Utilizes an in-memory 60s cache, Binance ticker (fast, no rate-limits),
+   * CoinGecko fallback, and resilient static fallback.
    */
   public static async getCryptoPrice(currencySymbol: string): Promise<number> {
     const sym = currencySymbol.toUpperCase();
@@ -34,45 +43,130 @@ export class DepositVerificationService {
       return 1.0;
     }
 
-    // Try fetching live price with timeout
+    // 1. Check in-memory cache first
+    const cached = this.priceCache.get(sym);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.price;
+    }
+
+    let fetchedPrice: number | null = null;
+
+    // 2. Fast Binance Price Check for high-volume pairs (TON, BNB, TRX, SOL, ETH)
     try {
-      const coingeckoMap: Record<string, string> = {
-        TON: 'the-open-network',
-        GRAM: 'the-open-network',
-        BNB: 'binancecoin',
-        TRX: 'tron',
-        SOL: 'solana',
-        ETH: 'ethereum',
+      const binancePairMap: Record<string, string> = {
+        TON: 'TONUSDT',
+        GRAM: 'TONUSDT',
+        BNB: 'BNBUSDT',
+        TRX: 'TRXUSDT',
+        SOL: 'SOLUSDT',
+        ETH: 'ETHUSDT',
       };
 
-      const coinId = coingeckoMap[sym];
-      if (coinId) {
+      const pair = binancePairMap[sym];
+      if (pair) {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 2500);
-        const res = await fetch(
-          `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd`,
-          { signal: controller.signal }
-        );
+        const timeout = setTimeout(() => controller.abort(), 2000);
+        const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${pair}`, {
+          signal: controller.signal,
+        });
         clearTimeout(timeout);
 
         if (res.ok) {
-          const data = (await res.json()) as Record<string, { usd: number }>;
-          if (data[coinId]?.usd) {
-            return data[coinId].usd;
+          const bData = (await res.json()) as { symbol: string; price: string };
+          const p = parseFloat(bData.price);
+          if (!isNaN(p) && p > 0) {
+            fetchedPrice = p;
           }
         }
       }
     } catch {
-      // Graceful fallback to static reference rates
+      // Graceful fallback to CoinGecko
     }
 
-    return this.FALLBACK_PRICES[sym] || 1.0;
+    // 3. CoinGecko fallback if Binance did not return a price
+    if (!fetchedPrice) {
+      try {
+        const coingeckoMap: Record<string, string> = {
+          TON: 'the-open-network',
+          GRAM: 'the-open-network',
+          BNB: 'binancecoin',
+          TRX: 'tron',
+          SOL: 'solana',
+          ETH: 'ethereum',
+        };
+
+        const coinId = coingeckoMap[sym];
+        if (coinId) {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 2500);
+          const res = await fetch(
+            `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd`,
+            { signal: controller.signal }
+          );
+          clearTimeout(timeout);
+
+          if (res.ok) {
+            const data = (await res.json()) as Record<string, { usd: number }>;
+            if (data[coinId]?.usd) {
+              fetchedPrice = data[coinId].usd;
+            }
+          }
+        }
+      } catch {
+        // Fallback to static reference rates
+      }
+    }
+
+    const finalPrice = fetchedPrice || this.FALLBACK_PRICES[sym] || 1.0;
+
+    // Store in cache
+    this.priceCache.set(sym, {
+      price: finalPrice,
+      expiresAt: Date.now() + this.PRICE_CACHE_TTL_MS,
+    });
+
+    return finalPrice;
+  }
+
+  /**
+   * Calculate precise TON amount and nanoTON quote with decimal-safe arithmetic.
+   * TON Amount = USD Amount / TON Price in USD
+   * NanoTON = TON Amount * 1,000,000,000
+   */
+  public static async calculateTonQuote(amountUsd: number): Promise<{
+    amountUsd: number;
+    tonPriceUsd: number;
+    tonAmount: number;
+    nanoTonAmount: string;
+    quoteExpiresAt: number;
+  }> {
+    const tonPriceUsd = await this.getCryptoPrice('TON');
+    const safePrice = tonPriceUsd > 0 ? tonPriceUsd : 5.20;
+
+    // Decimal-safe rounding to 4 decimal places for TON amount
+    const rawTon = amountUsd / safePrice;
+    const tonAmount = Math.round(rawTon * 10000) / 10000;
+    const nanoTonAmount = BigInt(Math.round(tonAmount * 1_000_000_000)).toString();
+    const quoteExpiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes quote validity
+
+    return {
+      amountUsd,
+      tonPriceUsd: safePrice,
+      tonAmount,
+      nanoTonAmount,
+      quoteExpiresAt,
+    };
   }
 
   /**
    * Calculate expected crypto amount for a given USD target
    */
   public static async calculateCryptoAmount(amountUsd: number, currencySymbol: string): Promise<number> {
+    const sym = currencySymbol.toUpperCase();
+    if (sym === 'TON' || sym === 'GRAM') {
+      const quote = await this.calculateTonQuote(amountUsd);
+      return quote.tonAmount;
+    }
     const price = await this.getCryptoPrice(currencySymbol);
     if (price <= 0) return amountUsd;
     const cryptoAmount = amountUsd / price;
@@ -219,6 +313,148 @@ Your account balance has been updated immediately!`;
         newBalance: Number(balanceAfter),
       };
     });
+  }
+
+  /**
+   * Real-time on-chain verification of a TON deposit.
+   * Queries TON blockchain (Toncenter v2 API), validates recipient, nanoTON amount, memo/deposit_id,
+   * ensures transaction uniqueness, and atomically credits user balance.
+   */
+  public static async checkOnChainDeposit(
+    depositId: string,
+    userId: string
+  ): Promise<{
+    success: boolean;
+    isCompleted: boolean;
+    status: string;
+    txHash?: string;
+    newBalance?: number;
+    message: string;
+  }> {
+    const deposit = await prisma.deposit.findUnique({
+      where: { id: depositId },
+      include: { user: true },
+    });
+
+    if (!deposit || deposit.userId !== userId) {
+      throw new Error('Deposit record not found');
+    }
+
+    if (deposit.status === 'COMPLETED' || deposit.status === 'CONFIRMED') {
+      return {
+        success: true,
+        isCompleted: true,
+        status: 'COMPLETED',
+        txHash: deposit.txHash || undefined,
+        message: 'Deposit has already been verified and credited.',
+      };
+    }
+
+    // Resolve official receiving address
+    const treasury = deposit.depositAddress || env.TRUST_WALLET_TON_ADDRESS || 'UQBGdgDogsxtpbFIvzAFnIByU3E3PlXsdkt_xyuG4S-gzvgR';
+    const paymentRef = (deposit.paymentReference || '').trim();
+    const userTelegramId = deposit.user?.telegramId?.toString() || '';
+    const expectedTon = Number(deposit.expectedCryptoAmount || 0);
+    const expectedNanoTon = BigInt(Math.round(expectedTon * 1_000_000_000));
+
+    // Query Toncenter v2 API for incoming transactions with bounded 5s timeout
+    let matchingTx: { hash: string; valueNanoTon: bigint; comment: string } | null = null;
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      const url = `https://toncenter.com/api/v2/getTransactions?address=${encodeURIComponent(treasury)}&limit=35`;
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeout);
+
+      if (res.ok) {
+        const data = (await res.json()) as { ok: boolean; result?: any[] };
+        if (data.ok && Array.isArray(data.result)) {
+          for (const tx of data.result) {
+            const inMsg = tx.in_msg;
+            if (!inMsg) continue;
+
+            const txHash = tx.transaction_id?.hash;
+            if (!txHash) continue;
+
+            // In TON, in_msg.value is string in nanoTON
+            const valStr = inMsg.value || '0';
+            const valNanoTon = BigInt(valStr);
+
+            // Extract message/memo/comment
+            const memo = (inMsg.message || inMsg.msg_data?.text || '').trim();
+
+            // Match memo against deposit reference or user Telegram ID or depositId
+            const memoUpper = memo.toUpperCase();
+            const refUpper = paymentRef.toUpperCase();
+            const idUpper = deposit.id.toUpperCase();
+
+            const isMemoMatch =
+              Boolean(paymentRef && (memoUpper === refUpper || memoUpper.includes(refUpper))) ||
+              Boolean(userTelegramId && (memo === userTelegramId || memoUpper.includes(userTelegramId))) ||
+              Boolean(deposit.id && memoUpper.includes(idUpper));
+
+            if (!isMemoMatch) continue;
+
+            // Amount check with 2% slippage tolerance
+            const minAcceptableNanoTon = (expectedNanoTon * 98n) / 100n;
+            if (expectedNanoTon > 0n && valNanoTon < minAcceptableNanoTon) {
+              logger.warn(`[OnChainVerify] Partial amount detected for deposit ${depositId}: expected ${expectedNanoTon}, got ${valNanoTon}`);
+              continue;
+            }
+
+            // Check if txHash has already been credited in DB
+            const existingTx = await prisma.deposit.findFirst({
+              where: {
+                txHash,
+                id: { not: deposit.id },
+                status: { in: ['COMPLETED', 'CONFIRMED'] },
+              },
+            });
+
+            if (existingTx) {
+              logger.warn(`[OnChainVerify] TX ${txHash} already credited to deposit ${existingTx.id}`);
+              continue;
+            }
+
+            // Valid matching incoming transaction found!
+            matchingTx = {
+              hash: txHash,
+              valueNanoTon: valNanoTon,
+              comment: memo,
+            };
+            break;
+          }
+        }
+      }
+    } catch (apiErr) {
+      logger.warn('[OnChainVerify] Toncenter request failed or timed out:', apiErr);
+    }
+
+    if (matchingTx) {
+      const receivedTon = Number(matchingTx.valueNanoTon) / 1_000_000_000;
+      const finalizeResult = await this.finalizeVerifiedDeposit(
+        deposit.id,
+        matchingTx.hash,
+        receivedTon
+      );
+
+      return {
+        success: true,
+        isCompleted: true,
+        status: 'COMPLETED',
+        txHash: matchingTx.hash,
+        newBalance: finalizeResult.newBalance,
+        message: 'Deposit confirmed and balance credited successfully!',
+      };
+    }
+
+    return {
+      success: false,
+      isCompleted: false,
+      status: deposit.status,
+      message: 'No matching transaction detected on TON blockchain yet. Please wait a few moments and try again.',
+    };
   }
 }
 

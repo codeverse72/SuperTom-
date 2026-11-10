@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../config/database.js';
 import { AuthenticatedRequest } from '../../middleware/auth.js';
@@ -8,8 +8,6 @@ import { LedgerService } from '../ledger/ledgerService.js';
 import { env } from '../../config/env.js';
 import { DepositVerificationService } from './depositVerificationService.js';
 import { WithdrawalEntitlementService } from './withdrawalEntitlementService.js';
-import { TonPriceService } from './tonPriceService.js';
-import { TonBlockchainService } from './tonBlockchainService.js';
 
 const withdrawalRequestSchema = z.object({
   walletAddress: z.string().min(10, 'Wallet address is required'),
@@ -23,14 +21,9 @@ const saveWalletSchema = z.object({
 });
 
 const createDepositSchema = z.object({
-  amountUsdt: z.number().min(0.5, 'Minimum deposit is $0.50 USDT'),
+  amountUsdt: z.number().min(0.5, 'Minimum deposit is $0.50 USDT').max(10000, 'Maximum deposit is $10,000 USDT'),
   currency: z.string().min(2),
   network: z.string().min(2),
-  notes: z.string().optional(),
-});
-
-const createTonDepositSchema = z.object({
-  amountUsd: z.number().min(0.5, 'Minimum deposit is $0.50 USD'),
   notes: z.string().optional(),
 });
 
@@ -243,7 +236,6 @@ export class PayoutController {
         where: {
           key: {
             in: [
-              'TON_RECEIVING_WALLET_ADDRESS',
               'TRUST_WALLET_EVM_ADDRESS',
               'TRUST_WALLET_TRON_ADDRESS',
               'TRUST_WALLET_TON_ADDRESS',
@@ -264,17 +256,11 @@ export class PayoutController {
 
       const evmAddr = settingsMap['TRUST_WALLET_EVM_ADDRESS'] || settingsMap['TREASURY_EVM_ADDRESS'] || process.env.TRUST_WALLET_EVM_ADDRESS || process.env.TREASURY_EVM_ADDRESS || '0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1';
       const tronAddr = settingsMap['TRUST_WALLET_TRON_ADDRESS'] || settingsMap['TREASURY_TRON_ADDRESS'] || process.env.TRUST_WALLET_TRON_ADDRESS || process.env.TREASURY_TRON_ADDRESS || process.env.TREASURY_TRON_ADORESS || 'TJLEgXHdQG3fxwn1UiHVpDoqz29FmJshCv';
-      const tonAddr = settingsMap['TON_RECEIVING_WALLET_ADDRESS'] || settingsMap['TRUST_WALLET_TON_ADDRESS'] || settingsMap['TREASURY_TON_ADDRESS'] || process.env.TON_RECEIVING_WALLET_ADDRESS || process.env.TRUST_WALLET_TON_ADDRESS || process.env.TREASURY_TON_ADDRESS || 'UQBGdgDogaxtpbFIvzAFnIByU3E3Plxsdkt_xyuG4S-gzvgR';
+      const tonAddr = settingsMap['TRUST_WALLET_TON_ADDRESS'] || settingsMap['TREASURY_TON_ADDRESS'] || process.env.TRUST_WALLET_TON_ADDRESS || process.env.TREASURY_TON_ADDRESS || 'UQBGdgDogsxtpbFIvzAFnIByU3E3PlXsdkt_xyuG4S-gzvgR';
       const solAddr = settingsMap['TRUST_WALLET_SOL_ADDRESS'] || settingsMap['TREASURY_SOL_ADDRESS'] || settingsMap['TREASURY_SOLANA_ADDRESS'] || process.env.TRUST_WALLET_SOL_ADDRESS || process.env.TREASURY_SOL_ADDRESS || process.env.TREASURY_SOLANA_ADDRESS || 'ER74j5s2PgVPx9dsT7wqyMSM7RgY4LKzfT9c1NFp92Qk';
 
       sendSuccess(res, {
         wallets: {
-          TON: {
-            currency: 'TON',
-            network: 'TON',
-            address: tonAddr,
-            hint: 'Official TON Mainnet Receiving Address',
-          },
           GRAM: {
             currency: 'GRAM',
             network: 'TON',
@@ -423,21 +409,35 @@ export class PayoutController {
 
       const evmAddr = settingsMap['TRUST_WALLET_EVM_ADDRESS'] || settingsMap['TREASURY_EVM_ADDRESS'] || process.env.TREASURY_EVM_ADDRESS || process.env.TRUST_WALLET_EVM_ADDRESS || '0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1';
       const tronAddr = settingsMap['TRUST_WALLET_TRON_ADDRESS'] || settingsMap['TREASURY_TRON_ADDRESS'] || process.env.TREASURY_TRON_ADDRESS || process.env.TREASURY_TRON_ADORESS || process.env.TRUST_WALLET_TRON_ADDRESS || 'TJLEgXHdQG3fxwn1UiHVpDoqz29FmJshCv';
-      const tonAddr = settingsMap['TON_RECEIVING_WALLET_ADDRESS'] || settingsMap['TRUST_WALLET_TON_ADDRESS'] || settingsMap['TREASURY_TON_ADDRESS'] || process.env.TON_RECEIVING_WALLET_ADDRESS || process.env.TREASURY_TON_ADDRESS || process.env.TRUST_WALLET_TON_ADDRESS || 'UQBGdgDogaxtpbFIvzAFnIByU3E3Plxsdkt_xyuG4S-gzvgR';
+      const tonAddr = settingsMap['TRUST_WALLET_TON_ADDRESS'] || settingsMap['TREASURY_TON_ADDRESS'] || process.env.TREASURY_TON_ADDRESS || process.env.TRUST_WALLET_TON_ADDRESS || 'UQBGdgDogsxtpbFIvzAFnIByU3E3PlXsdkt_xyuG4S-gzvgR';
       const solAddr = settingsMap['TRUST_WALLET_SOL_ADDRESS'] || settingsMap['TREASURY_SOL_ADDRESS'] || settingsMap['TREASURY_SOLANA_ADDRESS'] || process.env.TREASURY_SOL_ADDRESS || process.env.TREASURY_SOLANA_ADDRESS || process.env.TRUST_WALLET_SOL_ADDRESS || 'ER74j5s2PgVPx9dsT7wqyMSM7RgY4LKzfT9c1NFp92Qk';
 
       let depositAddress = tronAddr;
       const netUpper = network.toUpperCase();
-      if (netUpper.includes('TON')) depositAddress = tonAddr;
+      const isTon = netUpper.includes('TON') || currency.toUpperCase() === 'TON' || currency.toUpperCase() === 'GRAM';
+      if (isTon) depositAddress = tonAddr;
       else if (netUpper.includes('BNB') || netUpper.includes('BEP20') || netUpper.includes('BASE') || netUpper.includes('ETH')) depositAddress = evmAddr;
       else if (netUpper.includes('SOL')) depositAddress = solAddr;
 
-      // 2. Expected crypto amount
-      const expectedCrypto = await DepositVerificationService.calculateCryptoAmount(amountUsdt, currency);
+      // 2. Expected crypto amount & TON calculation
+      let expectedCrypto = 0;
+      let nanoTonAmount: string | undefined = undefined;
+      let tonPriceUsd: number | undefined = undefined;
+
+      if (isTon) {
+        const quote = await DepositVerificationService.calculateTonQuote(amountUsdt);
+        expectedCrypto = quote.tonAmount;
+        nanoTonAmount = quote.nanoTonAmount;
+        tonPriceUsd = quote.tonPriceUsd;
+      } else {
+        expectedCrypto = await DepositVerificationService.calculateCryptoAmount(amountUsdt, currency);
+      }
       const amountPoops = BigInt(Math.round(amountUsdt * env.POOPS_PER_USDT));
 
-      // 3. Payment reference (User Telegram ID for instant auto-credit matching Reference Image 1)
-      const paymentReference = user.telegramId.toString();
+      // 3. Unique Payment Reference (DEP-[telegramId]-[randomHex])
+      // Provides deterministic traceability and uniqueness across concurrent deposits
+      const uniqueSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
+      const paymentReference = `DEP-${user.telegramId}-${uniqueSuffix}`;
 
       // 4. Create deposit record with WAITING_FOR_PAYMENT status
       const deposit = await prisma.deposit.create({
@@ -456,6 +456,14 @@ export class PayoutController {
         },
       });
 
+      // Build official Tonkeeper Universal Link & Deep Link
+      const tonkeeperUniversalUrl = isTon && nanoTonAmount
+        ? `https://app.tonkeeper.com/transfer/${depositAddress}?amount=${nanoTonAmount}&text=${encodeURIComponent(paymentReference)}`
+        : undefined;
+      const tonDeepLink = isTon && nanoTonAmount
+        ? `ton://transfer/${depositAddress}?amount=${nanoTonAmount}&text=${encodeURIComponent(paymentReference)}`
+        : undefined;
+
       sendSuccess(res, {
         id: deposit.id,
         telegramId: user.telegramId.toString(),
@@ -466,6 +474,10 @@ export class PayoutController {
         depositAddress: deposit.depositAddress,
         paymentReference: deposit.paymentReference,
         expectedCryptoAmount: Number(deposit.expectedCryptoAmount),
+        nanoTonAmount,
+        tonPriceUsd,
+        tonkeeperUniversalUrl,
+        tonDeepLink,
         minDeposit: 1.0,
         status: deposit.status,
         expiresAt: deposit.expiresAt?.getTime(),
@@ -474,6 +486,28 @@ export class PayoutController {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to create deposit';
       sendError(res, msg, 500, 'DEPOSIT_CREATE_ERROR');
+    }
+  }
+
+  /**
+   * POST /api/v1/payouts/deposits/:id/check-onchain
+   * Real-time on-chain blockchain query for native TON deposits.
+   * Atomically credits balance upon matching verification without waiting for manual admin approval.
+   */
+  public static async checkDepositOnChain(req: AuthenticatedRequest, res: Response): Promise<void> {
+    const userId = req.user?.userId;
+    const { id } = req.params;
+    if (!userId) {
+      sendError(res, 'Unauthorized', 401, 'UNAUTHORIZED');
+      return;
+    }
+
+    try {
+      const result = await DepositVerificationService.checkOnChainDeposit(id, userId);
+      sendSuccess(res, result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to verify on-chain deposit';
+      sendError(res, msg, 400, 'ONCHAIN_VERIFY_ERROR');
     }
   }
 
@@ -732,208 +766,6 @@ export class PayoutController {
       sendSuccess(res, wallet);
     } catch {
       sendError(res, 'Failed to save wallet', 500, 'WALLET_SAVE_ERROR');
-    }
-  }
-
-  /**
-   * GET /api/v1/payouts/ton-rate
-   * Fetches real-time TON/USD price from reliable price oracles.
-   */
-  public static async getTonRate(_req: Request, res: Response): Promise<void> {
-    try {
-      const price = await TonPriceService.getTonUsdPrice();
-      sendSuccess(res, {
-        priceUsd: price,
-        timestamp: Date.now(),
-      });
-    } catch {
-      sendError(res, 'Failed to fetch TON rate', 500, 'TON_RATE_ERROR');
-    }
-  }
-
-  /**
-   * POST /api/v1/payouts/deposits/ton/create
-   * Generates a unique deposit intent with exact nanoTON conversion and unique deposit reference comment.
-   */
-  public static async createTonDeposit(req: AuthenticatedRequest, res: Response): Promise<void> {
-    const userId = req.user?.userId;
-    if (!userId) {
-      sendError(res, 'Unauthorized', 401, 'UNAUTHORIZED');
-      return;
-    }
-
-    const parse = createTonDepositSchema.safeParse(req.body);
-    if (!parse.success) {
-      sendError(res, 'Validation failed', 422, 'VALIDATION_ERROR', parse.error.format());
-      return;
-    }
-
-    const { amountUsd, notes } = parse.data;
-
-    try {
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-      });
-
-      if (!user) {
-        sendError(res, 'User not found', 404, 'NOT_FOUND');
-        return;
-      }
-
-      // Convert USD to nanoTON and get precise values
-      const conversion = await TonPriceService.convertUsdToNanoTon(amountUsd);
-
-      // Determine receiving address
-      const dbSetting = await prisma.systemSetting.findFirst({
-        where: {
-          key: { in: ['TON_RECEIVING_WALLET_ADDRESS', 'TRUST_WALLET_TON_ADDRESS', 'TREASURY_TON_ADDRESS'] }
-        }
-      });
-      const receivingAddress = dbSetting?.value || process.env.TON_RECEIVING_WALLET_ADDRESS || process.env.TREASURY_TON_ADDRESS || process.env.TRUST_WALLET_TON_ADDRESS || 'UQBGdgDogaxtpbFIvzAFnIByU3E3Plxsdkt_xyuG4S-gzvgR';
-
-      // Unique reference code: e.g. ST-DEP-ABC123-999999999
-      const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
-      const depositReference = `ST-DEP-${randomSuffix}-${user.telegramId.toString()}`;
-
-      const amountPoops = BigInt(Math.round(amountUsd * env.POOPS_PER_USDT));
-
-      // Save deposit record with WAITING_FOR_PAYMENT
-      const deposit = await prisma.deposit.create({
-        data: {
-          userId,
-          amountUsdt: amountUsd,
-          amountPoops,
-          currency: 'TON',
-          network: 'TON',
-          depositAddress: receivingAddress,
-          paymentReference: depositReference,
-          expectedCryptoAmount: conversion.tonAmount,
-          status: 'WAITING_FOR_PAYMENT',
-          notes: notes ? notes.trim() : `TON Connect deposit intent: $${amountUsd} USD (${conversion.tonAmount} TON, ${conversion.nanoTon.toString()} nanoTON) Ref: ${depositReference}`,
-          expiresAt: new Date(Date.now() + 2 * 3600 * 1000), // 2 hours
-        },
-      });
-
-      // Construct official Tonkeeper universal link and standard ton:// transfer link
-      const encodedAddress = encodeURIComponent(receivingAddress);
-      const encodedComment = encodeURIComponent(depositReference);
-      const deepLinkTonkeeper = `https://app.tonkeeper.com/transfer/${encodedAddress}?amount=${conversion.nanoTon.toString()}&text=${encodedComment}`;
-      const deepLinkTon = `ton://transfer/${encodedAddress}?amount=${conversion.nanoTon.toString()}&text=${encodedComment}`;
-
-      sendSuccess(res, {
-        id: deposit.id,
-        depositReference,
-        telegramId: user.telegramId.toString(),
-        amountUsd,
-        tonAmount: conversion.tonAmount,
-        nanoTon: conversion.nanoTon.toString(),
-        tonPriceUsd: conversion.tonPriceUsd,
-        receivingAddress,
-        deepLinkTonkeeper,
-        deepLinkTon,
-        status: deposit.status,
-        expiresAt: deposit.expiresAt?.getTime(),
-      });
-    } catch (err: any) {
-      sendError(res, 'Failed to create TON deposit request: ' + (err.message || 'Server error'), 500, 'TON_DEPOSIT_CREATE_ERROR');
-    }
-  }
-
-  /**
-   * POST /api/v1/payouts/deposits/:id/check-ton
-   * Verifies incoming on-chain TON transaction for this deposit.
-   */
-  public static async checkTonDepositOnChain(req: AuthenticatedRequest, res: Response): Promise<void> {
-    const userId = req.user?.userId;
-    if (!userId) {
-      sendError(res, 'Unauthorized', 401, 'UNAUTHORIZED');
-      return;
-    }
-
-    const { id } = req.params;
-    if (!id) {
-      sendError(res, 'Deposit ID required', 400, 'BAD_REQUEST');
-      return;
-    }
-
-    try {
-      const deposit = await prisma.deposit.findFirst({
-        where: { id, userId },
-        include: { user: true },
-      });
-
-      if (!deposit) {
-        sendError(res, 'Deposit record not found', 404, 'NOT_FOUND');
-        return;
-      }
-
-      if (deposit.status === 'COMPLETED' || deposit.status === 'CONFIRMED') {
-        sendSuccess(res, {
-          verified: true,
-          status: 'COMPLETED',
-          message: 'Deposit already verified and credited',
-          txHash: deposit.txHash,
-          amountPoops: Number(deposit.amountPoops),
-        });
-        return;
-      }
-
-      // Check if expired
-      if (deposit.expiresAt && deposit.expiresAt.getTime() < Date.now()) {
-        await prisma.deposit.update({
-          where: { id },
-          data: { status: 'EXPIRED' },
-        });
-        sendSuccess(res, {
-          verified: false,
-          status: 'EXPIRED',
-          message: 'Deposit intent expired. Please generate a new deposit.',
-        });
-        return;
-      }
-
-      // Fetch on-chain transactions for receivingAddress
-      const receivingAddress = deposit.depositAddress || process.env.TON_RECEIVING_WALLET_ADDRESS || process.env.TREASURY_TON_ADDRESS || 'UQBGdgDogaxtpbFIvzAFnIByU3E3Plxsdkt_xyuG4S-gzvgR';
-      const recentTxs = await TonBlockchainService.fetchRecentTransactions(receivingAddress, 50);
-
-      // Extract expected nanoTon
-      const expectedTon = deposit.expectedCryptoAmount ? Number(deposit.expectedCryptoAmount) : 0;
-      const expectedNanoTon = BigInt(Math.round(expectedTon * 1e9));
-
-      const match = TonBlockchainService.findMatchingDepositTransaction(recentTxs, {
-        depositId: deposit.id,
-        paymentReference: deposit.paymentReference,
-        telegramId: deposit.user?.telegramId?.toString(),
-        expectedNanoTon,
-        depositCreatedAt: deposit.createdAt,
-      });
-
-      if (match) {
-        // Finalize verified deposit atomically
-        const result = await DepositVerificationService.finalizeVerifiedDeposit(
-          deposit.id,
-          match.txHash,
-          match.receivedTonAmount
-        );
-
-        sendSuccess(res, {
-          verified: true,
-          status: 'COMPLETED',
-          message: result.message,
-          txHash: match.txHash,
-          senderAddress: match.senderAddress,
-          amountTon: match.receivedTonAmount,
-          newBalance: result.newBalance,
-        });
-      } else {
-        sendSuccess(res, {
-          verified: false,
-          status: deposit.status,
-          message: 'Payment not detected on blockchain yet. Please ensure you sent the transaction and try again.',
-        });
-      }
-    } catch (err: any) {
-      sendError(res, 'Failed to verify TON transaction on blockchain: ' + (err.message || 'Server error'), 500, 'TON_VERIFY_ERROR');
     }
   }
 }
