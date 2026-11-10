@@ -108,9 +108,9 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
     networkType: 'TRON',
     minDepositUsd: 1.0,
     minWithdrawUsd: 1.0,
-    placeholder: 'e.g. TJLEgXHdQG3fxwn1UiHVpDoqz29FmJshCv',
+    placeholder: 'e.g. TJLEgXHdGG3fxwn1UiHvpDoqz29FmJshCv',
     hint: 'TRON addresses start with "T" and contain 34 characters.',
-    defaultTreasuryAddress: 'TJLEgXHdQG3fxwn1UiHVpDoqz29FmJshCv',
+    defaultTreasuryAddress: 'TJLEgXHdGG3fxwn1UiHvpDoqz29FmJshCv',
     hasMemoSupport: false,
     getUniversalWalletUrl: (addr) => `https://link.trustwallet.com/send?address=${addr}&asset=c195_tTR7NHqJEKQxGTCi8q8ZY4pL8otSzgjLj6`,
     getExplorerAddressUrl: (addr) => `https://tronscan.org/#/address/${addr}`,
@@ -150,9 +150,9 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
     networkType: 'TRON',
     minDepositUsd: 1.0,
     minWithdrawUsd: 1.0,
-    placeholder: 'e.g. TJLEgXHdQG3fxwn1UiHVpDoqz29FmJshCv',
+    placeholder: 'e.g. TJLEgXHdGG3fxwn1UiHvpDoqz29FmJshCv',
     hint: 'TRON addresses start with "T" and contain 34 characters.',
-    defaultTreasuryAddress: 'TJLEgXHdQG3fxwn1UiHVpDoqz29FmJshCv',
+    defaultTreasuryAddress: 'TJLEgXHdGG3fxwn1UiHvpDoqz29FmJshCv',
     hasMemoSupport: false,
     getUniversalWalletUrl: (addr) => `https://link.trustwallet.com/send?address=${addr}&asset=c195`,
     getExplorerAddressUrl: (addr) => `https://tronscan.org/#/address/${addr}`,
@@ -172,9 +172,9 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
     networkType: 'SOLANA',
     minDepositUsd: 1.0,
     minWithdrawUsd: 1.0,
-    placeholder: 'e.g. ER74j5s2PgVPx9dsT7wqyMSM7RgY4LKzfT9c1NFp92Qk',
+    placeholder: 'e.g. ER74j5s2PgVPx9dsT7wqyMSM7RgY4LKrFt9c1NFp92Qk',
     hint: 'Solana addresses are 32-44 characters Base58 encoded.',
-    defaultTreasuryAddress: 'ER74j5s2PgVPx9dsT7wqyMSM7RgY4LKzfT9c1NFp92Qk',
+    defaultTreasuryAddress: 'ER74j5s2PgVPx9dsT7wqyMSM7RgY4LKrFt9c1NFp92Qk',
     hasMemoSupport: false,
     getUniversalWalletUrl: () => `https://phantom.app/`,
     getExplorerAddressUrl: (addr) => `https://solscan.io/account/${addr}`,
@@ -263,6 +263,7 @@ export const Payout: React.FC = () => {
   // Entitlement State ($3 for 3 withdrawals, $5 for unlimited)
   const [entitlement, setEntitlement] = useState<WithdrawalEntitlementDto | null>(null);
   const [showUnlockModal, setShowUnlockModal] = useState<boolean>(false);
+  const [showTonWalletModal, setShowTonWalletModal] = useState<boolean>(false);
 
   // Treasury dynamic addresses map
   const [treasuryWallets, setTreasuryWallets] = useState<Record<string, string>>({});
@@ -270,7 +271,7 @@ export const Payout: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Safe Universal URL & Protocol Opener (Telegram WebApp & Mobile Browser Compatible)
-  const openSafeUrl = (universalUrl: string, tonDeepLink?: string) => {
+  const openSafeUrl = (universalUrl: string) => {
     if (!universalUrl) return;
     const webApp = window.Telegram?.WebApp;
 
@@ -282,40 +283,26 @@ export const Payout: React.FC = () => {
       }
     }
 
-    // 2. Telegram WebApp openLink (Only accepts https:// links, requires try_instant_view: false)
+    // 2. Telegram WebApp openLink (Only accepts https:// links, safely hands over to OS browser/Tonkeeper)
+    // Note: NEVER pass custom schemes (like ton://) into Telegram WebApp or DOM navigation inside Telegram
+    // to avoid net::ERR_UNKNOWN_URL_SCHEME errors in Android WebView.
     if (webApp?.openLink) {
       try {
         webApp.openLink(universalUrl, { try_instant_view: false });
+        return;
       } catch (e) {
         console.warn('Telegram openLink failed:', e);
       }
     }
 
-    // 3. Native app intent trigger via hidden iframe (Handles ton:// without crashing WebView or throwing ERR_UNKNOWN_URL_SCHEME)
-    if (tonDeepLink) {
-      try {
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        iframe.src = tonDeepLink;
-        document.body.appendChild(iframe);
-        setTimeout(() => {
-          try {
-            document.body.removeChild(iframe);
-          } catch {}
-        }, 2000);
-      } catch {}
-    }
-
-    // 4. Standard browser fallback (when running outside Telegram WebApp)
-    if (!webApp?.openLink) {
-      try {
-        const opened = window.open(universalUrl, '_blank', 'noopener,noreferrer');
-        if (!opened) {
-          window.location.assign(universalUrl);
-        }
-      } catch {
+    // 3. Standard browser fallback (when running outside Telegram WebApp)
+    try {
+      const opened = window.open(universalUrl, '_blank', 'noopener,noreferrer');
+      if (!opened) {
         window.location.assign(universalUrl);
       }
+    } catch {
+      window.location.assign(universalUrl);
     }
   };
 
@@ -444,17 +431,16 @@ export const Payout: React.FC = () => {
     const nanoTon = BigInt(Math.round(calculatedTon * 1_000_000_000)).toString();
     const memo = activeDepositQuote?.paymentReference || `DEP-${telegramUserId}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
-    // Universal URL for Telegram WebApp + Deep link for native Tonkeeper app
+    // Universal URL for Tonkeeper transfer
     const universalUrl = `https://app.tonkeeper.com/transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
-    const tonDeepLink = `ton://transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
 
-    // 2. Open wallet IMMEDIATELY within the synchronous user click event
-    // This guarantees the browser/Telegram user gesture token is valid and not dropped by pop-up blockers
-    openSafeUrl(universalUrl, tonDeepLink);
+    // 2. Open wallet within synchronous user click event
+    openSafeUrl(universalUrl);
 
-    // 3. Immediately display active status feedback to the user
+    // 3. Immediately display active status feedback to the user & open Wallet choice modal
     setPaymentFeedback('Payment pending verification.');
     setDepositStatus('WAITING_FOR_PAYMENT');
+    setShowTonWalletModal(true);
 
     if (!activeDepositQuote || activeDepositQuote.amountUsdt !== amt) {
       setActiveDepositQuote({
@@ -796,6 +782,186 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
     }
   };
 
+  // Render Pay with TON Wallet Choice Modal
+  const renderTonWalletModal = (cur: CurrencyConfig) => {
+    if (!showTonWalletModal) return null;
+
+    const amt = depositAmountUsd || activeDepositQuote?.amountUsdt || 10;
+    const currentPrice = activeDepositQuote?.tonPriceUsd || 5.20;
+    const tonAmount = activeDepositQuote?.expectedCryptoAmount || Math.round((amt / currentPrice) * 10000) / 10000;
+    const nanoTon = activeDepositQuote?.nanoTonAmount || BigInt(Math.round(tonAmount * 1_000_000_000)).toString();
+    const memo = activeDepositQuote?.paymentReference || telegramUserId || 'DEP-TON';
+    const officialTonAddress = 'UQBGdgDogsxtpbFIvzAFnIByU3E3PlXsdkt_xyuG4S-gzvgR';
+    const targetAddress = (cur.networkType === 'TON' ? getEffectiveTreasuryAddress(cur) : null) || activeDepositQuote?.depositAddress || officialTonAddress;
+
+    const tonkeeperUniversalUrl = `https://app.tonkeeper.com/transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="w-full max-w-sm rounded-3xl bg-[#090e1c] border border-cyan-500/40 p-4 space-y-3.5 shadow-2xl relative max-h-[92vh] overflow-y-auto">
+          {/* Close button */}
+          <button
+            type="button"
+            onClick={() => setShowTonWalletModal(false)}
+            className="absolute top-3.5 right-3.5 p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all cursor-pointer z-10"
+          >
+            <X className="w-4 h-4" />
+          </button>
+
+          {/* Modal Header */}
+          <div className="text-center pt-1 space-y-1">
+            <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-[#0098EA]/30 via-cyan-500/20 to-blue-600/30 border border-cyan-400/50 flex items-center justify-center shadow-lg mb-1">
+              <Sparkles className="w-6 h-6 text-cyan-400" />
+            </div>
+            <h3 className="text-base font-black text-white font-display tracking-tight">
+              Pay with TON Wallet
+            </h3>
+            <p className="text-[11px] text-slate-300 leading-snug px-1">
+              Transfer instantly via Tonkeeper, @wallet, or any TON wallet
+            </p>
+          </div>
+
+          {/* Deposit Summary Box */}
+          <div className="p-3 rounded-2xl bg-[#040711] border border-cyan-950/80 space-y-2 text-xs">
+            <div className="flex justify-between items-center text-slate-300">
+              <span className="text-slate-400">Deposit Amount:</span>
+              <span className="font-bold text-white font-mono">${amt.toFixed(2)} USD</span>
+            </div>
+            <div className="flex justify-between items-center text-cyan-300">
+              <span className="text-slate-400">Exact TON to Send:</span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-black text-cyan-200 font-mono text-sm">{tonAmount} TON</span>
+                <button
+                  type="button"
+                  onClick={() => handleCopy(tonAmount.toString(), 'modal_ton_amt', 'TON Amount')}
+                  className="text-cyan-400 hover:text-white cursor-pointer"
+                  title="Copy TON Amount"
+                >
+                  {copiedKey === 'modal_ton_amt' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            </div>
+            <div className="flex justify-between items-center text-amber-300 pt-1 border-t border-cyan-950/50">
+              <span className="text-slate-400">Transfer Comment / Memo:</span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono font-bold">{memo}</span>
+                <button
+                  type="button"
+                  onClick={() => handleCopy(memo, 'modal_memo', 'Memo')}
+                  className="text-cyan-400 hover:text-white cursor-pointer"
+                  title="Copy Memo"
+                >
+                  {copiedKey === 'modal_memo' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Wallet Actions */}
+          <div className="space-y-2 pt-1">
+            {/* Primary Action: Direct Tonkeeper Launch Link */}
+            <a
+              href={tonkeeperUniversalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                if (window.Telegram?.WebApp?.openLink) {
+                  e.preventDefault();
+                  window.Telegram.WebApp.openLink(tonkeeperUniversalUrl, { try_instant_view: false });
+                }
+              }}
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#0098EA] via-[#00B4D8] to-[#0077B5] hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-[0_0_20px_rgba(0,180,216,0.35)] transition-all cursor-pointer border border-cyan-300/40 text-center select-none"
+            >
+              <div className="flex items-center gap-2">
+                <ExternalLink className="w-4 h-4 text-white" />
+                <div className="text-left">
+                  <div className="leading-tight">Open in Tonkeeper App</div>
+                  <div className="text-[9px] font-normal text-cyan-100 opacity-90">Pre-fills address, amount & memo</div>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4" />
+            </a>
+
+            {/* Secondary Action: Telegram @wallet */}
+            <button
+              type="button"
+              onClick={() => {
+                if (window.Telegram?.WebApp?.openTelegramLink) {
+                  window.Telegram.WebApp.openTelegramLink('https://t.me/wallet');
+                } else {
+                  window.open('https://t.me/wallet', '_blank');
+                }
+              }}
+              className="w-full py-2.5 px-4 rounded-xl bg-[#0c162c] hover:bg-[#132247] border border-cyan-500/30 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between transition-all cursor-pointer shadow-md active:scale-95"
+            >
+              <div className="flex items-center gap-2">
+                <Send className="w-4 h-4 text-cyan-400" />
+                <div className="text-left">
+                  <div className="leading-tight">Open Telegram @wallet</div>
+                  <div className="text-[9px] font-normal text-slate-300">Pay inside Telegram bot</div>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400" />
+            </button>
+          </div>
+
+          {/* Copyable Address Box */}
+          <div className="p-2.5 rounded-xl bg-[#050811] border border-cyan-950/70 space-y-1.5">
+            <div className="flex items-center justify-between text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+              <span>Official TON Address:</span>
+              <button
+                type="button"
+                onClick={() => handleCopy(targetAddress, 'modal_addr', 'TON Address')}
+                className="text-cyan-400 hover:text-white flex items-center gap-1 font-sans cursor-pointer"
+              >
+                {copiedKey === 'modal_addr' ? (
+                  <>
+                    <Check className="w-3 h-3 text-emerald-400" />
+                    <span className="text-emerald-400">Copied</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3 h-3" />
+                    <span>Copy</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <div className="text-[11px] font-mono text-cyan-200 break-all bg-black/40 p-2 rounded-lg select-all">
+              {targetAddress}
+            </div>
+          </div>
+
+          {/* Copy All Details Button */}
+          <button
+            type="button"
+            onClick={() => handleCopyAllPaymentDetails(cur, targetAddress, amt, memo)}
+            className="w-full py-2 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-slate-700/50 text-slate-200 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+          >
+            <Copy className="w-3.5 h-3.5 text-slate-400" />
+            <span>Copy All Details (for Binance, OKX, etc.)</span>
+          </button>
+
+          {/* On-Chain Verification Trigger */}
+          <div className="pt-1 border-t border-cyan-950/60">
+            <button
+              type="button"
+              disabled={isCheckingOnChain}
+              onClick={() => checkDepositOnChainStatus(activeDepositId || '', true)}
+              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isCheckingOnChain ? 'animate-spin' : ''}`} />
+              <span>{isCheckingOnChain ? 'Checking Blockchain...' : 'I Have Paid — Check Status'}</span>
+            </button>
+            <p className="text-[10px] text-slate-400 text-center mt-1.5">
+              Instant auto-credit upon blockchain finality (usually 5–15 seconds).
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await Promise.all([refreshWithdrawals(), refreshDeposits(), fetchEntitlement()]);
@@ -1079,8 +1245,8 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
                       const nanoTon = activeDepositQuote?.nanoTonAmount || BigInt(Math.round(((depositAmountUsd || 1) / 5.20) * 1_000_000_000)).toString();
                       const memo = activeDepositQuote?.paymentReference || telegramUserId;
                       const uUrl = `https://app.tonkeeper.com/transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
-                      const dLink = `ton://transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
-                      openSafeUrl(uUrl, dLink);
+                      openSafeUrl(uUrl);
+                      setShowTonWalletModal(true);
                     }}
                     className="py-2 px-3 rounded-xl bg-[#0d162b] hover:bg-[#121e3b] border border-cyan-500/40 text-cyan-300 font-bold text-[11px] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                   >
@@ -1285,6 +1451,9 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
             </button>
           )}
         </form>
+
+        {/* TON Wallet & Tonkeeper Payment Modal */}
+        {renderTonWalletModal(cur)}
       </div>
     );
   }
@@ -1740,6 +1909,9 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
           </a>
         </div>
       </div>
+
+      {/* TON Wallet & Tonkeeper Payment Modal */}
+      {renderTonWalletModal(activeDepositCurrency || SUPPORTED_CURRENCIES[0])}
 
       {/* 8. Withdrawal Unlock & Activation Modal ($3 for 3 payouts, $5 for Unlimited) */}
       {showUnlockModal && (
