@@ -258,7 +258,6 @@ export const Payout: React.FC = () => {
   const [treasuryWallets, setTreasuryWallets] = useState<Record<string, string>>({});
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
 
   // Safe Universal URL Opener (Compliant with Telegram WebApp API)
   const openSafeUrl = (url: string) => {
@@ -279,6 +278,38 @@ export const Payout: React.FC = () => {
 
   const openTelegramWallet = () => {
     openSafeUrl('https://t.me/wallet');
+  };
+
+  // Open Tonkeeper Direct Deep Link / Universal Link
+  const handleOpenTonkeeper = (address: string, memo: string, curConfig?: CurrencyConfig) => {
+    sound.playClick();
+    
+    // For TON or GRAM (or default TON deposit), build Tonkeeper universal link
+    const isTon = !curConfig || curConfig.networkType === 'TON' || curConfig.network.toUpperCase() === 'TON';
+    const targetTonAddress = isTon 
+      ? address 
+      : (getEffectiveTreasuryAddress(SUPPORTED_CURRENCIES[0]) || address);
+
+    const memoParam = memo ? `?text=${encodeURIComponent(memo)}` : '';
+    const universalUrl = `https://app.tonkeeper.com/transfer/${targetTonAddress}${memoParam}`;
+    const directScheme = `ton://transfer/${targetTonAddress}${memoParam}`;
+
+    const webApp = window.Telegram?.WebApp;
+    if (webApp?.openLink) {
+      // In Telegram WebApp, openLink with https://app.tonkeeper.com smoothly opens Tonkeeper on mobile devices
+      webApp.openLink(universalUrl);
+      return;
+    }
+
+    // In desktop or mobile browser outside Telegram:
+    try {
+      window.location.href = directScheme;
+      setTimeout(() => {
+        window.open(universalUrl, '_blank', 'noopener,noreferrer');
+      }, 500);
+    } catch {
+      window.open(universalUrl, '_blank', 'noopener,noreferrer');
+    }
   };
 
   const handleCopyAllPaymentDetails = (
@@ -346,7 +377,7 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
   const handleSelectUnlockTier = (amount: number, label: string) => {
     setShowUnlockModal(false);
     setActiveTab('deposit');
-    const defaultCur = SUPPORTED_CURRENCIES[2]; // USDT TRC20 by default
+    const defaultCur = SUPPORTED_CURRENCIES[0]; // GRAM / TON by default
     setActiveDepositCurrency(defaultCur);
     setDepositAmountUsd(amount);
     setCustomAmountInput(amount.toFixed(2));
@@ -392,7 +423,7 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
   useEffect(() => {
     if (selectedPlanForDeposit) {
       setActiveTab('deposit');
-      const defaultCur = SUPPORTED_CURRENCIES[2]; // USDT TRC20 by default
+      const defaultCur = SUPPORTED_CURRENCIES[0]; // GRAM / TON by default
       setActiveDepositCurrency(defaultCur);
       const amt = selectedPlanForDeposit.usdtAmount;
       setDepositAmountUsd(amt);
@@ -760,53 +791,15 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
           </p>
         </div>
 
-        {/* Big Open in Wallet Button matching Screenshot 1 */}
+        {/* Uniform Primary Wallet Button */}
         <button
           type="button"
-          onClick={() => setIsWalletModalOpen(true)}
+          onClick={() => handleOpenTonkeeper(treasuryAddress, telegramUserId, cur)}
           className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#0098EA] via-[#00B4D8] to-[#0077B5] hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(0,180,216,0.35)] transition-all cursor-pointer border border-cyan-300/40"
         >
-          <span>OPEN IN TELEGRAM WALLET / ANY {cur.network.toUpperCase()} WALLET</span>
+          <span>OPEN IN TELEGRAM WALLET / ANY TON WALLET</span>
           <ExternalLink className="w-4 h-4" />
         </button>
-
-        {/* 1-Tap Quick Action Row */}
-        <div className="grid grid-cols-3 gap-2">
-          <button
-            type="button"
-            onClick={openTelegramWallet}
-            className="py-2.5 px-1.5 rounded-xl bg-gradient-to-r from-[#0088cc]/25 to-[#0098ea]/25 border border-[#0098ea]/40 hover:bg-[#0098ea]/30 text-cyan-200 text-[11px] font-bold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer shadow-md active:scale-95"
-            title="Open official Telegram @wallet"
-          >
-            <Send className="w-4 h-4 text-[#00b4d8]" />
-            <span className="truncate max-w-full font-sans">TG @wallet</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              const url = cur.getUniversalWalletUrl 
-                ? cur.getUniversalWalletUrl(treasuryAddress, depositAmountUsd, telegramUserId)
-                : 'https://link.trustwallet.com';
-              openSafeUrl(url);
-            }}
-            className="py-2.5 px-1.5 rounded-xl bg-gradient-to-r from-purple-900/30 to-indigo-900/30 border border-purple-500/40 hover:bg-purple-900/40 text-purple-200 text-[11px] font-bold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer shadow-md active:scale-95"
-            title={`Open ${cur.network} Mobile Wallet`}
-          >
-            <Wallet className="w-4 h-4 text-purple-300" />
-            <span className="truncate max-w-full font-sans">{cur.network} App</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleCopyAllPaymentDetails(cur, treasuryAddress, depositAmountUsd, telegramUserId)}
-            className="py-2.5 px-1.5 rounded-xl bg-gradient-to-r from-emerald-950/40 to-teal-950/40 border border-emerald-500/40 hover:bg-emerald-900/40 text-emerald-300 text-[11px] font-bold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer shadow-md active:scale-95"
-            title="Copy Address, Memo and Amount to paste into Binance or OKX"
-          >
-            <Copy className="w-4 h-4 text-emerald-400" />
-            <span className="truncate max-w-full font-sans">{copiedKey === 'all_details' ? 'Copied!' : 'Copy All'}</span>
-          </button>
-        </div>
 
         {/* Deposit Amount Selector matching Screenshot 1 */}
         <div className="rounded-2xl bg-[#090e1c] border border-cyan-500/30 p-3.5 space-y-3 shadow-xl">
@@ -990,133 +983,6 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
             </button>
           )}
         </form>
-
-        {/* Wallet Selection Modal */}
-        {isWalletModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="w-full max-w-sm rounded-3xl bg-[#090e1c] border border-cyan-500/40 p-4 space-y-3.5 shadow-2xl">
-              {/* Header */}
-              <div className="flex items-center justify-between pb-2 border-b border-cyan-900/50">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300">
-                    <Wallet className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-black text-white font-display">Pay with Wallet</h3>
-                    <p className="text-[10px] text-slate-400 font-sans">
-                      {cur.name} • {cur.network} Network
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsWalletModalOpen(false)}
-                  className="p-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Options */}
-              <div className="space-y-2">
-                {/* 1. Telegram @wallet */}
-                <div
-                  onClick={() => {
-                    setIsWalletModalOpen(false);
-                    openTelegramWallet();
-                  }}
-                  className="p-3 rounded-2xl bg-gradient-to-r from-[#0098EA]/20 via-[#00B4D8]/10 to-[#0077B5]/20 border border-[#0098EA]/40 hover:border-[#0098EA]/70 transition-all cursor-pointer active:scale-[0.99] flex items-center justify-between group"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#0098EA] to-[#0077B5] flex items-center justify-center text-white shadow-md shrink-0">
-                      <Send className="w-4 h-4 fill-current" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <h4 className="text-xs font-black text-white">Telegram @wallet</h4>
-                        <span className="px-1.5 py-0.2 rounded bg-cyan-400/20 text-cyan-300 text-[9px] font-bold uppercase">
-                          Built-in
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-slate-300">Pay directly inside Telegram</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-cyan-400 group-hover:translate-x-0.5 transition-transform" />
-                </div>
-
-                {/* 2. External Wallet (Trust Wallet, Tonkeeper, TronLink) */}
-                <div
-                  onClick={() => {
-                    setIsWalletModalOpen(false);
-                    const url = cur.getUniversalWalletUrl
-                      ? cur.getUniversalWalletUrl(treasuryAddress, depositAmountUsd, telegramUserId)
-                      : 'https://link.trustwallet.com';
-                    openSafeUrl(url);
-                  }}
-                  className="p-3 rounded-2xl bg-[#0d162b] border border-purple-500/30 hover:border-purple-500/60 transition-all cursor-pointer active:scale-[0.99] flex items-center justify-between group"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300 shrink-0">
-                      <Wallet className="w-4 h-4 text-purple-400" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <h4 className="text-xs font-black text-white">{cur.network} Mobile Wallet</h4>
-                        <span className="px-1.5 py-0.2 rounded bg-purple-400/20 text-purple-300 text-[9px] font-bold uppercase">
-                          {cur.networkType === 'TON' ? 'Tonkeeper' : cur.networkType === 'TRON' ? 'Trust / TronLink' : 'MetaMask / Trust'}
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-slate-300">Opens app with address pre-filled</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-purple-400 group-hover:translate-x-0.5 transition-transform" />
-                </div>
-
-                {/* 3. Binance, OKX, Bybit (Copy All) */}
-                <div
-                  onClick={() => {
-                    setIsWalletModalOpen(false);
-                    handleCopyAllPaymentDetails(cur, treasuryAddress, depositAmountUsd, telegramUserId);
-                  }}
-                  className="p-3 rounded-2xl bg-[#0d162b] border border-emerald-500/30 hover:border-emerald-500/60 transition-all cursor-pointer active:scale-[0.99] flex items-center justify-between group"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-300 shrink-0">
-                      <Copy className="w-4 h-4 text-emerald-400" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <h4 className="text-xs font-black text-white">Binance • OKX • Any App</h4>
-                        <span className="px-1.5 py-0.2 rounded bg-emerald-400/20 text-emerald-300 text-[9px] font-bold uppercase">
-                          1-Tap Copy
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-slate-300">Copies Address, Memo & Amount</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-0.5 transition-transform" />
-                </div>
-
-                {/* 4. Explorer Link */}
-                {cur.getExplorerAddressUrl && (
-                  <div
-                    onClick={() => {
-                      setIsWalletModalOpen(false);
-                      openSafeUrl(cur.getExplorerAddressUrl!(treasuryAddress));
-                    }}
-                    className="p-2.5 rounded-xl bg-[#060b14] border border-cyan-900/40 hover:border-cyan-700/50 transition-all cursor-pointer flex items-center justify-between text-slate-400 hover:text-cyan-300 text-[11px]"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Inspect Official Treasury on {cur.network} Explorer</span>
-                    </div>
-                    <span className="text-[10px] text-cyan-400 font-mono">Verify ↗</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -1204,7 +1070,7 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
       {/* 4. 5K Members Celebration Campaign (Replaces old Limited Flash Deal) */}
       {activeTab === 'deposit' && (
         <CampaignBanner
-          onApplyDeposit={(amt) => handleOpenDepositDetails(SUPPORTED_CURRENCIES[2], amt)}
+          onApplyDeposit={(amt) => handleOpenDepositDetails(SUPPORTED_CURRENCIES[0], amt)}
         />
       )}
 
