@@ -72,6 +72,45 @@ describe('Multi-Chain Deposit & Amount Conversion Suite', () => {
       assert.strictEqual(url.searchParams.get('text'), 'DEP-8441612063-ABC12');
       assert.strictEqual(url.pathname, `/transfer/${TREASURY_TON}`);
     });
+
+    it('should generate distinct, proportional NanoTON amounts for $1, $3, $5, $10, $15, $50 without hardcoded values', async () => {
+      const amounts = [1.0, 3.0, 5.0, 10.0, 15.0, 50.0];
+      const quotes = await Promise.all(
+        amounts.map((usd) =>
+          DepositVerificationService.calculateMultiChainQuote(
+            usd,
+            'TON',
+            'TON',
+            TREASURY_TON,
+            `DEP-TEST-${usd}`
+          )
+        )
+      );
+
+      // Verify each quote has the correct exact URL amount matching its rawUnits
+      for (let i = 0; i < amounts.length; i++) {
+        const q = quotes[i];
+        const usd = amounts[i];
+        assert.ok(q.cryptoAmount > 0, `Expected positive crypto amount for $${usd}`);
+        assert.ok(q.rawUnits.length >= 7, `Expected valid NanoTON for $${usd}`);
+
+        const keeperUrl = new URL(q.walletLinks.keeperUniversalUrl);
+        assert.strictEqual(keeperUrl.searchParams.get('amount'), q.rawUnits);
+        assert.strictEqual(keeperUrl.searchParams.get('text'), `DEP-TEST-${usd}`);
+      }
+
+      // Verify $5 quote does NOT have $10 amount (~1.923e9 or hardcoded 1.9...)
+      const quote5 = quotes[2];
+      const quote10 = quotes[3];
+      assert.notStrictEqual(quote5.rawUnits, quote10.rawUnits);
+      assert.ok(
+        BigInt(quote10.rawUnits) > BigInt(quote5.rawUnits),
+        '$10 NanoTON must be strictly greater than $5 NanoTON'
+      );
+      // $10 NanoTON should be approximately double $5 NanoTON
+      const ratio = Number(BigInt(quote10.rawUnits)) / Number(BigInt(quote5.rawUnits));
+      assert.ok(Math.abs(ratio - 2.0) < 0.05, `Expected 2x ratio between $10 and $5, got ${ratio}`);
+    });
   });
 
   describe('3. USDT (BEP20) – BNB Smart Chain (Chain ID: 56)', () => {

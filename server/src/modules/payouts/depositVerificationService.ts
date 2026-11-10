@@ -55,12 +55,12 @@ export class DepositVerificationService {
   private static readonly FALLBACK_PRICES: CryptoPriceMap = {
     USDT: 1.0,
     USDC: 1.0,
-    GRAM: 0.05,
-    TON: 5.20,
+    GRAM: 1.15,
+    TON: 1.15,
     BNB: 650.0,
-    TRX: 0.25,
-    SOL: 180.0,
-    ETH: 2600.0,
+    TRX: 0.32,
+    SOL: 85.0,
+    ETH: 2100.0,
     BASE: 1.0,
   };
 
@@ -95,39 +95,60 @@ export class DepositVerificationService {
 
     let fetchedPrice: number | null = null;
 
-    // 2. Fast Binance Price Check for high-volume pairs (TON, BNB, TRX, SOL, ETH)
-    try {
-      const binancePairMap: Record<string, string> = {
-        TON: 'TONUSDT',
-        GRAM: 'TONUSDT',
-        BNB: 'BNBUSDT',
-        TRX: 'TRXUSDT',
-        SOL: 'SOLUSDT',
-        ETH: 'ETHUSDT',
-      };
-
-      const pair = binancePairMap[sym];
-      if (pair) {
+    // 2. TON Native Price Check via TonAPI (Tonkeeper's official live rate source)
+    if (sym === 'TON' || sym === 'GRAM') {
+      try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 2000);
-        const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${pair}`, {
+        const tonRes = await fetch('https://tonapi.io/v2/rates?tokens=ton&currencies=usd', {
           signal: controller.signal,
         });
         clearTimeout(timeout);
-
-        if (res.ok) {
-          const bData = (await res.json()) as { symbol: string; price: string };
-          const p = parseFloat(bData.price);
-          if (!isNaN(p) && p > 0) {
+        if (tonRes.ok) {
+          const tData = (await tonRes.json()) as { rates?: { TON?: { prices?: { USD?: number } } } };
+          const p = tData.rates?.TON?.prices?.USD;
+          if (p && p > 0) {
             fetchedPrice = p;
           }
         }
+      } catch {
+        // Fallback to CoinGecko below
       }
-    } catch {
-      // Graceful fallback to CoinGecko
     }
 
-    // 3. CoinGecko fallback if Binance did not return a price
+    // 3. Fast Binance Price Check for BNB, TRX, SOL, ETH (high volume spot pairs)
+    if (!fetchedPrice && sym !== 'TON' && sym !== 'GRAM') {
+      try {
+        const binancePairMap: Record<string, string> = {
+          BNB: 'BNBUSDT',
+          TRX: 'TRXUSDT',
+          SOL: 'SOLUSDT',
+          ETH: 'ETHUSDT',
+        };
+
+        const pair = binancePairMap[sym];
+        if (pair) {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 2000);
+          const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${pair}`, {
+            signal: controller.signal,
+          });
+          clearTimeout(timeout);
+
+          if (res.ok) {
+            const bData = (await res.json()) as { symbol: string; price: string };
+            const p = parseFloat(bData.price);
+            if (!isNaN(p) && p > 0) {
+              fetchedPrice = p;
+            }
+          }
+        }
+      } catch {
+        // Graceful fallback to CoinGecko
+      }
+    }
+
+    // 4. CoinGecko fallback if TonAPI / Binance did not return a price
     if (!fetchedPrice) {
       try {
         const coingeckoMap: Record<string, string> = {

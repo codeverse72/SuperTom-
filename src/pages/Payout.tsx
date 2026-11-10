@@ -554,12 +554,12 @@ export const Payout: React.FC = () => {
       const links = quote?.walletLinks;
 
       if (cur.networkType === 'TON') {
-        const currentTonPrice = quote?.tonPriceUsd || 5.20;
+        const currentTonPrice = quote?.tonPriceUsd || quote?.cryptoPriceUsd || 1.15;
         const tonCoins = quote?.expectedCryptoAmount || Math.round((amt / currentTonPrice) * 10000) / 10000;
         const nanoTon = quote?.nanoTonAmount || quote?.rawUnits || BigInt(Math.round(Number(tonCoins) * 1_000_000_000)).toString();
         const memo = quote?.paymentReference || telegramUserId || `DEP-${telegramUserId}`;
-        const universalUrl = links?.keeperUniversalUrl || links?.tonkeeperUniversalUrl || `https://app.tonkeeper.com/transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
-        const deepLink = links?.keeperDeepLink || links?.tonDeepLink || `ton://transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
+        const universalUrl = `https://app.tonkeeper.com/transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
+        const deepLink = `ton://transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
 
         openSafeUrl(universalUrl, deepLink);
         setShowWalletModal(true);
@@ -641,12 +641,12 @@ export const Payout: React.FC = () => {
       const links = quote?.walletLinks;
 
       if (wallet === 'KEEPER') {
-        const currentTonPrice = quote?.tonPriceUsd || 5.20;
+        const currentTonPrice = quote?.tonPriceUsd || quote?.cryptoPriceUsd || 1.15;
         const tonCoins = quote?.expectedCryptoAmount || Math.round((amt / currentTonPrice) * 10000) / 10000;
         const nanoTon = quote?.nanoTonAmount || quote?.rawUnits || BigInt(Math.round(Number(tonCoins) * 1_000_000_000)).toString();
         const memo = quote?.paymentReference || telegramUserId || `DEP-${telegramUserId}`;
-        const universalUrl = links?.keeperUniversalUrl || links?.tonkeeperUniversalUrl || `https://app.tonkeeper.com/transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
-        const deepLink = links?.keeperDeepLink || links?.tonDeepLink || `ton://transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
+        const universalUrl = `https://app.tonkeeper.com/transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
+        const deepLink = `ton://transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
 
         openSafeUrl(universalUrl, deepLink);
       } else {
@@ -760,6 +760,7 @@ Payment Reference / Memo: ${memo}`;
     setActiveDepositCurrency(defaultCur);
     setDepositAmountUsd(amount);
     setCustomAmountInput(amount.toFixed(2));
+    setActiveDepositQuote(null);
     setDepositTxHash('');
     setDepositError(null);
     setDepositStatus('WAITING_FOR_PAYMENT');
@@ -808,6 +809,7 @@ Payment Reference / Memo: ${memo}`;
       const amt = selectedPlanForDeposit.usdtAmount;
       setDepositAmountUsd(amt);
       setCustomAmountInput(amt.toFixed(2));
+      setActiveDepositQuote(null);
       setDepositTxHash('');
       setDepositError(null);
       setDepositStatus('WAITING_FOR_PAYMENT');
@@ -890,6 +892,7 @@ Payment Reference / Memo: ${memo}`;
     const amt = initialAmount !== undefined ? initialAmount : defaultAmt;
     setDepositAmountUsd(amt);
     setCustomAmountInput(amt.toFixed(2));
+    setActiveDepositQuote(null);
     setDepositTxHash('');
     setDepositError(null);
     setDepositStatus('WAITING_FOR_PAYMENT');
@@ -1055,27 +1058,33 @@ Payment Reference / Memo: ${memo}`;
       setShowSolanaModal(false);
     };
 
-    const amt = depositAmountUsd || activeDepositQuote?.amountUsdt || 10;
+    const amt = depositAmountUsd;
     const isTon = cur.networkType === 'TON';
     const isBase = cur.id === 'BASE' || cur.id === 'USDC_BASE' || cur.id === 'ETH_BASE';
     const effectiveSymbol = isBase ? (cur.id === 'USDC_BASE' ? 'USDC' : (cur.id === 'ETH_BASE' ? 'ETH' : baseAsset)) : cur.symbol;
 
-    const currentPrice = isTon ? (activeDepositQuote?.tonPriceUsd || 5.20) : (activeDepositQuote?.cryptoPriceUsd || 1.0);
-    const cryptoAmount = activeDepositQuote?.expectedCryptoAmount || 
-      (isTon ? (Math.round((amt / currentPrice) * 10000) / 10000) : (cur.symbol === 'USDT' || cur.symbol === 'USDC' ? amt : (Math.round((amt / currentPrice) * 100000) / 100000)));
+    const isQuoteMatching = Boolean(
+      activeDepositQuote &&
+      Math.abs(activeDepositQuote.amountUsdt - amt) < 0.001 &&
+      (activeDepositQuote.currency === effectiveSymbol || activeDepositQuote.currency === cur.symbol) &&
+      activeDepositQuote.network === cur.network
+    );
 
-    const nanoTon = activeDepositQuote?.nanoTonAmount || activeDepositQuote?.rawUnits || BigInt(Math.round(Number(cryptoAmount) * 1_000_000_000)).toString();
-    const memo = activeDepositQuote?.paymentReference || telegramUserId || `DEP-${cur.symbol}`;
-    const targetAddress = activeDepositQuote?.depositAddress || getEffectiveTreasuryAddress(cur);
-    const tokenContract = activeDepositQuote?.tokenContract;
-    const links = activeDepositQuote?.walletLinks;
+    const liveTonPrice = activeDepositQuote?.tonPriceUsd || activeDepositQuote?.cryptoPriceUsd || 1.15;
+    const liveOtherPrice = activeDepositQuote?.cryptoPriceUsd || 1.0;
+    const currentPrice = isTon ? liveTonPrice : liveOtherPrice;
 
-    // Keeper (Tonkeeper) Links
-    const keeperUniversalUrl = links?.keeperUniversalUrl || links?.tonkeeperUniversalUrl || `https://app.tonkeeper.com/transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
-    const keeperDeepLink = links?.keeperDeepLink || links?.tonDeepLink || `ton://transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
+    const cryptoAmount = isQuoteMatching && activeDepositQuote
+      ? activeDepositQuote.expectedCryptoAmount 
+      : (isTon ? (Math.round((amt / currentPrice) * 10000) / 10000) : (cur.symbol === 'USDT' || cur.symbol === 'USDC' ? amt : (Math.round((amt / currentPrice) * 100000) / 100000)));
 
-    // Trust Wallet Link (Supported across all 8 networks)
-    const trustWalletUrl = links?.trustWalletUrl || (cur.getUniversalWalletUrl ? cur.getUniversalWalletUrl(targetAddress) : '');
+    const nanoTon: string = (isQuoteMatching && activeDepositQuote && (activeDepositQuote.nanoTonAmount || activeDepositQuote.rawUnits))
+      ? (activeDepositQuote.nanoTonAmount || activeDepositQuote.rawUnits)!
+      : BigInt(Math.round(Number(cryptoAmount) * 1_000_000_000)).toString();
+
+    const memo: string = (isQuoteMatching && activeDepositQuote?.paymentReference) ? activeDepositQuote.paymentReference : (telegramUserId ? `DEP-${telegramUserId}` : `DEP-${cur.symbol}`);
+    const targetAddress: string = (isQuoteMatching && activeDepositQuote?.depositAddress) ? activeDepositQuote.depositAddress : getEffectiveTreasuryAddress(cur);
+    const tokenContract = isQuoteMatching ? activeDepositQuote?.tokenContract : undefined;
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
@@ -1162,14 +1171,9 @@ Payment Reference / Memo: ${memo}`;
           <div className="space-y-2 pt-1">
             {/* 1. Keeper (Tonkeeper) */}
             {isTon ? (
-              <a
-                href={keeperUniversalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => {
-                  e.preventDefault();
-                  openSafeUrl(keeperUniversalUrl, keeperDeepLink);
-                }}
+              <button
+                type="button"
+                onClick={() => handleOpenPaymentWithWallet(cur, 'KEEPER')}
                 className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#0098EA] via-[#00B4D8] to-[#0077B5] hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-[0_0_20px_rgba(0,180,216,0.35)] transition-all cursor-pointer border border-cyan-300/40 text-center select-none"
               >
                 <div className="flex items-center gap-2 text-left">
@@ -1180,7 +1184,7 @@ Payment Reference / Memo: ${memo}`;
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-white" />
-              </a>
+              </button>
             ) : (
               <div className="w-full py-2.5 px-4 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-500 text-xs flex items-center justify-between opacity-70">
                 <div className="flex items-center gap-2 text-left">
@@ -1195,14 +1199,9 @@ Payment Reference / Memo: ${memo}`;
             )}
 
             {/* 2. Trust Wallet (Supported for all 8 currencies) */}
-            <a
-              href={trustWalletUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => {
-                e.preventDefault();
-                openSafeUrl(trustWalletUrl);
-              }}
+            <button
+              type="button"
+              onClick={() => handleOpenPaymentWithWallet(cur, 'TRUST_WALLET')}
               className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#0500FF] via-[#0052FF] to-[#00A3FF] hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-[0_0_20px_rgba(0,82,255,0.35)] transition-all cursor-pointer border border-blue-400/40 text-center select-none"
             >
               <div className="flex items-center gap-2 text-left">
@@ -1213,7 +1212,7 @@ Payment Reference / Memo: ${memo}`;
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-white" />
-            </a>
+            </button>
 
             {/* Additional TON Options */}
             {isTon && (
@@ -1905,6 +1904,7 @@ Payment Reference / Memo: ${memo}`;
                   onClick={() => {
                     setDepositAmountUsd(amt);
                     setCustomAmountInput(amt.toFixed(2));
+                    setActiveDepositQuote(null);
                     const effectiveSymbol = cur.id === 'BASE' ? baseAsset : cur.symbol;
                     // Keep deposit intent synchronized with selected amount
                     paymentService.createDepositIntent({
@@ -1966,6 +1966,7 @@ Payment Reference / Memo: ${memo}`;
                   const val = parseFloat(e.target.value);
                   if (!isNaN(val) && val > 0) {
                     setDepositAmountUsd(val);
+                    setActiveDepositQuote(null);
                     const effectiveSymbol = cur.id === 'BASE' ? baseAsset : cur.symbol;
                     paymentService.createDepositIntent({
                       amountUsdt: val,
@@ -2026,7 +2027,7 @@ Payment Reference / Memo: ${memo}`;
                   <span className="text-base">🟢</span>
                   <div>
                     <div className="leading-tight font-black">Pay with Keeper</div>
-                    <div className="text-[9px] font-normal text-cyan-100 opacity-90">Auto-fills {activeDepositQuote?.expectedCryptoAmount || (Math.round((depositAmountUsd / 5.20) * 10000) / 10000)} TON & memo</div>
+                    <div className="text-[9px] font-normal text-cyan-100 opacity-90">Auto-fills {activeDepositQuote && Math.abs(activeDepositQuote.amountUsdt - depositAmountUsd) < 0.001 ? activeDepositQuote.expectedCryptoAmount : (Math.round((depositAmountUsd / (activeDepositQuote?.tonPriceUsd || 1.15)) * 10000) / 10000)} TON & memo</div>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-white" />
