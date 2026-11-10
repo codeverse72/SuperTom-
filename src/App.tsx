@@ -6,11 +6,15 @@ import { Toast } from './components/Toast';
 import { Home } from './pages/Home';
 import { Missions } from './pages/Missions';
 import { Store } from './pages/Store';
-import { Payout } from './pages/Payout';
 import { Profile } from './pages/Profile';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useTelegram } from './hooks/useTelegram';
 import { sound } from './utils/sound';
+
+// Lazy-load Payout so wallet SDKs load asynchronously without blocking Mini App initial render
+const Payout = React.lazy(() =>
+  import('./pages/Payout').then((m) => ({ default: m.Payout }))
+);
 
 // Lazy-load AdminApp so Telegram Mini App users do not download any admin bundle assets
 const AdminApp = React.lazy(() =>
@@ -103,15 +107,23 @@ export default function App() {
           {/* Active Tab Screen Content */}
           <main className="flex-1 p-4 pb-24 overflow-y-auto">
             <ErrorBoundary>
-              {activeTab === 'home' && (
-                <Home onNavigateToStore={() => handleTabChange('store')} />
-              )}
-              {activeTab === 'missions' && <Missions />}
-              {activeTab === 'store' && (
-                <Store onNavigateToDeposit={() => handleTabChange('payout')} />
-              )}
-              {activeTab === 'payout' && <Payout />}
-              {activeTab === 'profile' && <Profile />}
+              <React.Suspense
+                fallback={
+                  <div className="py-20 text-center text-cyan-400 font-mono text-xs animate-pulse">
+                    Loading SuperTom...
+                  </div>
+                }
+              >
+                {activeTab === 'home' && (
+                  <Home onNavigateToStore={() => handleTabChange('store')} />
+                )}
+                {activeTab === 'missions' && <Missions />}
+                {activeTab === 'store' && (
+                  <Store onNavigateToDeposit={() => handleTabChange('payout')} />
+                )}
+                {activeTab === 'payout' && <Payout />}
+                {activeTab === 'profile' && <Profile />}
+              </React.Suspense>
             </ErrorBoundary>
           </main>
 

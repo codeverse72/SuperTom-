@@ -1,5 +1,43 @@
 import { TonConnectUI, ConnectedWallet } from '@tonconnect/ui';
-import { beginCell } from '@ton/core';
+
+/**
+ * Serializes a TON text comment into a standard single-cell BoC base64 payload
+ * using 100% browser-native Uint8Array and window.btoa (Zero Node.js Buffer dependencies).
+ * Opcode: 0x00000000 (32-bit zero integer) + UTF-8 comment text.
+ */
+function createCommentBoc(commentText: string): string {
+  if (!commentText || !commentText.trim()) return '';
+  try {
+    const textBytes = new TextEncoder().encode(commentText.trim());
+    if (textBytes.length > 120) {
+      return '';
+    }
+    const dataLen = 4 + textBytes.length;
+    const cellLen = 2 + dataLen;
+    const d2 = dataLen * 2;
+
+    const boc = new Uint8Array([
+      0xb5, 0xee, 0x9c, 0x72,
+      0x01, 0x01, 0x01, 0x01, 0x00,
+      cellLen,
+      0x00,
+      0x00,
+      d2,
+      0x00, 0x00, 0x00, 0x00,
+      ...textBytes,
+    ]);
+
+    let binary = '';
+    const len = boc.byteLength;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(boc[i]);
+    }
+    return typeof window !== 'undefined' ? window.btoa(binary) : '';
+  } catch (err) {
+    console.warn('[TonConnectService] Failed to encode comment BoC:', err);
+    return '';
+  }
+}
 
 class TonConnectService {
   private tonConnectUI: TonConnectUI | null = null;
@@ -79,17 +117,7 @@ class TonConnectService {
    * Format: 32 zero bits (0x00000000) followed by the UTF-8 comment text.
    */
   public encodeCommentPayload(commentText: string): string {
-    if (!commentText || !commentText.trim()) return '';
-    try {
-      const cell = beginCell()
-        .storeUint(0, 32)
-        .storeStringTail(commentText.trim())
-        .endCell();
-      return cell.toBoc().toString('base64');
-    } catch (e) {
-      console.warn('[TonConnectService] Failed to encode comment payload:', e);
-      return '';
-    }
+    return createCommentBoc(commentText);
   }
 
   /**
@@ -143,3 +171,4 @@ class TonConnectService {
 }
 
 export const tonConnectService = new TonConnectService();
+
