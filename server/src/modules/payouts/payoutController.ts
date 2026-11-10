@@ -256,7 +256,7 @@ export class PayoutController {
 
       const evmAddr = settingsMap['TRUST_WALLET_EVM_ADDRESS'] || settingsMap['TREASURY_EVM_ADDRESS'] || process.env.TRUST_WALLET_EVM_ADDRESS || process.env.TREASURY_EVM_ADDRESS || '0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1';
       const tronAddr = settingsMap['TRUST_WALLET_TRON_ADDRESS'] || settingsMap['TREASURY_TRON_ADDRESS'] || process.env.TRUST_WALLET_TRON_ADDRESS || process.env.TREASURY_TRON_ADDRESS || process.env.TREASURY_TRON_ADORESS || 'TJLEgXHdQG3fxwn1UiHVpDoqz29FmJshCv';
-      const tonAddr = settingsMap['TRUST_WALLET_TON_ADDRESS'] || settingsMap['TREASURY_TON_ADDRESS'] || process.env.TRUST_WALLET_TON_ADDRESS || process.env.TREASURY_TON_ADDRESS || 'UQBG6dgDogaxatpbFiVzAFNiByU3E3P1Xsdkt_xyuG4S-gzv';
+      const tonAddr = settingsMap['TRUST_WALLET_TON_ADDRESS'] || settingsMap['TREASURY_TON_ADDRESS'] || process.env.TRUST_WALLET_TON_ADDRESS || process.env.TREASURY_TON_ADDRESS || 'UQBGdgDogaxtpbFIvzAFnIByU3E3Plxsdkt_xyuG4S-gzvgR';
       const solAddr = settingsMap['TRUST_WALLET_SOL_ADDRESS'] || settingsMap['TREASURY_SOL_ADDRESS'] || settingsMap['TREASURY_SOLANA_ADDRESS'] || process.env.TRUST_WALLET_SOL_ADDRESS || process.env.TREASURY_SOL_ADDRESS || process.env.TREASURY_SOLANA_ADDRESS || 'ER74j5s2PgVPx9dsT7wqyMSM7RgY4LKzfT9c1NFp92Qk';
 
       sendSuccess(res, {
@@ -409,7 +409,7 @@ export class PayoutController {
 
       const evmAddr = settingsMap['TRUST_WALLET_EVM_ADDRESS'] || settingsMap['TREASURY_EVM_ADDRESS'] || process.env.TREASURY_EVM_ADDRESS || process.env.TRUST_WALLET_EVM_ADDRESS || '0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1';
       const tronAddr = settingsMap['TRUST_WALLET_TRON_ADDRESS'] || settingsMap['TREASURY_TRON_ADDRESS'] || process.env.TREASURY_TRON_ADDRESS || process.env.TREASURY_TRON_ADORESS || process.env.TRUST_WALLET_TRON_ADDRESS || 'TJLEgXHdQG3fxwn1UiHVpDoqz29FmJshCv';
-      const tonAddr = settingsMap['TRUST_WALLET_TON_ADDRESS'] || settingsMap['TREASURY_TON_ADDRESS'] || process.env.TREASURY_TON_ADDRESS || process.env.TRUST_WALLET_TON_ADDRESS || 'UQBG6dgDogaxatpbFiVzAFNiByU3E3P1Xsdkt_xyuG4S-gzv';
+      const tonAddr = settingsMap['TRUST_WALLET_TON_ADDRESS'] || settingsMap['TREASURY_TON_ADDRESS'] || process.env.TREASURY_TON_ADDRESS || process.env.TRUST_WALLET_TON_ADDRESS || 'UQBGdgDogaxtpbFIvzAFnIByU3E3Plxsdkt_xyuG4S-gzvgR';
       const solAddr = settingsMap['TRUST_WALLET_SOL_ADDRESS'] || settingsMap['TREASURY_SOL_ADDRESS'] || settingsMap['TREASURY_SOLANA_ADDRESS'] || process.env.TREASURY_SOL_ADDRESS || process.env.TREASURY_SOLANA_ADDRESS || process.env.TRUST_WALLET_SOL_ADDRESS || 'ER74j5s2PgVPx9dsT7wqyMSM7RgY4LKzfT9c1NFp92Qk';
 
       let depositAddress = tronAddr;

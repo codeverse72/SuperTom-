@@ -65,12 +65,12 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
     networkType: 'TON',
     minDepositUsd: 1.0,
     minWithdrawUsd: 1.0,
-    placeholder: 'e.g. UQBG6dgDogaxatpbFiVzAFNiByU3E3P1Xsdkt_xyuG4S-gzv',
+    placeholder: 'e.g. UQBGdgDogaxtpbFIvzAFnIByU3E3Plxsdkt_xyuG4S-gzvgR',
     hint: 'TON addresses start with "EQ" or "UQ" and contain 48 characters.',
-    defaultTreasuryAddress: 'UQBG6dgDogaxatpbFiVzAFNiByU3E3P1Xsdkt_xyuG4S-gzv',
+    defaultTreasuryAddress: 'UQBGdgDogaxtpbFIvzAFnIByU3E3Plxsdkt_xyuG4S-gzvgR',
     hasMemoSupport: true,
-    walletUriScheme: (addr, _amt, memo) => `ton://transfer/${addr}${memo ? `?text=${encodeURIComponent(memo)}` : ''}`,
-    getUniversalWalletUrl: (addr, _amt, memo) => `https://app.tonkeeper.com/transfer/${addr}${memo ? `?text=${encodeURIComponent(memo)}` : ''}`,
+    walletUriScheme: (addr, amt, memo) => `ton://transfer/${addr}?amount=${Math.round((amt || 1) * 1_000_000_000)}${memo ? `&text=${encodeURIComponent(memo)}` : ''}`,
+    getUniversalWalletUrl: (addr, amt, memo) => `https://app.tonkeeper.com/transfer/${addr}?amount=${Math.round((amt || 1) * 1_000_000_000)}${memo ? `&text=${encodeURIComponent(memo)}` : ''}`,
     getExplorerAddressUrl: (addr) => `https://tonviewer.com/${addr}`,
     renderIcon: () => (
       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0098EA] to-[#0077B5] flex items-center justify-center text-white shadow-md shrink-0">
@@ -280,35 +280,62 @@ export const Payout: React.FC = () => {
     openSafeUrl('https://t.me/wallet');
   };
 
-  // Open Tonkeeper Direct Deep Link / Universal Link
-  const handleOpenTonkeeper = (address: string, memo: string, curConfig?: CurrencyConfig) => {
+  // Open Tonkeeper Direct Deep Link / Universal Link with pre-filled amount and memo
+  const handleOpenTonkeeper = (
+    address: string, 
+    memo: string, 
+    curConfig?: CurrencyConfig,
+    amountNum?: number
+  ) => {
     sound.playClick();
     
-    // For TON or GRAM (or default TON deposit), build Tonkeeper universal link
+    // Standardized valid 48-char official TON treasury address
+    const officialTonAddress = 'UQBGdgDogaxtpbFIvzAFnIByU3E3Plxsdkt_xyuG4S-gzvgR';
     const isTon = !curConfig || curConfig.networkType === 'TON' || curConfig.network.toUpperCase() === 'TON';
-    const targetTonAddress = isTon 
+    const targetTonAddress = (isTon && address && address.length >= 48) 
       ? address 
-      : (getEffectiveTreasuryAddress(SUPPORTED_CURRENCIES[0]) || address);
+      : (getEffectiveTreasuryAddress(SUPPORTED_CURRENCIES[0]) || officialTonAddress);
 
-    const memoParam = memo ? `?text=${encodeURIComponent(memo)}` : '';
-    const universalUrl = `https://app.tonkeeper.com/transfer/${targetTonAddress}${memoParam}`;
-    const directScheme = `ton://transfer/${targetTonAddress}${memoParam}`;
+    // Calculate exact nanotons (1 TON = 1e9 nanotons)
+    const finalAmount = (amountNum !== undefined && amountNum > 0) ? amountNum : (depositAmountUsd > 0 ? depositAmountUsd : 1);
+    const amountInNanoTon = Math.round(finalAmount * 1_000_000_000);
+    const memoParam = memo ? `&text=${encodeURIComponent(memo)}` : '';
+
+    const directScheme = `ton://transfer/${targetTonAddress}?amount=${amountInNanoTon}${memoParam}`;
+    const universalUrl = `https://app.tonkeeper.com/transfer/${targetTonAddress}?amount=${amountInNanoTon}${memoParam}`;
 
     const webApp = window.Telegram?.WebApp;
+    
+    // Strategy 1: Telegram WebApp openLink with universal HTTPS link
     if (webApp?.openLink) {
-      // In Telegram WebApp, openLink with https://app.tonkeeper.com smoothly opens Tonkeeper on mobile devices
-      webApp.openLink(universalUrl);
-      return;
+      try {
+        webApp.openLink(universalUrl);
+      } catch (err) {
+        console.warn('Telegram openLink universal failed:', err);
+      }
     }
 
-    // In desktop or mobile browser outside Telegram:
+    // Strategy 2: Direct OS URI protocol trigger (launches Tonkeeper native app on mobile)
     try {
-      window.location.href = directScheme;
+      const link = document.createElement('a');
+      link.href = directScheme;
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      try {
+        window.location.href = directScheme;
+      } catch {
+        // Fallback
+      }
+    }
+
+    // Strategy 3: Standard browser fallback outside Telegram
+    if (!webApp) {
       setTimeout(() => {
         window.open(universalUrl, '_blank', 'noopener,noreferrer');
-      }, 500);
-    } catch {
-      window.open(universalUrl, '_blank', 'noopener,noreferrer');
+      }, 600);
     }
   };
 
@@ -792,14 +819,16 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
         </div>
 
         {/* Uniform Primary Wallet Button */}
-        <button
-          type="button"
-          onClick={() => handleOpenTonkeeper(treasuryAddress, telegramUserId, cur)}
-          className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#0098EA] via-[#00B4D8] to-[#0077B5] hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(0,180,216,0.35)] transition-all cursor-pointer border border-cyan-300/40"
+        <a
+          href={`ton://transfer/${(treasuryAddress && treasuryAddress.length >= 48) ? treasuryAddress : 'UQBGdgDogaxtpbFIvzAFnIByU3E3Plxsdkt_xyuG4S-gzvgR'}?amount=${Math.round((depositAmountUsd > 0 ? depositAmountUsd : 1) * 1_000_000_000)}${telegramUserId ? `&text=${encodeURIComponent(telegramUserId)}` : ''}`}
+          onClick={(e) => {
+            handleOpenTonkeeper(treasuryAddress, telegramUserId, cur, depositAmountUsd);
+          }}
+          className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#0098EA] via-[#00B4D8] to-[#0077B5] hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(0,180,216,0.35)] transition-all cursor-pointer border border-cyan-300/40 text-center select-none"
         >
           <span>OPEN IN TELEGRAM WALLET / ANY TON WALLET</span>
           <ExternalLink className="w-4 h-4" />
-        </button>
+        </a>
 
         {/* Deposit Amount Selector matching Screenshot 1 */}
         <div className="rounded-2xl bg-[#090e1c] border border-cyan-500/30 p-3.5 space-y-3 shadow-xl">
