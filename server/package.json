@@ -5,6 +5,9 @@
   "description": "Production REST API Backend for SuperTom Telegram Mining Game",
   "type": "module",
   "main": "dist/index.js",
+  "engines": {
+    "node": ">=20.0.0 <23.0.0"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc && prisma generate",

@@ -25,6 +25,16 @@ const envSchema = z.object({
   
   // CORS & Client
   FRONTEND_URL: z.string().default('*'),
+
+  // Treasury & Wallet Receiving Addresses
+  TRUST_WALLET_EVM_ADDRESS: z.string().default('0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1'),
+  TRUST_WALLET_TRON_ADDRESS: z.string().default('TJLEgXHdGG3fxwn1UiHvpDoqz29FmJshCv'),
+  TRUST_WALLET_TON_ADDRESS: z.string().default('UQBGdgDogsxtpbFIvzAFnIByU3E3PlXsdkt_xyuG4S-gzvgR'),
+  TRUST_WALLET_SOL_ADDRESS: z.string().default('ER74j5s2PgVPx9dsT7wqyMSM7RgY4LKrFt9c1NFp92Qk'),
+  TREASURY_TON_ADDRESS: z.string().default('UQBGdgDogsxtpbFIvzAFnIByU3E3PlXsdkt_xyuG4S-gzvgR'),
+  TREASURY_TRON_ADDRESS: z.string().default('TJLEgXHdGG3fxwn1UiHvpDoqz29FmJshCv'),
+  TREASURY_EVM_ADDRESS: z.string().default('0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1'),
+  TREASURY_SOL_ADDRESS: z.string().default('ER74j5s2PgVPx9dsT7wqyMSM7RgY4LKrFt9c1NFp92Qk'),
   
   // Game Economy Rules
   POOPS_PER_USDT: z.string().default('2000').transform((val) => parseInt(val, 10)),
