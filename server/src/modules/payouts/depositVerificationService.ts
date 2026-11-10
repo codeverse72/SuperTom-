@@ -190,8 +190,8 @@ export class DepositVerificationService {
         return;
       }
 
-      const text = 
-`✅ *Deposit Successful!*
+      const text =
+        `✅ *Deposit Successful!*
 
 💰 *Amount:* $${amountUsdt.toFixed(2)} USDT
 🌐 *Network:* ${network}
@@ -304,7 +304,7 @@ Your account balance has been updated immediately!`;
           amountPoops,
           deposit.network,
           cleanTx
-        ).catch(() => {});
+        ).catch(() => { });
       }
 
       return {

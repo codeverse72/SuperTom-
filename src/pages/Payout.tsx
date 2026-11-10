@@ -269,21 +269,54 @@ export const Payout: React.FC = () => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Safe Universal URL Opener (Compliant with Telegram WebApp API)
-  const openSafeUrl = (url: string) => {
-    if (!url) return;
+  // Safe Universal URL & Protocol Opener (Telegram WebApp & Mobile Browser Compatible)
+  const openSafeUrl = (universalUrl: string, tonDeepLink?: string) => {
+    if (!universalUrl) return;
     const webApp = window.Telegram?.WebApp;
-    if (url.startsWith('https://t.me/') || url.startsWith('tg:')) {
+
+    // 1. If Telegram internal link (e.g. https://t.me/wallet)
+    if (universalUrl.startsWith('https://t.me/') || universalUrl.startsWith('tg:')) {
       if (webApp?.openTelegramLink) {
-        webApp.openTelegramLink(url);
+        webApp.openTelegramLink(universalUrl);
         return;
       }
     }
+
+    // 2. Telegram WebApp openLink (Only accepts https:// links, requires try_instant_view: false)
     if (webApp?.openLink) {
-      webApp.openLink(url);
-      return;
+      try {
+        webApp.openLink(universalUrl, { try_instant_view: false });
+      } catch (e) {
+        console.warn('Telegram openLink failed:', e);
+      }
     }
-    window.open(url, '_blank', 'noopener,noreferrer');
+
+    // 3. Native app intent trigger via hidden iframe (Handles ton:// without crashing WebView or throwing ERR_UNKNOWN_URL_SCHEME)
+    if (tonDeepLink) {
+      try {
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = tonDeepLink;
+        document.body.appendChild(iframe);
+        setTimeout(() => {
+          try {
+            document.body.removeChild(iframe);
+          } catch {}
+        }, 2000);
+      } catch {}
+    }
+
+    // 4. Standard browser fallback (when running outside Telegram WebApp)
+    if (!webApp?.openLink) {
+      try {
+        const opened = window.open(universalUrl, '_blank', 'noopener,noreferrer');
+        if (!opened) {
+          window.location.assign(universalUrl);
+        }
+      } catch {
+        window.location.assign(universalUrl);
+      }
+    }
   };
 
   const openTelegramWallet = () => {
@@ -314,34 +347,44 @@ export const Payout: React.FC = () => {
     setIsCheckingOnChain(true);
 
     try {
-      const res = await paymentService.checkOnChainDeposit(depositId);
-      setIsCheckingOnChain(false);
+      if (depositId) {
+        const res = await paymentService.checkOnChainDeposit(depositId);
+        setIsCheckingOnChain(false);
 
-      if (res.success && res.data?.isCompleted) {
-        stopOnChainPolling();
-        setDepositStatus('COMPLETED');
-        setPaymentFeedback('Deposit successful!');
-        sound.playReward();
-        showToast(
-          'Deposit Confirmed!',
-          res.data.message || 'Deposit confirmed and balance credited immediately!',
-          'reward'
-        );
-
-        refreshDeposits();
-        refreshWithdrawals();
-        fetchEntitlement();
-        if (selectedPlanForDeposit) {
-          setSelectedPlanForDeposit(null);
-        }
-        return true;
-      } else {
-        if (isManual) {
+        if (res.success && res.data?.isCompleted) {
+          stopOnChainPolling();
+          setDepositStatus('COMPLETED');
+          setPaymentFeedback('Deposit successful!');
+          sound.playReward();
           showToast(
-            'Payment Pending Verification',
-            res.data?.message || 'Transaction not found on chain yet. Please allow 10-30 seconds for TON network finality.',
-            'info'
+            'Deposit Confirmed!',
+            res.data.message || 'Deposit confirmed and balance credited immediately!',
+            'reward'
           );
+
+          refreshDeposits();
+          refreshWithdrawals();
+          fetchEntitlement();
+          if (selectedPlanForDeposit) {
+            setSelectedPlanForDeposit(null);
+          }
+          return true;
+        } else {
+          if (isManual) {
+            showToast(
+              'Payment Pending Verification',
+              res.data?.message || 'Transaction not found on chain yet. Please allow 10-30 seconds for TON network finality.',
+              'info'
+            );
+          }
+          return false;
+        }
+      } else {
+        // Fallback: refresh deposits if depositId not assigned yet
+        await Promise.all([refreshDeposits(), refreshWithdrawals(), fetchEntitlement()]);
+        setIsCheckingOnChain(false);
+        if (isManual) {
+          showToast('Status Checked', 'Deposit status refreshed. If already sent, it will confirm shortly.', 'info');
         }
         return false;
       }
@@ -372,12 +415,12 @@ export const Payout: React.FC = () => {
 
   /**
    * Primary TON deposit handler:
-   * 1. Validates deposit amount
-   * 2. Requests server-side intent with cached TON exchange rate & unique DEP reference
-   * 3. Opens Tonkeeper via official HTTPS Universal Link (prevents ERR_UNKNOWN_URL_SCHEME)
-   * 4. Initiates bounded on-chain verification polling
+   * 1. Validates deposit amount ($1 - $10,000)
+   * 2. Computes parameters synchronously (targetAddress, nanoTon, memo)
+   * 3. Launches Tonkeeper immediately (synchronous user gesture context prevents popup blocking & drops)
+   * 4. Asynchronously creates backend tracked intent & initializes on-chain verification
    */
-  const handleOpenTonPayment = async (cur: CurrencyConfig) => {
+  const handleOpenTonPayment = (cur: CurrencyConfig) => {
     sound.playClick();
     setDepositError(null);
 
@@ -393,53 +436,62 @@ export const Payout: React.FC = () => {
       return;
     }
 
-    setIsInitiatingPayment(true);
-    setPaymentFeedback('Preparing your payment...');
+    // 1. Prepare target addresses & parameters synchronously
+    const officialTonAddress = 'UQBGdgDogsxtpbFIvzAFnIByU3E3PlXsdkt_xyuG4S-gzvgR';
+    const targetAddress = getEffectiveTreasuryAddress(cur) || officialTonAddress;
+    const currentPrice = activeDepositQuote?.tonPriceUsd || 5.20;
+    const calculatedTon = Math.round((amt / currentPrice) * 10000) / 10000;
+    const nanoTon = BigInt(Math.round(calculatedTon * 1_000_000_000)).toString();
+    const memo = activeDepositQuote?.paymentReference || `DEP-${telegramUserId}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
-    try {
-      const res = await paymentService.createDepositIntent({
+    // Universal URL for Telegram WebApp + Deep link for native Tonkeeper app
+    const universalUrl = `https://app.tonkeeper.com/transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
+    const tonDeepLink = `ton://transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
+
+    // 2. Open wallet IMMEDIATELY within the synchronous user click event
+    // This guarantees the browser/Telegram user gesture token is valid and not dropped by pop-up blockers
+    openSafeUrl(universalUrl, tonDeepLink);
+
+    // 3. Immediately display active status feedback to the user
+    setPaymentFeedback('Payment pending verification.');
+    setDepositStatus('WAITING_FOR_PAYMENT');
+
+    if (!activeDepositQuote || activeDepositQuote.amountUsdt !== amt) {
+      setActiveDepositQuote({
+        id: activeDepositId || '',
+        telegramId: telegramUserId,
         amountUsdt: amt,
+        amountPoops: Math.round(amt * 2000),
         currency: cur.symbol,
         network: cur.network,
-        notes: selectedPlanForDeposit 
-          ? `[Biscuit Purchase: ${selectedPlanForDeposit.name} (+${selectedPlanForDeposit.boostPerHour.toLocaleString()}/hr)]`
-          : undefined,
+        depositAddress: targetAddress,
+        paymentReference: memo,
+        expectedCryptoAmount: calculatedTon,
+        nanoTonAmount: nanoTon,
+        tonPriceUsd: currentPrice,
+        minDeposit: 1.0,
+        status: 'WAITING_FOR_PAYMENT',
+        createdAt: Date.now(),
       });
-
-      if (!res.success || !res.data) {
-        setIsInitiatingPayment(false);
-        setPaymentFeedback(null);
-        setDepositError(res.error || 'Failed to prepare deposit request. Please try again.');
-        return;
-      }
-
-      const quote = res.data;
-      setActiveDepositId(quote.id);
-      setActiveDepositQuote(quote);
-
-      setPaymentFeedback('Opening your TON wallet...');
-
-      const officialTonAddress = 'UQBGdgDogsxtpbFIvzAFnIByU3E3PlXsdkt_xyuG4S-gzvgR';
-      const targetAddress = quote.depositAddress || officialTonAddress;
-      const nanoTon = quote.nanoTonAmount || Math.round((quote.expectedCryptoAmount || (amt / 5.20)) * 1_000_000_000).toString();
-      const commentRef = quote.paymentReference || telegramUserId;
-
-      // Construct official Tonkeeper HTTPS Universal Link (compliant with Telegram WebApp SDK, prevents ERR_UNKNOWN_URL_SCHEME)
-      const universalUrl = quote.tonkeeperUniversalUrl || `https://app.tonkeeper.com/transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(commentRef)}`;
-
-      openSafeUrl(universalUrl);
-
-      setIsInitiatingPayment(false);
-      setPaymentFeedback('Payment pending verification.');
-      setDepositStatus('WAITING_FOR_PAYMENT');
-
-      startOnChainPolling(quote.id);
-    } catch (err: unknown) {
-      setIsInitiatingPayment(false);
-      setPaymentFeedback(null);
-      const msg = err instanceof Error ? err.message : 'Unable to open wallet.';
-      setDepositError(msg);
     }
+
+    // 4. Background registration on backend for on-chain verification
+    paymentService.createDepositIntent({
+      amountUsdt: amt,
+      currency: cur.symbol,
+      network: cur.network,
+      notes: selectedPlanForDeposit 
+        ? `[Biscuit Purchase: ${selectedPlanForDeposit.name} (+${selectedPlanForDeposit.boostPerHour.toLocaleString()}/hr)]`
+        : undefined,
+    }).then((res) => {
+      if (res.success && res.data) {
+        setActiveDepositId(res.data.id);
+        setActiveDepositQuote(res.data);
+        startOnChainPolling(res.data.id);
+      }
+    }).catch((err) => {
+      console.warn('Background deposit intent registration deferred:', err);
+    });
   };
 
   const handleCopyAllPaymentDetails = (
@@ -1003,16 +1055,14 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
               </div>
             )}
 
-            {/* Action Buttons: Check Payment Status & Fallback Copy */}
+            {/* Action Buttons: Check Payment Status & Re-open */}
             {paymentFeedback !== 'Deposit successful!' && (
               <div className="space-y-2 pt-1">
                 <button
                   type="button"
-                  disabled={isCheckingOnChain || !activeDepositId}
+                  disabled={isCheckingOnChain}
                   onClick={() => {
-                    if (activeDepositId) {
-                      checkDepositOnChainStatus(activeDepositId, true);
-                    }
+                    checkDepositOnChainStatus(activeDepositId || '', true);
                   }}
                   className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
                 >
@@ -1020,14 +1070,31 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
                   <span>{isCheckingOnChain ? 'Checking Blockchain...' : 'Check Payment Status'}</span>
                 </button>
 
-                <div className="flex items-center justify-between text-[11px] text-slate-400 px-1 pt-1">
-                  <span>Unable to open your wallet?</span>
+                <div className="grid grid-cols-2 gap-2 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const officialTonAddress = 'UQBGdgDogsxtpbFIvzAFnIByU3E3PlXsdkt_xyuG4S-gzvgR';
+                      const targetAddress = activeDepositQuote?.depositAddress || getEffectiveTreasuryAddress(cur) || officialTonAddress;
+                      const nanoTon = activeDepositQuote?.nanoTonAmount || BigInt(Math.round(((depositAmountUsd || 1) / 5.20) * 1_000_000_000)).toString();
+                      const memo = activeDepositQuote?.paymentReference || telegramUserId;
+                      const uUrl = `https://app.tonkeeper.com/transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
+                      const dLink = `ton://transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
+                      openSafeUrl(uUrl, dLink);
+                    }}
+                    className="py-2 px-3 rounded-xl bg-[#0d162b] hover:bg-[#121e3b] border border-cyan-500/40 text-cyan-300 font-bold text-[11px] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Re-open Wallet</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => handleCopyAllPaymentDetails(cur, treasuryAddress, depositAmountUsd, activeDepositQuote?.paymentReference || telegramUserId)}
-                    className="text-cyan-400 hover:text-cyan-300 font-bold underline cursor-pointer"
+                    className="py-2 px-3 rounded-xl bg-[#0d162b] hover:bg-[#121e3b] border border-cyan-900/60 text-slate-300 hover:text-white font-bold text-[11px] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                   >
-                    Copy Payment Details
+                    <Copy className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Copy Details</span>
                   </button>
                 </div>
               </div>
