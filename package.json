@@ -10,7 +10,9 @@
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "server:build": "npm --prefix server run build",
+    "server:start": "npm --prefix server start"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

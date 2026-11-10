@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: supertom-backend
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_BOT_USERNAME
+        value: SuperrTombot
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        value: https://super-tom.vercel.app,https://web.telegram.org
+      - key: TREASURY_TON_ADDRESS
+        value: UQBGdgDogsxtpbFIvzAFnIByU3E3PlXsdkt_xyuG4S-gzvgR
+      - key: TREASURY_TRON_ADDRESS
+        value: TJLEgXHdGG3fxwn1UiHvpDoqz29FmJshCv
+      - key: TREASURY_EVM_ADDRESS
+        value: 0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1
+      - key: TREASURY_SOL_ADDRESS
+        value: ER74j5s2PgVPx9dsT7wqyMSM7RgY4LKrFt9c1NFp92Qk
+      - key: SUPPORT_TELEGRAM_USERNAME
+        value: SuperTomCare

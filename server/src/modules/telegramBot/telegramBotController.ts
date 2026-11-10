@@ -83,7 +83,8 @@ export class TelegramBotController {
     if (!token || token === 'TEST_BOT_TOKEN_PLACEHOLDER') return;
 
     try {
-      const webhookUrl = 'https://supertom-backend.onrender.com/api/v1/bot/webhook';
+      const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.SERVER_URL || 'https://supertom-backend.onrender.com';
+      const webhookUrl = `${baseUrl.replace(/\/+$/, '')}/api/v1/bot/webhook`;
       const infoRes = await fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`);
       const infoData: any = await infoRes.json();
 
