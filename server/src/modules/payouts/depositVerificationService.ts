@@ -351,7 +351,11 @@ Your account balance has been updated immediately!`;
     }
 
     // Resolve official receiving address
-    const treasury = deposit.depositAddress || env.TRUST_WALLET_TON_ADDRESS || 'UQBGdgDogsxtpbFIvzAFnIByU3E3PlXsdkt_xyuG4S-gzvgR';
+    let treasury = deposit.depositAddress;
+    if (!treasury) {
+      const tonConfig = await prisma.tonPaymentConfig.findUnique({ where: { id: 'singleton' } }).catch(() => null);
+      treasury = tonConfig?.tonReceivingAddress || env.TRUST_WALLET_TON_ADDRESS || 'UQBGdgDogsxtpbFIvzAFnIByU3E3PlXsdkt_xyuG4S-gzvgR';
+    }
     const paymentRef = (deposit.paymentReference || '').trim();
     const userTelegramId = deposit.user?.telegramId?.toString() || '';
     const expectedTon = Number(deposit.expectedCryptoAmount || 0);
@@ -400,7 +404,17 @@ Your account balance has been updated immediately!`;
             const minAcceptableNanoTon = (expectedNanoTon * 98n) / 100n;
             if (expectedNanoTon > 0n && valNanoTon < minAcceptableNanoTon) {
               logger.warn(`[OnChainVerify] Partial amount detected for deposit ${depositId}: expected ${expectedNanoTon}, got ${valNanoTon}`);
-              continue;
+              await prisma.deposit.update({
+                where: { id: deposit.id },
+                data: { status: 'UNDERPAID' },
+              }).catch(() => {});
+              return {
+                success: false,
+                isCompleted: false,
+                status: 'UNDERPAID',
+                txHash,
+                message: `Partial payment received (${(Number(valNanoTon) / 1e9).toFixed(4)} TON). Required: ${expectedTon} TON.`,
+              };
             }
 
             // Check if txHash has already been credited in DB

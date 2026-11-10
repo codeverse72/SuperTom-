@@ -34,6 +34,8 @@ enum DepositStatus {
   PENDING
   CONFIRMED
   REJECTED
+  UNDERPAID
+  OVERPAID
 }
 
 enum CurrencyType {
@@ -640,5 +642,18 @@ model PayoutAutomationLog {
   @@index([createdAt])
 }
 
+// TON Payment Configuration (admin-managed)
+model TonPaymentConfig {
+  id                      String   @id @default("singleton")
+  tonReceivingAddress     String   @default("UQBGdgDogsxtpbFIvzAFnIByU3E3PlXsdkt_xyuG4S-gzvgR")
+  requiredConfirmations   Int      @default(1)
+  depositExpiryMinutes    Int      @default(1440)
+  minDepositTon           Float    @default(0.1)
+  maxDepositTon           Float    @default(10000.0)
+  monitoringEnabled       Boolean  @default(true)
+  tonConnectManifestUrl   String   @default("https://super-tom.vercel.app/tonconnect-manifest.json")
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
 
 

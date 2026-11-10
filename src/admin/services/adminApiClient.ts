@@ -691,6 +691,45 @@ class AdminApiClient {
     });
   }
 
+  // === TON Config ===
+  public async getTonConfig() {
+    return this.request<{
+      id: string;
+      tonReceivingAddress: string;
+      requiredConfirmations: number;
+      depositExpiryMinutes: number;
+      minDepositTon: number;
+      maxDepositTon: number;
+      monitoringEnabled: boolean;
+      tonConnectManifestUrl: string;
+    }>('/ton-config');
+  }
+
+  public async updateTonConfig(data: {
+    tonReceivingAddress?: string;
+    requiredConfirmations?: number;
+    depositExpiryMinutes?: number;
+    minDepositTon?: number;
+    maxDepositTon?: number;
+    monitoringEnabled?: boolean;
+    tonConnectManifestUrl?: string;
+  }) {
+    return this.request<{ message: string }>('/ton-config', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  public async getTonDeposits(params: { limit?: number; network?: string } = {}) {
+    const q = new URLSearchParams();
+    if (params.limit) q.set('limit', params.limit.toString());
+    if (params.network) q.set('network', params.network);
+    return this.request<{
+      total?: number;
+      deposits: DepositItem[];
+    }>(`/deposits?${q.toString()}`);
+  }
+
   public async getPayoutAutomationAnalytics() {
     return this.request<{
       stats: {

@@ -778,5 +778,67 @@ export class AdminPayoutController {
       sendError(res, 'Failed to update treasury settings', 500, 'SERVER_ERROR');
     }
   }
+
+  /**
+   * GET /api/v1/admin/ton-config
+   * Returns current TON payment configuration
+   */
+  public static async getTonConfig(_req: AuthenticatedAdminRequest, res: Response): Promise<void> {
+    try {
+      let config = await prisma.tonPaymentConfig.findUnique({ where: { id: 'singleton' } });
+      if (!config) {
+        config = await prisma.tonPaymentConfig.create({ data: { id: 'singleton' } });
+      }
+      sendSuccess(res, config);
+    } catch (err) {
+      sendError(res, 'Failed to fetch TON config', 500, 'SERVER_ERROR');
+    }
+  }
+
+  /**
+   * PUT /api/v1/admin/ton-config
+   * Updates TON payment configuration
+   */
+  public static async updateTonConfig(req: AuthenticatedAdminRequest, res: Response): Promise<void> {
+    const adminId = req.admin?.adminId;
+    if (!adminId) { sendError(res, 'Unauthorized', 401, 'UNAUTHORIZED'); return; }
+
+    const updateSchema = z.object({
+      tonReceivingAddress: z.string().optional(),
+      requiredConfirmations: z.number().int().min(1).max(10).optional(),
+      depositExpiryMinutes: z.number().int().min(5).max(10080).optional(),
+      minDepositTon: z.number().min(0.01).optional(),
+      maxDepositTon: z.number().max(100000).optional(),
+      monitoringEnabled: z.boolean().optional(),
+      tonConnectManifestUrl: z.string().url().optional(),
+    });
+
+    const parse = updateSchema.safeParse(req.body);
+    if (!parse.success) {
+      sendError(res, 'Invalid configuration data', 422, 'VALIDATION_ERROR', parse.error.format());
+      return;
+    }
+
+    try {
+      const updated = await prisma.tonPaymentConfig.upsert({
+        where: { id: 'singleton' },
+        create: { id: 'singleton', ...parse.data },
+        update: parse.data,
+      });
+
+      await recordAuditLog({
+        adminId,
+        action: 'UPDATE_TON_CONFIG',
+        targetEntity: 'TonPaymentConfig',
+        targetId: 'singleton',
+        newValue: parse.data,
+        req,
+      });
+
+      sendSuccess(res, { message: 'TON configuration updated', config: updated });
+    } catch (err) {
+      sendError(res, 'Failed to update TON config', 500, 'SERVER_ERROR');
+    }
+  }
 }
 

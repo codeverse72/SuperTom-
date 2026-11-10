@@ -148,6 +148,14 @@ adminRouter.post(
   AdminPayoutController.updateTreasurySettings
 );
 
+// TON Payment Configuration
+adminRouter.get('/ton-config', AdminPayoutController.getTonConfig);
+adminRouter.put(
+  '/ton-config',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  AdminPayoutController.updateTonConfig
+);
+
 // Ledger & Transaction Management
 adminRouter.get('/transactions', AdminTransactionController.listTransactions);
 

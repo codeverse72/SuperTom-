@@ -11,6 +11,7 @@ import { MissionsPage } from './pages/MissionsPage';
 import { SpinPage } from './pages/SpinPage';
 import { PayoutsPage } from './pages/PayoutsPage';
 import { PayoutAutomationPage } from './pages/PayoutAutomationPage';
+import { TonConfigPage } from './pages/TonConfigPage';
 import { CampaignPage } from './pages/CampaignPage';
 import { TransactionsPage } from './pages/TransactionsPage';
 import { ReferralsPage } from './pages/ReferralsPage';
@@ -71,6 +72,10 @@ export const App: React.FC = () => {
       title: 'Payout Channel Automation',
       subtitle: 'Reference channel monitoring, adaptive format extraction, and Telegram payout broadcasting.',
     },
+    tonConfig: {
+      title: 'TON Wallet & Payment Settings',
+      subtitle: 'Manage receiving address, TON Connect manifest, network thresholds, and live monitoring.',
+    },
     campaign: {
       title: '5K Members Achievement Celebration',
       subtitle: 'Manage 30% instant cashback, tiered daily rewards, participant schedules, and batch disbursements.',
@@ -110,6 +115,7 @@ export const App: React.FC = () => {
           {activeTab === 'spin' && <SpinPage />}
           {activeTab === 'payouts' && <PayoutsPage />}
           {activeTab === 'payoutAutomation' && <PayoutAutomationPage />}
+          {activeTab === 'tonConfig' && <TonConfigPage />}
           {activeTab === 'campaign' && <CampaignPage />}
           {activeTab === 'transactions' && <TransactionsPage />}
           {activeTab === 'referrals' && <ReferralsPage />}

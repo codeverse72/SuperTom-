@@ -499,7 +499,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setBalance(res.data.newBalance);
             showToast('Hourly Mining Added!', `+${res.data.claimedAmount.toLocaleString()} Poops added to main balance!`, 'reward');
           }
-          const nextMs = res.data.msUntilNextHour ?? 3600 * 1000;
+          const nextMs = (res.data as any).msUntilNextHour ?? 3600 * 1000;
           setNextMiningAdditionTimestamp(Date.now() + nextMs);
         }
       }).finally(() => {
@@ -826,7 +826,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     address: string,
     amount: number,
     network: string = 'TRC20'
-  ): Promise<{ success: boolean; error?: string }> => {
+  ): Promise<{ success: boolean; error?: string; code?: string }> => {
     const validation = validateWithdrawal(address, amount, balance, network as any);
     if (!validation.isValid) {
       const err = validation.errors.address || validation.errors.amount || validation.errors.balance || 'Validation error';

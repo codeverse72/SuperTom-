@@ -37,6 +37,7 @@ import { QRCode } from '../components/QRCode';
 import { DepositDto, WithdrawalEntitlementDto, CreateDepositIntentResponseDto } from '../services/types';
 import { CampaignBanner } from '../components/CampaignBanner';
 import { sound } from '../utils/sound';
+import { useTonConnect } from '../hooks/useTonConnect';
 
 export interface CurrencyConfig {
   id: string;
@@ -211,6 +212,26 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
   },
 ];
 
+const StatusBadge: React.FC<{status: string}> = ({ status }) => {
+  const configs: Record<string, {label: string; color: string}> = {
+    WAITING_FOR_PAYMENT: { label: '⏳ Awaiting Payment', color: 'bg-yellow-950/80 border-yellow-500/40 text-yellow-300' },
+    PAYMENT_DETECTED:    { label: '🔍 Detected', color: 'bg-blue-950/80 border-blue-500/40 text-blue-300' },
+    CONFIRMING:          { label: '⏳ Confirming', color: 'bg-cyan-950/80 border-cyan-500/40 text-cyan-300' },
+    COMPLETED:           { label: '✅ Confirmed', color: 'bg-emerald-950/80 border-emerald-500/40 text-emerald-300' },
+    CONFIRMED:           { label: '✅ Confirmed', color: 'bg-emerald-950/80 border-emerald-500/40 text-emerald-300' },
+    EXPIRED:             { label: '⏰ Expired', color: 'bg-red-950/80 border-red-500/40 text-red-300' },
+    FAILED:              { label: '❌ Failed', color: 'bg-red-950/80 border-red-500/40 text-red-300' },
+    UNDERPAID:           { label: '⚠️ Underpaid', color: 'bg-orange-950/80 border-orange-500/40 text-orange-300' },
+    OVERPAID:            { label: '⬆️ Overpaid', color: 'bg-green-950/80 border-green-500/40 text-green-300' },
+  };
+  const cfg = configs[status] || { label: status, color: 'bg-slate-800 border-slate-600 text-slate-300' };
+  return (
+    <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border ${cfg.color}`}>
+      {cfg.label}
+    </span>
+  );
+};
+
 export const Payout: React.FC = () => {
   const { 
     balance, 
@@ -251,7 +272,7 @@ export const Payout: React.FC = () => {
   const [isCheckingOnChain, setIsCheckingOnChain] = useState<boolean>(false);
 
   // Polling references for bounded verification checks (no infinite polling)
-  const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollCountRef = useRef<number>(0);
 
   // Withdrawal Form State (Screenshot 3)
@@ -264,6 +285,18 @@ export const Payout: React.FC = () => {
   const [entitlement, setEntitlement] = useState<WithdrawalEntitlementDto | null>(null);
   const [showUnlockModal, setShowUnlockModal] = useState<boolean>(false);
   const [showTonWalletModal, setShowTonWalletModal] = useState<boolean>(false);
+
+  // Official TON Connect hook - lazily mounted only when modal is open
+  const {
+    isConnected: isTonConnected,
+    walletAddress: tonWalletAddress,
+    network: tonNetwork,
+    isLoading: isTonLoading,
+    error: tonConnectError,
+    connectWallet: connectTonWallet,
+    disconnectWallet: disconnectTonWallet,
+    sendTonTransaction,
+  } = useTonConnect(showTonWalletModal);
 
   // Treasury dynamic addresses map
   const [treasuryWallets, setTreasuryWallets] = useState<Record<string, string>>({});
@@ -883,7 +916,7 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
 
           {/* Wallet Actions */}
           <div className="space-y-2 pt-1">
-            {/* Primary Action: Direct Tonkeeper Launch Link */}
+            {/* 1. Tonkeeper Universal Link */}
             <a
               href={launcherUrl}
               target="_blank"
@@ -892,19 +925,19 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
                 e.preventDefault();
                 openSafeUrl(launcherUrl, tonkeeperDeepLink);
               }}
-              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#0098EA] via-[#00B4D8] to-[#0077B5] hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-[0_0_20px_rgba(0,180,216,0.35)] transition-all cursor-pointer border border-cyan-300/40 text-center select-none"
+              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#0098EA] via-[#00B4D8] to-[#0077B5] hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-[0_0_20px_rgba(0,180,216,0.35)] transition-all cursor-pointer border border-cyan-300/40 text-center select-none"
             >
               <div className="flex items-center gap-2">
-                <ExternalLink className="w-4 h-4 text-white" />
+                <span className="text-sm">🟢</span>
                 <div className="text-left">
-                  <div className="leading-tight">Open in Tonkeeper App</div>
-                  <div className="text-[9px] font-normal text-cyan-100 opacity-90">Pre-fills address, amount & memo</div>
+                  <div className="leading-tight">Pay with Tonkeeper</div>
+                  <div className="text-[9px] font-normal text-cyan-100 opacity-90">Auto-fills address, {tonAmount} TON & memo</div>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4" />
             </a>
 
-            {/* Secondary Action: Telegram @wallet */}
+            {/* 2. Telegram @wallet */}
             <button
               type="button"
               onClick={() => {
@@ -917,14 +950,107 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
               className="w-full py-2.5 px-4 rounded-xl bg-[#0c162c] hover:bg-[#132247] border border-cyan-500/30 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between transition-all cursor-pointer shadow-md active:scale-95"
             >
               <div className="flex items-center gap-2">
-                <Send className="w-4 h-4 text-cyan-400" />
+                <span className="text-sm">💎</span>
                 <div className="text-left">
-                  <div className="leading-tight">Open Telegram @wallet</div>
-                  <div className="text-[9px] font-normal text-slate-300">Pay inside Telegram bot</div>
+                  <div className="leading-tight">Pay with Telegram Wallet</div>
+                  <div className="text-[9px] font-normal text-slate-300">Open @wallet bot inside Telegram</div>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-slate-400" />
             </button>
+
+            {/* 3. TON Connect */}
+            {!isTonConnected ? (
+              <button
+                type="button"
+                disabled={isTonLoading}
+                onClick={async () => {
+                  try {
+                    await connectTonWallet();
+                  } catch {
+                    // Handled in hook
+                  }
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-[#141b33] hover:bg-[#1c2647] border border-blue-500/40 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between transition-all cursor-pointer shadow-md active:scale-95 disabled:opacity-50"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">🔗</span>
+                  <div className="text-left">
+                    <div className="leading-tight">Connect Wallet (TON Connect)</div>
+                    <div className="text-[9px] font-normal text-slate-300">Tonkeeper, MyTonWallet, OpenMask</div>
+                  </div>
+                </div>
+                {isTonLoading ? (
+                  <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                )}
+              </button>
+            ) : (
+              <div className="p-2.5 rounded-xl bg-[#09152e] border border-blue-500/50 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="font-mono text-[11px] text-cyan-200">
+                      {tonWalletAddress ? `${tonWalletAddress.slice(0, 6)}...${tonWalletAddress.slice(-4)}` : 'Connected'}
+                    </span>
+                    <span className="px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-400 text-[9px] uppercase font-bold border border-cyan-800">
+                      {tonNetwork || 'TON'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={disconnectTonWallet}
+                    className="text-[10px] text-red-400 hover:text-red-300 underline cursor-pointer"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={isVerifyingDeposit || isTonLoading}
+                  onClick={async () => {
+                    try {
+                      sound.playTap();
+                      setIsVerifyingDeposit(true);
+                      const boc = await sendTonTransaction(targetAddress, nanoTon, memo);
+                      if (boc) {
+                        showToast('Transaction Sent', 'Verifying on TON blockchain...', 'info');
+                        setPaymentFeedback('Payment broadcasted! Verifying on-chain...');
+                        setDepositStatus('PAYMENT_DETECTED');
+                        if (activeDepositId) {
+                          checkDepositOnChainStatus(activeDepositId, true);
+                        }
+                      }
+                    } catch (err: unknown) {
+                      const msg = err instanceof Error ? err.message : 'Transaction failed';
+                      showToast('Payment Failed', msg, 'error');
+                    } finally {
+                      setIsVerifyingDeposit(false);
+                    }
+                  }}
+                  className="w-full py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg cursor-pointer disabled:opacity-50"
+                >
+                  {isVerifyingDeposit ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Signing & Sending...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>⚡ Pay {tonAmount} TON via Wallet</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {tonConnectError && (
+              <div className="p-2 rounded-lg bg-red-950/60 border border-red-500/40 text-[10px] text-red-300 text-center">
+                {tonConnectError}
+              </div>
+            )}
           </div>
 
           {/* Copyable Address Box */}
@@ -1288,6 +1414,146 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
                     <span>Copy Details</span>
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* Extended Status Details */}
+            {activeDepositQuote && depositStatus !== 'WAITING_FOR_PAYMENT' && (
+              <div className="mt-2 p-2.5 rounded-xl bg-[#040711] border border-cyan-900/50 space-y-2 text-[10px]">
+                {/* Status Badge */}
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-bold uppercase tracking-wider">Status</span>
+                  <StatusBadge status={depositStatus} />
+                </div>
+
+                {/* TX Hash (when available) */}
+                {activeDepositQuote.txHash && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">TX Hash:</span>
+                    <a
+                      href={`https://tonviewer.com/transaction/${activeDepositQuote.txHash}`}
+                      onClick={(e) => { e.preventDefault(); openSafeUrl(`https://tonviewer.com/transaction/${activeDepositQuote.txHash!}`); }}
+                      className="font-mono text-cyan-400 hover:text-cyan-300 underline"
+                    >
+                      {activeDepositQuote.txHash.slice(0, 8)}...{activeDepositQuote.txHash.slice(-6)}
+                    </a>
+                  </div>
+                )}
+
+                {/* Deposit details row */}
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Network:</span>
+                  <span className="text-cyan-200 font-mono font-bold">{activeDepositQuote.currency} / {activeDepositQuote.network}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">USD Amount:</span>
+                  <span className="text-white font-mono font-bold">${activeDepositQuote.amountUsdt.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Expected TON:</span>
+                  <span className="text-cyan-300 font-mono font-bold">{activeDepositQuote.expectedCryptoAmount} TON</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Address:</span>
+                  <div className="flex items-center gap-1">
+                    <span className="font-mono text-slate-300">
+                      {activeDepositQuote.depositAddress.slice(0, 6)}...{activeDepositQuote.depositAddress.slice(-6)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(activeDepositQuote.depositAddress, 'addr_ext_copy', 'Address')}
+                      className="text-cyan-400 hover:text-white"
+                      title="Copy Address"
+                    >
+                      {copiedKey === 'addr_ext_copy' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between pt-1 border-t border-cyan-900/30">
+                  <span className="text-slate-400">Reference:</span>
+                  <div className="flex items-center gap-1">
+                    <span className="font-mono text-amber-300 font-bold">{activeDepositQuote.paymentReference}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(activeDepositQuote.paymentReference, 'ref_ext_copy', 'Reference')}
+                      className="text-cyan-400 hover:text-white"
+                      title="Copy Reference"
+                    >
+                      {copiedKey === 'ref_ext_copy' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                  </div>
+                </div>
+                {activeDepositQuote.createdAt && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Created:</span>
+                    <span className="text-slate-300 font-mono">{new Date(activeDepositQuote.createdAt * 1000).toLocaleTimeString()}</span>
+                  </div>
+                )}
+                {activeDepositQuote.expiresAt && (depositStatus === 'WAITING_FOR_PAYMENT' || depositStatus === 'PAYMENT_DETECTED' || depositStatus === 'CONFIRMING') && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Expires:</span>
+                    <span className="text-orange-300 font-mono">{new Date(activeDepositQuote.expiresAt * 1000).toLocaleTimeString()}</span>
+                  </div>
+                )}
+
+                {/* Confirmation progress for CONFIRMING status */}
+                {depositStatus === 'CONFIRMING' && (
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Confirmations:</span>
+                      <span className="text-cyan-300 font-mono">Waiting...</span>
+                    </div>
+                    <div className="w-full bg-slate-800 rounded-full h-1.5">
+                      <div className="bg-cyan-400 h-1.5 rounded-full animate-pulse" style={{width: '40%'}} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Copy all payment details button */}
+                <button
+                  type="button"
+                  onClick={() => handleCopyAllPaymentDetails(cur, treasuryAddress, depositAmountUsd, activeDepositQuote?.paymentReference || telegramUserId)}
+                  className="w-full py-1.5 rounded-xl bg-slate-800/60 border border-slate-700/60 text-slate-300 font-bold text-[10px] flex items-center justify-center gap-1.5 cursor-pointer hover:bg-slate-700/60 transition-all"
+                >
+                  <Copy className="w-3 h-3 text-slate-400" />
+                  <span>Copy Payment Details</span>
+                </button>
+
+                {/* Deposit completed actions */}
+                {(depositStatus === 'COMPLETED' || depositStatus === 'CONFIRMED') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDepositStatus('WAITING_FOR_PAYMENT');
+                      setPaymentFeedback('');
+                      setActiveDepositQuote(null);
+                      setActiveDepositId('');
+                      setDepositAmountUsd(10);
+                      setCustomAmountInput('10.00');
+                    }}
+                    className="w-full py-2 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold text-[11px] flex items-center justify-center gap-1.5 cursor-pointer hover:bg-emerald-500/30 transition-all"
+                  >
+                    <span>✨ Start New Deposit</span>
+                  </button>
+                )}
+
+                {/* Expired / Failed actions */}
+                {(depositStatus === 'EXPIRED' || depositStatus === 'FAILED') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDepositStatus('WAITING_FOR_PAYMENT');
+                      setPaymentFeedback('');
+                      setActiveDepositQuote(null);
+                      setActiveDepositId('');
+                      setDepositAmountUsd(10);
+                      setCustomAmountInput('10.00');
+                    }}
+                    className="w-full py-2 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 font-bold text-[11px] flex items-center justify-center gap-1.5 cursor-pointer hover:bg-red-500/30 transition-all"
+                  >
+                    <span>↩ Start New Deposit</span>
+                  </button>
+                )}
               </div>
             )}
           </div>

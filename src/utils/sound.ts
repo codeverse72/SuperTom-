@@ -197,6 +197,14 @@ class SoundController {
       // ignore
     }
   }
+
+  public playReward() {
+    this.playWin();
+  }
+
+  public playClick() {
+    this.playTap();
+  }
 }
 
 export const sound = new SoundController();

@@ -50,7 +50,7 @@ export const PayoutAutomationPage: React.FC = () => {
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isVerifyingRef, setIsVerifyingRef] = useState(false);
   const [isVerifyingDest, setIsVerifyingDest] = useState(false);
-  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
   // Form Inputs for Config
   const [refChannelInput, setRefChannelInput] = useState('');

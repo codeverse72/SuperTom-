@@ -214,6 +214,7 @@ export interface CreateDepositIntentResponseDto {
   tonPriceUsd?: number;
   tonkeeperUniversalUrl?: string;
   tonDeepLink?: string;
+  txHash?: string;
   minDeposit: number;
   status: string;
   expiresAt?: number;
