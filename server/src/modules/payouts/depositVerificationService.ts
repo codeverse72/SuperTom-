@@ -19,11 +19,20 @@ export interface MultiChainQuote {
   decimals: number;
   tokenContract?: string | null;
   walletLinks: {
+    // Two-Wallet Protocol Links (Keeper & Trust Wallet)
+    keeperSupported: boolean;
+    keeperReasonIfNotSupported?: string;
+    keeperUniversalUrl?: string;
+    keeperDeepLink?: string;
+
+    trustWalletSupported: boolean;
+    trustWalletUrl?: string;
+
+    // Backward-compatible fields
     tonkeeperUniversalUrl?: string;
     tonDeepLink?: string;
     webLauncherUrl?: string;
     telegramWalletUrl?: string;
-    trustWalletUrl?: string;
     eip681Uri?: string;
     tronUri?: string;
     solanaPayUri?: string;
@@ -248,33 +257,64 @@ export class DepositVerificationService {
     const rawUnits = this.toBaseUnits(cryptoAmount, decimals);
     const quoteExpiresAt = Date.now() + 15 * 60 * 1000; // 15 mins
 
-    // Build platform & wallet URLs
-    const walletLinks: MultiChainQuote['walletLinks'] = {};
+    // Build platform & wallet URLs for the TWO-WALLET system (Keeper & Trust Wallet)
+    const walletLinks: MultiChainQuote['walletLinks'] = {
+      keeperSupported: false,
+      trustWalletSupported: true,
+    };
 
     if (isTon) {
-      walletLinks.tonkeeperUniversalUrl = `https://app.tonkeeper.com/transfer/${recipientAddress}?amount=${rawUnits}&text=${encodeURIComponent(paymentReference)}`;
-      walletLinks.tonDeepLink = `ton://transfer/${recipientAddress}?amount=${rawUnits}&text=${encodeURIComponent(paymentReference)}`;
+      walletLinks.keeperSupported = true;
+      walletLinks.keeperUniversalUrl = `https://app.tonkeeper.com/transfer/${recipientAddress}?amount=${rawUnits}&text=${encodeURIComponent(paymentReference)}`;
+      walletLinks.keeperDeepLink = `ton://transfer/${recipientAddress}?amount=${rawUnits}&text=${encodeURIComponent(paymentReference)}`;
+      walletLinks.tonkeeperUniversalUrl = walletLinks.keeperUniversalUrl;
+      walletLinks.tonDeepLink = walletLinks.keeperDeepLink;
       walletLinks.webLauncherUrl = `${baseOrigin}/open-tonkeeper.html?address=${encodeURIComponent(recipientAddress)}&amount=${rawUnits}&text=${encodeURIComponent(paymentReference)}&usd=${amountUsd.toFixed(2)}`;
+      
+      // Trust Wallet official send link for TON (asset=c607)
+      walletLinks.trustWalletSupported = true;
+      walletLinks.trustWalletUrl = `https://link.trustwallet.com/send?asset=c607&address=${recipientAddress}&amount=${cryptoAmount}&memo=${encodeURIComponent(paymentReference)}`;
       walletLinks.telegramWalletUrl = 'https://t.me/wallet';
     } else if (isUsdtBep20) {
+      walletLinks.keeperSupported = false;
+      walletLinks.keeperReasonIfNotSupported = 'Keeper (Tonkeeper) is TON-native and does not support BNB Smart Chain BEP20 transfers.';
+      walletLinks.trustWalletSupported = true;
       walletLinks.trustWalletUrl = `https://link.trustwallet.com/send?asset=c20000714_t${tokenContract}&address=${recipientAddress}&amount=${cryptoAmount}`;
       walletLinks.eip681Uri = `ethereum:${tokenContract}@56/transfer?address=${recipientAddress}&uint256=${rawUnits}`;
     } else if (isBnb) {
+      walletLinks.keeperSupported = false;
+      walletLinks.keeperReasonIfNotSupported = 'Keeper (Tonkeeper) is TON-native and does not support BNB Smart Chain transfers.';
+      walletLinks.trustWalletSupported = true;
       walletLinks.trustWalletUrl = `https://link.trustwallet.com/send?asset=c20000714&address=${recipientAddress}&amount=${cryptoAmount}`;
       walletLinks.eip681Uri = `ethereum:${recipientAddress}@56?value=${rawUnits}`;
     } else if (isUsdtTrc20) {
+      walletLinks.keeperSupported = false;
+      walletLinks.keeperReasonIfNotSupported = 'Keeper (Tonkeeper) does not support TRON network direct transfers.';
+      walletLinks.trustWalletSupported = true;
       walletLinks.trustWalletUrl = `https://link.trustwallet.com/send?asset=c195_t${tokenContract}&address=${recipientAddress}&amount=${cryptoAmount}`;
       walletLinks.tronUri = `tron:${recipientAddress}?token=${tokenContract}&amount=${rawUnits}`;
     } else if (isTrx) {
+      walletLinks.keeperSupported = false;
+      walletLinks.keeperReasonIfNotSupported = 'Keeper (Tonkeeper) does not support TRON network transfers.';
+      walletLinks.trustWalletSupported = true;
       walletLinks.trustWalletUrl = `https://link.trustwallet.com/send?asset=c195&address=${recipientAddress}&amount=${cryptoAmount}`;
       walletLinks.tronUri = `tron:${recipientAddress}?amount=${rawUnits}`;
     } else if (isSol) {
+      walletLinks.keeperSupported = false;
+      walletLinks.keeperReasonIfNotSupported = 'Keeper (Tonkeeper) does not support Solana network transfers.';
+      walletLinks.trustWalletSupported = true;
+      walletLinks.trustWalletUrl = `https://link.trustwallet.com/send?asset=c501&address=${recipientAddress}&amount=${cryptoAmount}&memo=${encodeURIComponent(paymentReference)}`;
       walletLinks.solanaPayUri = `solana:${recipientAddress}?amount=${cryptoAmount}&reference=${paymentReference}&memo=${encodeURIComponent(paymentReference)}`;
-      walletLinks.phantomUrl = `https://phantom.app/ul/browse/${encodeURIComponent(`solana:${recipientAddress}?amount=${cryptoAmount}&memo=${paymentReference}`)}`;
     } else if (isUsdcBase) {
+      walletLinks.keeperSupported = false;
+      walletLinks.keeperReasonIfNotSupported = 'Keeper (Tonkeeper) is TON-native and does not support Base network transfers.';
+      walletLinks.trustWalletSupported = true;
       walletLinks.trustWalletUrl = `https://link.trustwallet.com/send?asset=c8453_t${tokenContract}&address=${recipientAddress}&amount=${cryptoAmount}`;
       walletLinks.eip681Uri = `ethereum:${tokenContract}@8453/transfer?address=${recipientAddress}&uint256=${rawUnits}`;
     } else if (isEthBase) {
+      walletLinks.keeperSupported = false;
+      walletLinks.keeperReasonIfNotSupported = 'Keeper (Tonkeeper) is TON-native and does not support Base network transfers.';
+      walletLinks.trustWalletSupported = true;
       walletLinks.trustWalletUrl = `https://link.trustwallet.com/send?asset=c8453&address=${recipientAddress}&amount=${cryptoAmount}`;
       walletLinks.eip681Uri = `ethereum:${recipientAddress}@8453?value=${rawUnits}`;
     }

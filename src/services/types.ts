@@ -216,24 +216,34 @@ export interface CreateDepositIntentResponseDto {
   tokenContract?: string | null;
   nanoTonAmount?: string;
   tonPriceUsd?: number;
+  // Two-Wallet Protocol Links (Keeper & Trust Wallet)
+  keeperSupported?: boolean;
+  keeperReasonIfNotSupported?: string;
+  keeperUniversalUrl?: string;
+  keeperDeepLink?: string;
+  trustWalletSupported?: boolean;
+  trustWalletUrl?: string;
+
   tonkeeperUniversalUrl?: string;
   tonDeepLink?: string;
   webLauncherUrl?: string;
-  trustWalletUrl?: string;
   eip681Uri?: string;
   tronUri?: string;
   solanaPayUri?: string;
-  phantomUrl?: string;
   walletLinks?: {
+    keeperSupported?: boolean;
+    keeperReasonIfNotSupported?: string;
+    keeperUniversalUrl?: string;
+    keeperDeepLink?: string;
+    trustWalletSupported?: boolean;
+    trustWalletUrl?: string;
     tonkeeperUniversalUrl?: string;
     tonDeepLink?: string;
     webLauncherUrl?: string;
     telegramWalletUrl?: string;
-    trustWalletUrl?: string;
     eip681Uri?: string;
     tronUri?: string;
     solanaPayUri?: string;
-    phantomUrl?: string;
   };
   txHash?: string;
   minDeposit: number;

@@ -180,7 +180,10 @@ describe('Multi-Chain Deposit & Amount Conversion Suite', () => {
 
       assert.ok(quote.walletLinks.solanaPayUri.startsWith(`solana:${TREASURY_SOL}?amount=`));
       assert.ok(quote.walletLinks.solanaPayUri.includes('memo=DEP-8441612063-SOL'));
-      assert.ok(quote.walletLinks.phantomUrl.includes('phantom.app'));
+      assert.strictEqual(quote.walletLinks.trustWalletSupported, true);
+      assert.ok(quote.walletLinks.trustWalletUrl.includes('asset=c501'));
+      assert.strictEqual(quote.walletLinks.keeperSupported, false);
+      assert.ok(quote.walletLinks.keeperReasonIfNotSupported.includes('Keeper'));
     });
   });
 

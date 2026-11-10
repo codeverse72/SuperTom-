@@ -177,13 +177,53 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
     hint: 'Solana addresses are 32-44 characters Base58 encoded.',
     defaultTreasuryAddress: 'ER74j5s2PgVPx9dsT7wqyMSM7RgY4LKrFt9c1NFp92Qk',
     hasMemoSupport: false,
-    getUniversalWalletUrl: () => `https://phantom.app/`,
+    getUniversalWalletUrl: (addr) => `https://link.trustwallet.com/send?address=${addr}&asset=c501`,
     getExplorerAddressUrl: (addr) => `https://solscan.io/account/${addr}`,
     renderIcon: () => (
       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#9945FF] to-[#14F195] flex items-center justify-center text-white shadow-md shrink-0">
         <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
           <path d="M4.5 6.5L16.5 6.5L19.5 3.5L7.5 3.5L4.5 6.5ZM4.5 13.5L16.5 13.5L19.5 10.5L7.5 10.5L4.5 13.5ZM7.5 17.5L19.5 17.5L16.5 20.5L4.5 20.5L7.5 17.5Z" />
         </svg>
+      </div>
+    ),
+  },
+  {
+    id: 'USDC_BASE',
+    name: 'USDC (Base)',
+    network: 'Base',
+    symbol: 'USDC',
+    networkType: 'EVM',
+    minDepositUsd: 1.0,
+    minWithdrawUsd: 1.0,
+    placeholder: 'e.g. 0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1',
+    hint: 'Base addresses start with "0x" and contain 42 characters.',
+    defaultTreasuryAddress: '0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1',
+    hasMemoSupport: false,
+    getUniversalWalletUrl: (addr) => `https://link.trustwallet.com/send?address=${addr}&asset=c8453_t0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`,
+    getExplorerAddressUrl: (addr) => `https://basescan.org/address/${addr}`,
+    renderIcon: () => (
+      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0052FF] to-[#0038B8] flex items-center justify-center text-white shadow-md shrink-0 font-bold text-sm">
+        USDC
+      </div>
+    ),
+  },
+  {
+    id: 'ETH_BASE',
+    name: 'ETH (Base)',
+    network: 'Base',
+    symbol: 'ETH',
+    networkType: 'EVM',
+    minDepositUsd: 1.0,
+    minWithdrawUsd: 1.0,
+    placeholder: 'e.g. 0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1',
+    hint: 'Base addresses start with "0x" and contain 42 characters.',
+    defaultTreasuryAddress: '0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1',
+    hasMemoSupport: false,
+    getUniversalWalletUrl: (addr) => `https://link.trustwallet.com/send?address=${addr}&asset=c8453`,
+    getExplorerAddressUrl: (addr) => `https://basescan.org/address/${addr}`,
+    renderIcon: () => (
+      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#627EEA] to-[#3B4C80] flex items-center justify-center text-white shadow-md shrink-0 font-bold text-sm">
+        ETH
       </div>
     ),
   },
@@ -284,6 +324,7 @@ export const Payout: React.FC = () => {
   // Entitlement State ($3 for 3 withdrawals, $5 for unlimited)
   const [entitlement, setEntitlement] = useState<WithdrawalEntitlementDto | null>(null);
   const [showUnlockModal, setShowUnlockModal] = useState<boolean>(false);
+  const [showWalletModal, setShowWalletModal] = useState<boolean>(false);
   const [showTonWalletModal, setShowTonWalletModal] = useState<boolean>(false);
   const [showEvmWalletModal, setShowEvmWalletModal] = useState<boolean>(false);
   const [showTronModal, setShowTronModal] = useState<boolean>(false);
@@ -300,7 +341,7 @@ export const Payout: React.FC = () => {
     connectWallet: connectTonWallet,
     disconnectWallet: disconnectTonWallet,
     sendTonTransaction,
-  } = useTonConnect(showTonWalletModal);
+  } = useTonConnect(showWalletModal || showTonWalletModal);
 
   // Treasury dynamic addresses map
   const [treasuryWallets, setTreasuryWallets] = useState<Record<string, string>>({});
@@ -513,28 +554,21 @@ export const Payout: React.FC = () => {
       const links = quote?.walletLinks;
 
       if (cur.networkType === 'TON') {
-        const nanoTon = quote?.nanoTonAmount || quote?.rawUnits || BigInt(Math.round((amt / (quote?.tonPriceUsd || 5.20)) * 1_000_000_000)).toString();
+        const currentTonPrice = quote?.tonPriceUsd || 5.20;
+        const tonCoins = quote?.expectedCryptoAmount || Math.round((amt / currentTonPrice) * 10000) / 10000;
+        const nanoTon = quote?.nanoTonAmount || quote?.rawUnits || BigInt(Math.round(Number(tonCoins) * 1_000_000_000)).toString();
         const memo = quote?.paymentReference || telegramUserId || `DEP-${telegramUserId}`;
-        const baseOrigin = typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://super-tom.vercel.app';
-        const launcherUrl = links?.webLauncherUrl || `${baseOrigin}/open-tonkeeper.html?address=${encodeURIComponent(targetAddress)}&amount=${nanoTon}&text=${encodeURIComponent(memo)}&usd=${amt.toFixed(2)}`;
-        const deepLink = links?.tonDeepLink || `tonkeeper://transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
+        const universalUrl = links?.keeperUniversalUrl || links?.tonkeeperUniversalUrl || `https://app.tonkeeper.com/transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
+        const deepLink = links?.keeperDeepLink || links?.tonDeepLink || `ton://transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
 
-        openSafeUrl(launcherUrl, deepLink);
-        setShowTonWalletModal(true);
-      } else if (cur.networkType === 'EVM') {
-        setShowEvmWalletModal(true);
+        openSafeUrl(universalUrl, deepLink);
+        setShowWalletModal(true);
+      } else {
+        setShowWalletModal(true);
         if (links?.trustWalletUrl) {
-          openSafeUrl(links.trustWalletUrl, links.eip681Uri);
-        }
-      } else if (cur.networkType === 'TRON') {
-        setShowTronModal(true);
-        if (links?.trustWalletUrl) {
-          openSafeUrl(links.trustWalletUrl, links.tronUri);
-        }
-      } else if (cur.networkType === 'SOLANA') {
-        setShowSolanaModal(true);
-        if (links?.phantomUrl) {
-          openSafeUrl(links.phantomUrl, links.solanaPayUri);
+          openSafeUrl(links.trustWalletUrl);
+        } else if (cur.getUniversalWalletUrl) {
+          openSafeUrl(cur.getUniversalWalletUrl(targetAddress));
         }
       }
     } catch (err: unknown) {
@@ -546,25 +580,95 @@ export const Payout: React.FC = () => {
     }
   };
 
-  const getDepositButtonLabel = (cur: CurrencyConfig) => {
-    switch (cur.id) {
-      case 'TON':
-        return 'OPEN IN TONKEEPER / ANY TON WALLET';
-      case 'USDT_BEP20':
-        return 'PAY WITH TRUST WALLET / METAMASK (USDT BEP20)';
-      case 'USDT_TRC20':
-        return 'PAY WITH TRUST WALLET / TRONLINK (USDT TRC20)';
-      case 'BNB':
-        return 'PAY WITH TRUST WALLET / METAMASK (BNB)';
-      case 'TRX':
-        return 'PAY WITH TRUST WALLET / TRONLINK (TRX)';
-      case 'SOL':
-        return 'PAY WITH PHANTOM / SOLANA PAY (SOL)';
-      case 'BASE':
-        return `PAY WITH TRUST WALLET / METAMASK (${baseAsset})`;
-      default:
-        return `PAY WITH ${cur.name.toUpperCase()} WALLET`;
+  /**
+   * Two-Wallet Protocol Handler: Direct wallet launcher for Keeper or Trust Wallet
+   */
+  const handleOpenPaymentWithWallet = async (cur: CurrencyConfig, wallet: 'KEEPER' | 'TRUST_WALLET') => {
+    const amt = depositAmountUsd || 10;
+    if (isNaN(amt) || amt < cur.minDepositUsd) {
+      setDepositError(`Minimum deposit amount is $${cur.minDepositUsd.toFixed(2)} USD.`);
+      showToast('Invalid Amount', `Minimum deposit is $${cur.minDepositUsd.toFixed(2)} USD`, 'error');
+      return;
     }
+
+    if (wallet === 'KEEPER' && cur.networkType !== 'TON') {
+      showToast('Network Unsupported', `Keeper is TON-native and does not support ${cur.network}. Please choose Trust Wallet.`, 'info');
+      setShowWalletModal(true);
+      return;
+    }
+
+    setIsInitiatingPayment(true);
+    setPaymentFeedback(`Preparing ${wallet === 'KEEPER' ? 'Keeper (Tonkeeper)' : 'Trust Wallet'}...`);
+
+    const effectiveSymbol = cur.id === 'BASE' ? baseAsset : cur.symbol;
+
+    try {
+      let quote = activeDepositQuote;
+      const isQuoteFresh =
+        quote &&
+        Math.abs(quote.amountUsdt - amt) < 0.001 &&
+        (quote.currency === effectiveSymbol || quote.currency === cur.symbol) &&
+        quote.network === cur.network &&
+        quote.id;
+
+      if (!isQuoteFresh) {
+        const res = await paymentService.createDepositIntent({
+          amountUsdt: amt,
+          currency: effectiveSymbol,
+          network: cur.network,
+          notes: selectedPlanForDeposit 
+            ? `[Biscuit Purchase: ${selectedPlanForDeposit.name} (+${selectedPlanForDeposit.boostPerHour.toLocaleString()}/hr)]`
+            : undefined,
+        });
+
+        if (res.success && res.data) {
+          quote = res.data;
+          setActiveDepositId(res.data.id);
+          setActiveDepositQuote(res.data);
+          startOnChainPolling(res.data.id);
+        } else {
+          throw new Error(res.error?.message || 'Failed to generate deposit quote');
+        }
+      } else if (quote?.id) {
+        startOnChainPolling(quote.id);
+      }
+
+      setIsInitiatingPayment(false);
+      setPaymentFeedback('Payment pending verification.');
+      setDepositStatus('WAITING_FOR_PAYMENT');
+
+      const targetAddress = quote?.depositAddress || getEffectiveTreasuryAddress(cur);
+      const links = quote?.walletLinks;
+
+      if (wallet === 'KEEPER') {
+        const currentTonPrice = quote?.tonPriceUsd || 5.20;
+        const tonCoins = quote?.expectedCryptoAmount || Math.round((amt / currentTonPrice) * 10000) / 10000;
+        const nanoTon = quote?.nanoTonAmount || quote?.rawUnits || BigInt(Math.round(Number(tonCoins) * 1_000_000_000)).toString();
+        const memo = quote?.paymentReference || telegramUserId || `DEP-${telegramUserId}`;
+        const universalUrl = links?.keeperUniversalUrl || links?.tonkeeperUniversalUrl || `https://app.tonkeeper.com/transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
+        const deepLink = links?.keeperDeepLink || links?.tonDeepLink || `ton://transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
+
+        openSafeUrl(universalUrl, deepLink);
+      } else {
+        const trustWalletUrl = links?.trustWalletUrl || (cur.getUniversalWalletUrl ? cur.getUniversalWalletUrl(targetAddress) : '');
+        openSafeUrl(trustWalletUrl);
+      }
+
+      setShowWalletModal(true);
+    } catch (err: unknown) {
+      setIsInitiatingPayment(false);
+      setPaymentFeedback(null);
+      const msg = err instanceof Error ? err.message : 'Failed to connect to payment gateway';
+      setDepositError(msg);
+      showToast('Payment Error', msg, 'error');
+    }
+  };
+
+  const getDepositButtonLabel = (cur: CurrencyConfig) => {
+    if (cur.networkType === 'TON') {
+      return 'PAY WITH KEEPER / TRUST WALLET';
+    }
+    return `PAY WITH TRUST WALLET (${cur.id === 'BASE' ? baseAsset : cur.symbol})`;
   };
 
   const getButtonGradient = (cur: CurrencyConfig) => {
@@ -607,7 +711,7 @@ Payment Reference / Memo: ${memo}`;
       text += `\nToken Contract: ${tokenContract}`;
     }
 
-    text += `\nNote: Compatible with Trust Wallet, MetaMask, Phantom, OKX, Binance, or any crypto wallet!`;
+    text += `\nNote: Compatible with Keeper (Tonkeeper) and Trust Wallet, or any compatible wallet!`;
 
     navigator.clipboard?.writeText(text);
     setCopiedKey('all_details');
@@ -936,22 +1040,42 @@ Payment Reference / Memo: ${memo}`;
     }
   };
 
-  // Render Pay with TON Wallet Choice Modal
-  const renderTonWalletModal = (cur: CurrencyConfig) => {
-    if (!showTonWalletModal) return null;
+  // =========================================================================
+  // UNIFIED TWO-WALLET MODAL (Keeper & Trust Wallet Only)
+  // =========================================================================
+  const renderTwoWalletModal = (cur: CurrencyConfig) => {
+    const isModalOpen = showWalletModal || showTonWalletModal || showEvmWalletModal || showTronModal || showSolanaModal;
+    if (!isModalOpen) return null;
+
+    const closeModal = () => {
+      setShowWalletModal(false);
+      setShowTonWalletModal(false);
+      setShowEvmWalletModal(false);
+      setShowTronModal(false);
+      setShowSolanaModal(false);
+    };
 
     const amt = depositAmountUsd || activeDepositQuote?.amountUsdt || 10;
-    const currentPrice = activeDepositQuote?.tonPriceUsd || 5.20;
-    const tonAmount = activeDepositQuote?.expectedCryptoAmount || Math.round((amt / currentPrice) * 10000) / 10000;
-    const nanoTon = activeDepositQuote?.nanoTonAmount || BigInt(Math.round(tonAmount * 1_000_000_000)).toString();
-    const memo = activeDepositQuote?.paymentReference || telegramUserId || 'DEP-TON';
-    const officialTonAddress = 'UQBGdgDogsxtpbFIvzAFnIByU3E3PlXsdkt_xyuG4S-gzvgR';
-    const targetAddress = (cur.networkType === 'TON' ? getEffectiveTreasuryAddress(cur) : null) || activeDepositQuote?.depositAddress || officialTonAddress;
+    const isTon = cur.networkType === 'TON';
+    const isBase = cur.id === 'BASE' || cur.id === 'USDC_BASE' || cur.id === 'ETH_BASE';
+    const effectiveSymbol = isBase ? (cur.id === 'USDC_BASE' ? 'USDC' : (cur.id === 'ETH_BASE' ? 'ETH' : baseAsset)) : cur.symbol;
 
-    const tonkeeperUniversalUrl = `https://app.tonkeeper.com/transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
-    const tonkeeperDeepLink = `tonkeeper://transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
-    const baseOrigin = typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://super-tom.vercel.app';
-    const launcherUrl = `${baseOrigin}/open-tonkeeper.html?address=${encodeURIComponent(targetAddress)}&amount=${nanoTon}&text=${encodeURIComponent(memo)}&usd=${amt.toFixed(2)}`;
+    const currentPrice = isTon ? (activeDepositQuote?.tonPriceUsd || 5.20) : (activeDepositQuote?.cryptoPriceUsd || 1.0);
+    const cryptoAmount = activeDepositQuote?.expectedCryptoAmount || 
+      (isTon ? (Math.round((amt / currentPrice) * 10000) / 10000) : (cur.symbol === 'USDT' || cur.symbol === 'USDC' ? amt : (Math.round((amt / currentPrice) * 100000) / 100000)));
+
+    const nanoTon = activeDepositQuote?.nanoTonAmount || activeDepositQuote?.rawUnits || BigInt(Math.round(Number(cryptoAmount) * 1_000_000_000)).toString();
+    const memo = activeDepositQuote?.paymentReference || telegramUserId || `DEP-${cur.symbol}`;
+    const targetAddress = activeDepositQuote?.depositAddress || getEffectiveTreasuryAddress(cur);
+    const tokenContract = activeDepositQuote?.tokenContract;
+    const links = activeDepositQuote?.walletLinks;
+
+    // Keeper (Tonkeeper) Links
+    const keeperUniversalUrl = links?.keeperUniversalUrl || links?.tonkeeperUniversalUrl || `https://app.tonkeeper.com/transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
+    const keeperDeepLink = links?.keeperDeepLink || links?.tonDeepLink || `ton://transfer/${targetAddress}?amount=${nanoTon}&text=${encodeURIComponent(memo)}`;
+
+    // Trust Wallet Link (Supported across all 8 networks)
+    const trustWalletUrl = links?.trustWalletUrl || (cur.getUniversalWalletUrl ? cur.getUniversalWalletUrl(targetAddress) : '');
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
@@ -959,7 +1083,7 @@ Payment Reference / Memo: ${memo}`;
           {/* Close button */}
           <button
             type="button"
-            onClick={() => setShowTonWalletModal(false)}
+            onClick={closeModal}
             className="absolute top-3.5 right-3.5 p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all cursor-pointer z-10"
           >
             <X className="w-4 h-4" />
@@ -967,14 +1091,14 @@ Payment Reference / Memo: ${memo}`;
 
           {/* Modal Header */}
           <div className="text-center pt-1 space-y-1">
-            <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-[#0098EA]/30 via-cyan-500/20 to-blue-600/30 border border-cyan-400/50 flex items-center justify-center shadow-lg mb-1">
+            <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-cyan-500/30 via-blue-600/30 to-indigo-600/30 border border-cyan-400/50 flex items-center justify-center shadow-lg mb-1">
               <Sparkles className="w-6 h-6 text-cyan-400" />
             </div>
             <h3 className="text-base font-black text-white font-display tracking-tight">
-              Pay with TON Wallet
+              Pay with {cur.name}
             </h3>
-            <p className="text-[11px] text-slate-300 leading-snug px-1">
-              Transfer instantly via Tonkeeper, @wallet, or any TON wallet
+            <p className="text-[11px] text-cyan-300 font-mono font-bold leading-snug px-1">
+              {cur.network} • Two-Wallet Protocol
             </p>
           </div>
 
@@ -985,184 +1109,190 @@ Payment Reference / Memo: ${memo}`;
               <span className="font-bold text-white font-mono">${amt.toFixed(2)} USD</span>
             </div>
             <div className="flex justify-between items-center text-cyan-300">
-              <span className="text-slate-400">Exact TON to Send:</span>
+              <span className="text-slate-400">Exact {effectiveSymbol} to Send:</span>
               <div className="flex items-center gap-1.5">
-                <span className="font-black text-cyan-200 font-mono text-sm">{tonAmount} TON</span>
+                <span className="font-black text-cyan-200 font-mono text-sm">{cryptoAmount} {effectiveSymbol}</span>
                 <button
                   type="button"
-                  onClick={() => handleCopy(tonAmount.toString(), 'modal_ton_amt', 'TON Amount')}
+                  onClick={() => handleCopy(cryptoAmount.toString(), 'modal_amt', `${effectiveSymbol} Amount`)}
                   className="text-cyan-400 hover:text-white cursor-pointer"
-                  title="Copy TON Amount"
+                  title="Copy Amount"
                 >
-                  {copiedKey === 'modal_ton_amt' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedKey === 'modal_amt' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
               </div>
             </div>
-            <div className="flex justify-between items-center text-amber-300 pt-1 border-t border-cyan-950/50">
-              <span className="text-slate-400">Transfer Comment / Memo:</span>
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono font-bold">{memo}</span>
-                <button
-                  type="button"
-                  onClick={() => handleCopy(memo, 'modal_memo', 'Memo')}
-                  className="text-cyan-400 hover:text-white cursor-pointer"
-                  title="Copy Memo"
-                >
-                  {copiedKey === 'modal_memo' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
+
+            {tokenContract && (
+              <div className="flex justify-between items-center text-emerald-300 pt-1 border-t border-cyan-950/50">
+                <span className="text-slate-400">Token Contract:</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono text-[10px]">{tokenContract.slice(0, 6)}...{tokenContract.slice(-4)}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(tokenContract, 'modal_contract', 'Contract Address')}
+                    className="text-emerald-400 hover:text-white cursor-pointer"
+                    title="Copy Contract"
+                  >
+                    {copiedKey === 'modal_contract' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
+
+            {isTon && (
+              <div className="flex justify-between items-center text-amber-300 pt-1 border-t border-cyan-950/50">
+                <span className="text-slate-400">Transfer Comment / Memo:</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono font-bold">{memo}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(memo, 'modal_memo', 'Memo')}
+                    className="text-cyan-400 hover:text-white cursor-pointer"
+                    title="Copy Memo"
+                  >
+                    {copiedKey === 'modal_memo' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Wallet Actions */}
+          {/* TWO WALLET OPTIONS: Keeper & Trust Wallet */}
           <div className="space-y-2 pt-1">
-            {/* 1. Tonkeeper Universal Link */}
+            {/* 1. Keeper (Tonkeeper) */}
+            {isTon ? (
+              <a
+                href={keeperUniversalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => {
+                  e.preventDefault();
+                  openSafeUrl(keeperUniversalUrl, keeperDeepLink);
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#0098EA] via-[#00B4D8] to-[#0077B5] hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-[0_0_20px_rgba(0,180,216,0.35)] transition-all cursor-pointer border border-cyan-300/40 text-center select-none"
+              >
+                <div className="flex items-center gap-2 text-left">
+                  <span className="text-base">🟢</span>
+                  <div>
+                    <div className="leading-tight font-black">Pay with Keeper (Tonkeeper)</div>
+                    <div className="text-[9px] font-normal text-cyan-100 opacity-90">Auto-fills address, {cryptoAmount} TON & memo</div>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-white" />
+              </a>
+            ) : (
+              <div className="w-full py-2.5 px-4 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-500 text-xs flex items-center justify-between opacity-70">
+                <div className="flex items-center gap-2 text-left">
+                  <span className="text-sm opacity-50">⚪</span>
+                  <div>
+                    <div className="leading-tight font-bold text-slate-400">Keeper (TON Only)</div>
+                    <div className="text-[9px] font-normal text-slate-500">Keeper is TON-native and does not support {cur.network}</div>
+                  </div>
+                </div>
+                <span className="text-[9px] font-mono font-bold uppercase bg-slate-800 px-1.5 py-0.5 rounded text-slate-400">Disabled</span>
+              </div>
+            )}
+
+            {/* 2. Trust Wallet (Supported for all 8 currencies) */}
             <a
-              href={launcherUrl}
+              href={trustWalletUrl}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => {
                 e.preventDefault();
-                openSafeUrl(launcherUrl, tonkeeperDeepLink);
+                openSafeUrl(trustWalletUrl);
               }}
-              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#0098EA] via-[#00B4D8] to-[#0077B5] hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-[0_0_20px_rgba(0,180,216,0.35)] transition-all cursor-pointer border border-cyan-300/40 text-center select-none"
+              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#0500FF] via-[#0052FF] to-[#00A3FF] hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-[0_0_20px_rgba(0,82,255,0.35)] transition-all cursor-pointer border border-blue-400/40 text-center select-none"
             >
-              <div className="flex items-center gap-2">
-                <span className="text-sm">🟢</span>
-                <div className="text-left">
-                  <div className="leading-tight">Pay with Tonkeeper</div>
-                  <div className="text-[9px] font-normal text-cyan-100 opacity-90">Auto-fills address, {tonAmount} TON & memo</div>
+              <div className="flex items-center gap-2 text-left">
+                <ShieldCheck className="w-4 h-4 text-emerald-300 shrink-0" />
+                <div>
+                  <div className="leading-tight font-black">Pay with Trust Wallet</div>
+                  <div className="text-[9px] font-normal text-blue-100 opacity-90">Direct send for {effectiveSymbol} on {cur.network}</div>
                 </div>
               </div>
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4 text-white" />
             </a>
 
-            {/* 2. Telegram @wallet */}
-            <button
-              type="button"
-              onClick={() => {
-                if (window.Telegram?.WebApp?.openTelegramLink) {
-                  window.Telegram.WebApp.openTelegramLink('https://t.me/wallet');
-                } else {
-                  window.open('https://t.me/wallet', '_blank');
-                }
-              }}
-              className="w-full py-2.5 px-4 rounded-xl bg-[#0c162c] hover:bg-[#132247] border border-cyan-500/30 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between transition-all cursor-pointer shadow-md active:scale-95"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm">💎</span>
-                <div className="text-left">
-                  <div className="leading-tight">Pay with Telegram Wallet</div>
-                  <div className="text-[9px] font-normal text-slate-300">Open @wallet bot inside Telegram</div>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-slate-400" />
-            </button>
-
-            {/* 3. TON Connect */}
-            {!isTonConnected ? (
-              <button
-                type="button"
-                disabled={isTonLoading}
-                onClick={async () => {
-                  try {
-                    await connectTonWallet();
-                  } catch {
-                    // Handled in hook
-                  }
-                }}
-                className="w-full py-2.5 px-4 rounded-xl bg-[#141b33] hover:bg-[#1c2647] border border-blue-500/40 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between transition-all cursor-pointer shadow-md active:scale-95 disabled:opacity-50"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">🔗</span>
-                  <div className="text-left">
-                    <div className="leading-tight">Connect Wallet (TON Connect)</div>
-                    <div className="text-[9px] font-normal text-slate-300">Tonkeeper, MyTonWallet, OpenMask</div>
-                  </div>
-                </div>
-                {isTonLoading ? (
-                  <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
-                ) : (
-                  <ChevronRight className="w-4 h-4 text-slate-400" />
-                )}
-              </button>
-            ) : (
-              <div className="p-2.5 rounded-xl bg-[#09152e] border border-blue-500/50 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="font-mono text-[11px] text-cyan-200">
-                      {tonWalletAddress ? `${tonWalletAddress.slice(0, 6)}...${tonWalletAddress.slice(-4)}` : 'Connected'}
-                    </span>
-                    <span className="px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-400 text-[9px] uppercase font-bold border border-cyan-800">
-                      {tonNetwork || 'TON'}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={disconnectTonWallet}
-                    className="text-[10px] text-red-400 hover:text-red-300 underline cursor-pointer"
-                  >
-                    Disconnect
-                  </button>
-                </div>
-
+            {/* Additional TON Options */}
+            {isTon && (
+              <>
                 <button
                   type="button"
-                  disabled={isVerifyingDeposit || isTonLoading}
-                  onClick={async () => {
-                    try {
-                      sound.playTap();
-                      setIsVerifyingDeposit(true);
-                      const boc = await sendTonTransaction(targetAddress, nanoTon, memo);
-                      if (boc) {
-                        showToast('Transaction Sent', 'Verifying on TON blockchain...', 'info');
-                        setPaymentFeedback('Payment broadcasted! Verifying on-chain...');
-                        setDepositStatus('PAYMENT_DETECTED');
-                        if (activeDepositId) {
-                          checkDepositOnChainStatus(activeDepositId, true);
-                        }
-                      }
-                    } catch (err: unknown) {
-                      const msg = err instanceof Error ? err.message : 'Transaction failed';
-                      showToast('Payment Failed', msg, 'error');
-                    } finally {
-                      setIsVerifyingDeposit(false);
-                    }
-                  }}
-                  className="w-full py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg cursor-pointer disabled:opacity-50"
+                  onClick={openTelegramWallet}
+                  className="w-full py-2.5 px-4 rounded-xl bg-[#0c162c] hover:bg-[#132247] border border-cyan-500/30 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between transition-all cursor-pointer shadow-md active:scale-95"
                 >
-                  {isVerifyingDeposit ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Signing & Sending...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>⚡ Pay {tonAmount} TON via Wallet</span>
-                    </>
-                  )}
+                  <div className="flex items-center gap-2 text-left">
+                    <span className="text-sm">💎</span>
+                    <div>
+                      <div className="leading-tight font-black">Pay with Telegram Wallet</div>
+                      <div className="text-[9px] font-normal text-slate-300">Open @wallet bot inside Telegram</div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
                 </button>
-              </div>
-            )}
 
-            {tonConnectError && (
-              <div className="p-2 rounded-lg bg-red-950/60 border border-red-500/40 text-[10px] text-red-300 text-center">
-                {tonConnectError}
-              </div>
+                {!isTonConnected ? (
+                  <button
+                    type="button"
+                    disabled={isTonLoading}
+                    onClick={async () => {
+                      try {
+                        await connectTonWallet();
+                      } catch {}
+                    }}
+                    className="w-full py-2.5 px-4 rounded-xl bg-[#141b33] hover:bg-[#1c2647] border border-blue-500/40 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between transition-all cursor-pointer shadow-md active:scale-95 disabled:opacity-50"
+                  >
+                    <div className="flex items-center gap-2 text-left">
+                      <span className="text-sm">🔗</span>
+                      <div>
+                        <div className="leading-tight font-black">Connect Wallet (TON Connect)</div>
+                        <div className="text-[9px] font-normal text-slate-300">Tonkeeper, MyTonWallet, OpenMask</div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-400" />
+                  </button>
+                ) : (
+                  <div className="p-2.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <div>
+                        <div className="text-emerald-300 font-bold">TON Connect Linked</div>
+                        <div className="text-[10px] text-slate-300 font-mono">
+                          {tonWalletAddress?.slice(0, 6)}...{tonWalletAddress?.slice(-4)}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isTonLoading}
+                      onClick={async () => {
+                        try {
+                          await sendTonTransaction(targetAddress, nanoTon, memo);
+                          closeModal();
+                        } catch {}
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[10px] uppercase cursor-pointer"
+                    >
+                      Send {cryptoAmount} TON
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
           {/* Copyable Address Box */}
           <div className="p-2.5 rounded-xl bg-[#050811] border border-cyan-950/70 space-y-1.5">
             <div className="flex items-center justify-between text-[10px] text-slate-400 uppercase font-bold tracking-wider">
-              <span>Official TON Address:</span>
+              <span>Official {cur.name} Receiving Address:</span>
               <button
                 type="button"
-                onClick={() => handleCopy(targetAddress, 'modal_addr', 'TON Address')}
+                onClick={() => handleCopy(targetAddress, 'modal_target_addr', 'Address')}
                 className="text-cyan-400 hover:text-white flex items-center gap-1 font-sans cursor-pointer"
               >
-                {copiedKey === 'modal_addr' ? (
+                {copiedKey === 'modal_target_addr' ? (
                   <>
                     <Check className="w-3 h-3 text-emerald-400" />
                     <span className="text-emerald-400">Copied</span>
@@ -1170,7 +1300,7 @@ Payment Reference / Memo: ${memo}`;
                 ) : (
                   <>
                     <Copy className="w-3 h-3" />
-                    <span>Copy</span>
+                    <span>Copy Address</span>
                   </>
                 )}
               </button>
@@ -1187,7 +1317,7 @@ Payment Reference / Memo: ${memo}`;
             className="w-full py-2 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-slate-700/50 text-slate-200 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
           >
             <Copy className="w-3.5 h-3.5 text-slate-400" />
-            <span>Copy All Details (for Binance, OKX, etc.)</span>
+            <span>Copy All Details</span>
           </button>
 
           {/* On-Chain Verification Trigger */}
@@ -1202,7 +1332,7 @@ Payment Reference / Memo: ${memo}`;
               <span>{isCheckingOnChain ? 'Checking Blockchain...' : 'I Have Paid — Check Status'}</span>
             </button>
             <p className="text-[10px] text-slate-400 text-center mt-1.5">
-              Instant auto-credit upon blockchain finality (usually 5–15 seconds).
+              Auto-verifies on {cur.network}. Instant credit upon confirmation!
             </p>
           </div>
         </div>
@@ -1210,574 +1340,11 @@ Payment Reference / Memo: ${memo}`;
     );
   };
 
-  // Render EVM Wallet Choice Modal (BSC & Base)
-  const renderEvmWalletModal = (cur: CurrencyConfig) => {
-    if (!showEvmWalletModal) return null;
-
-    const amt = depositAmountUsd || activeDepositQuote?.amountUsdt || 10;
-    const isBase = cur.id === 'BASE';
-    const symbol = isBase ? baseAsset : cur.symbol;
-    const cryptoAmount = activeDepositQuote?.expectedCryptoAmount || amt;
-    const memo = activeDepositQuote?.paymentReference || telegramUserId || 'DEP-EVM';
-    const evmAddress = activeDepositQuote?.depositAddress || getEffectiveTreasuryAddress(cur);
-    const tokenContract = activeDepositQuote?.tokenContract;
-    const links = activeDepositQuote?.walletLinks;
-
-    const networkTitle = isBase ? 'Base Network (Chain ID: 8453)' : 'BNB Smart Chain (BEP20, Chain ID: 56)';
-    const trustWalletUrl = links?.trustWalletUrl || (isBase 
-      ? `https://link.trustwallet.com/send?asset=c8453${tokenContract ? `_t${tokenContract}` : ''}&address=${evmAddress}&amount=${cryptoAmount}`
-      : `https://link.trustwallet.com/send?asset=c20000714${tokenContract ? `_t${tokenContract}` : ''}&address=${evmAddress}&amount=${cryptoAmount}`);
-    const eip681Uri = links?.eip681Uri || (isBase
-      ? (tokenContract ? `ethereum:${tokenContract}@8453/transfer?address=${evmAddress}&uint256=${activeDepositQuote?.rawUnits || ''}` : `ethereum:${evmAddress}@8453?value=${activeDepositQuote?.rawUnits || ''}`)
-      : (tokenContract ? `ethereum:${tokenContract}@56/transfer?address=${evmAddress}&uint256=${activeDepositQuote?.rawUnits || ''}` : `ethereum:${evmAddress}@56?value=${activeDepositQuote?.rawUnits || ''}`));
-
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-        <div className="w-full max-w-sm rounded-3xl bg-[#090e1c] border border-cyan-500/40 p-4 space-y-3.5 shadow-2xl relative max-h-[92vh] overflow-y-auto">
-          {/* Close button */}
-          <button
-            type="button"
-            onClick={() => setShowEvmWalletModal(false)}
-            className="absolute top-3.5 right-3.5 p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all cursor-pointer z-10"
-          >
-            <X className="w-4 h-4" />
-          </button>
-
-          {/* Modal Header */}
-          <div className="text-center pt-1 space-y-1">
-            <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-amber-500/20 via-blue-500/20 to-cyan-500/20 border border-cyan-400/50 flex items-center justify-center shadow-lg mb-1">
-              <Wallet className="w-6 h-6 text-cyan-400" />
-            </div>
-            <h3 className="text-base font-black text-white font-display tracking-tight">
-              Pay with EVM Wallet
-            </h3>
-            <p className="text-[11px] text-cyan-300 font-mono font-bold leading-snug px-1">
-              {networkTitle}
-            </p>
-          </div>
-
-          {/* Deposit Summary Box */}
-          <div className="p-3 rounded-2xl bg-[#040711] border border-cyan-950/80 space-y-2 text-xs">
-            <div className="flex justify-between items-center text-slate-300">
-              <span className="text-slate-400">Deposit Amount:</span>
-              <span className="font-bold text-white font-mono">${amt.toFixed(2)} USD</span>
-            </div>
-            <div className="flex justify-between items-center text-cyan-300">
-              <span className="text-slate-400">Exact {symbol} to Send:</span>
-              <div className="flex items-center gap-1.5">
-                <span className="font-black text-cyan-200 font-mono text-sm">{cryptoAmount} {symbol}</span>
-                <button
-                  type="button"
-                  onClick={() => handleCopy(cryptoAmount.toString(), 'modal_evm_amt', `${symbol} Amount`)}
-                  className="text-cyan-400 hover:text-white cursor-pointer"
-                  title="Copy Amount"
-                >
-                  {copiedKey === 'modal_evm_amt' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-            </div>
-            {tokenContract && (
-              <div className="flex justify-between items-center text-emerald-300 pt-1 border-t border-cyan-950/50">
-                <span className="text-slate-400">Token Contract:</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-mono text-[10px] text-emerald-200">{tokenContract.slice(0, 6)}...{tokenContract.slice(-4)}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleCopy(tokenContract, 'modal_evm_contract', 'Token Contract')}
-                    className="text-emerald-400 hover:text-white cursor-pointer"
-                    title="Copy Contract"
-                  >
-                    {copiedKey === 'modal_evm_contract' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-              </div>
-            )}
-            <div className="flex justify-between items-center text-amber-300 pt-1 border-t border-cyan-950/50">
-              <span className="text-slate-400">Payment Reference:</span>
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono font-bold">{memo}</span>
-                <button
-                  type="button"
-                  onClick={() => handleCopy(memo, 'modal_evm_memo', 'Reference')}
-                  className="text-cyan-400 hover:text-white cursor-pointer"
-                  title="Copy Reference"
-                >
-                  {copiedKey === 'modal_evm_memo' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Wallet Actions */}
-          <div className="space-y-2 pt-1">
-            {/* 1. Pay with Trust Wallet */}
-            <a
-              href={trustWalletUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => {
-                e.preventDefault();
-                openSafeUrl(trustWalletUrl, eip681Uri);
-              }}
-              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#0052FF] via-[#0077B5] to-[#0098EA] hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-[0_0_20px_rgba(0,180,216,0.35)] transition-all cursor-pointer border border-cyan-300/40 text-center select-none"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm">🛡️</span>
-                <div className="text-left">
-                  <div className="leading-tight">Pay with Trust Wallet</div>
-                  <div className="text-[9px] font-normal text-cyan-100 opacity-90">Auto-fills recipient & {cryptoAmount} {symbol}</div>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4" />
-            </a>
-
-            {/* 2. Pay with MetaMask / Web3 */}
-            <a
-              href={eip681Uri}
-              onClick={(e) => {
-                e.preventDefault();
-                openSafeUrl(eip681Uri);
-              }}
-              className="w-full py-2.5 px-4 rounded-xl bg-[#0c162c] hover:bg-[#132247] border border-cyan-500/30 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between transition-all cursor-pointer shadow-md active:scale-95"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm">🦊</span>
-                <div className="text-left">
-                  <div className="leading-tight">Pay with MetaMask / Web3 App</div>
-                  <div className="text-[9px] font-normal text-slate-300">Opens EIP-681 Web3 deep link</div>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-slate-400" />
-            </a>
-          </div>
-
-          {/* Copyable Address Box */}
-          <div className="p-2.5 rounded-xl bg-[#050811] border border-cyan-950/70 space-y-1.5">
-            <div className="flex items-center justify-between text-[10px] text-slate-400 uppercase font-bold tracking-wider">
-              <span>Official Recipient Address:</span>
-              <button
-                type="button"
-                onClick={() => handleCopy(evmAddress, 'modal_evm_addr', 'EVM Address')}
-                className="text-cyan-400 hover:text-white flex items-center gap-1 font-sans cursor-pointer"
-              >
-                {copiedKey === 'modal_evm_addr' ? (
-                  <>
-                    <Check className="w-3 h-3 text-emerald-400" />
-                    <span className="text-emerald-400">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3 h-3" />
-                    <span>Copy</span>
-                  </>
-                )}
-              </button>
-            </div>
-            <div className="text-[11px] font-mono text-cyan-200 break-all bg-black/40 p-2 rounded-lg select-all">
-              {evmAddress}
-            </div>
-          </div>
-
-          {/* Copy All Details Button */}
-          <button
-            type="button"
-            onClick={() => handleCopyAllPaymentDetails(cur, evmAddress, amt, memo)}
-            className="w-full py-2 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-slate-700/50 text-slate-200 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-          >
-            <Copy className="w-3.5 h-3.5 text-slate-400" />
-            <span>Copy All Details (for Binance, Bybit, OKX)</span>
-          </button>
-
-          {/* On-Chain Verification Trigger */}
-          <div className="pt-1 border-t border-cyan-950/60">
-            <button
-              type="button"
-              disabled={isCheckingOnChain}
-              onClick={() => checkDepositOnChainStatus(activeDepositId || '', true)}
-              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isCheckingOnChain ? 'animate-spin' : ''}`} />
-              <span>{isCheckingOnChain ? 'Checking Blockchain...' : 'I Have Paid — Check Status'}</span>
-            </button>
-            <p className="text-[10px] text-slate-400 text-center mt-1.5">
-              Auto-verifies on BSC / Base blockchain. Instant credit upon confirmation!
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Render TRON Wallet Choice Modal
-  const renderTronWalletModal = (cur: CurrencyConfig) => {
-    if (!showTronModal) return null;
-
-    const amt = depositAmountUsd || activeDepositQuote?.amountUsdt || 10;
-    const symbol = cur.symbol;
-    const cryptoAmount = activeDepositQuote?.expectedCryptoAmount || amt;
-    const memo = activeDepositQuote?.paymentReference || telegramUserId || 'DEP-TRON';
-    const tronAddress = activeDepositQuote?.depositAddress || getEffectiveTreasuryAddress(cur);
-    const tokenContract = activeDepositQuote?.tokenContract;
-    const links = activeDepositQuote?.walletLinks;
-
-    const trustWalletUrl = links?.trustWalletUrl || (tokenContract
-      ? `https://link.trustwallet.com/send?asset=c195_t${tokenContract}&address=${tronAddress}&amount=${cryptoAmount}`
-      : `https://link.trustwallet.com/send?asset=c195&address=${tronAddress}&amount=${cryptoAmount}`);
-    const tronUri = links?.tronUri || (tokenContract
-      ? `tron:${tronAddress}?token=${tokenContract}&amount=${activeDepositQuote?.rawUnits || ''}`
-      : `tron:${tronAddress}?amount=${activeDepositQuote?.rawUnits || ''}`);
-
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-        <div className="w-full max-w-sm rounded-3xl bg-[#090e1c] border border-red-500/40 p-4 space-y-3.5 shadow-2xl relative max-h-[92vh] overflow-y-auto">
-          {/* Close button */}
-          <button
-            type="button"
-            onClick={() => setShowTronModal(false)}
-            className="absolute top-3.5 right-3.5 p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all cursor-pointer z-10"
-          >
-            <X className="w-4 h-4" />
-          </button>
-
-          {/* Modal Header */}
-          <div className="text-center pt-1 space-y-1">
-            <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-red-600/30 via-red-500/20 to-rose-600/30 border border-red-400/50 flex items-center justify-center shadow-lg mb-1">
-              <Wallet className="w-6 h-6 text-red-400" />
-            </div>
-            <h3 className="text-base font-black text-white font-display tracking-tight">
-              Pay with TRON Wallet
-            </h3>
-            <p className="text-[11px] text-red-300 font-mono font-bold leading-snug px-1">
-              TRON Network (TRC20 / TRX)
-            </p>
-          </div>
-
-          {/* Deposit Summary Box */}
-          <div className="p-3 rounded-2xl bg-[#040711] border border-red-950/80 space-y-2 text-xs">
-            <div className="flex justify-between items-center text-slate-300">
-              <span className="text-slate-400">Deposit Amount:</span>
-              <span className="font-bold text-white font-mono">${amt.toFixed(2)} USD</span>
-            </div>
-            <div className="flex justify-between items-center text-red-300">
-              <span className="text-slate-400">Exact {symbol} to Send:</span>
-              <div className="flex items-center gap-1.5">
-                <span className="font-black text-red-200 font-mono text-sm">{cryptoAmount} {symbol}</span>
-                <button
-                  type="button"
-                  onClick={() => handleCopy(cryptoAmount.toString(), 'modal_tron_amt', `${symbol} Amount`)}
-                  className="text-red-400 hover:text-white cursor-pointer"
-                  title="Copy Amount"
-                >
-                  {copiedKey === 'modal_tron_amt' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-            </div>
-            {tokenContract && (
-              <div className="flex justify-between items-center text-emerald-300 pt-1 border-t border-red-950/50">
-                <span className="text-slate-400">USDT Contract:</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-mono text-[10px] text-emerald-200">{tokenContract.slice(0, 6)}...{tokenContract.slice(-4)}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleCopy(tokenContract, 'modal_tron_contract', 'USDT TRC20 Contract')}
-                    className="text-emerald-400 hover:text-white cursor-pointer"
-                    title="Copy Contract"
-                  >
-                    {copiedKey === 'modal_tron_contract' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-              </div>
-            )}
-            <div className="flex justify-between items-center text-amber-300 pt-1 border-t border-red-950/50">
-              <span className="text-slate-400">Payment Reference:</span>
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono font-bold">{memo}</span>
-                <button
-                  type="button"
-                  onClick={() => handleCopy(memo, 'modal_tron_memo', 'Reference')}
-                  className="text-red-400 hover:text-white cursor-pointer"
-                  title="Copy Reference"
-                >
-                  {copiedKey === 'modal_tron_memo' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Wallet Actions */}
-          <div className="space-y-2 pt-1">
-            {/* 1. Pay with Trust Wallet */}
-            <a
-              href={trustWalletUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => {
-                e.preventDefault();
-                openSafeUrl(trustWalletUrl, tronUri);
-              }}
-              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#EF0027] via-[#B3001B] to-[#8C0015] hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-[0_0_20px_rgba(239,0,39,0.35)] transition-all cursor-pointer border border-red-400/40 text-center select-none"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm">🛡️</span>
-                <div className="text-left">
-                  <div className="leading-tight">Pay with Trust Wallet</div>
-                  <div className="text-[9px] font-normal text-red-100 opacity-90">Auto-fills recipient & {cryptoAmount} {symbol}</div>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4" />
-            </a>
-
-            {/* 2. Pay with TronLink */}
-            <a
-              href={tronUri}
-              onClick={(e) => {
-                e.preventDefault();
-                openSafeUrl(tronUri);
-              }}
-              className="w-full py-2.5 px-4 rounded-xl bg-[#140b10] hover:bg-[#201018] border border-red-500/30 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between transition-all cursor-pointer shadow-md active:scale-95"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm">💎</span>
-                <div className="text-left">
-                  <div className="leading-tight">Pay with TronLink</div>
-                  <div className="text-[9px] font-normal text-slate-300">Opens TronLink native protocol link</div>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-slate-400" />
-            </a>
-          </div>
-
-          {/* Copyable Address Box */}
-          <div className="p-2.5 rounded-xl bg-[#050811] border border-red-950/70 space-y-1.5">
-            <div className="flex items-center justify-between text-[10px] text-slate-400 uppercase font-bold tracking-wider">
-              <span>Official TRON Address:</span>
-              <button
-                type="button"
-                onClick={() => handleCopy(tronAddress, 'modal_tron_addr', 'TRON Address')}
-                className="text-red-400 hover:text-white flex items-center gap-1 font-sans cursor-pointer"
-              >
-                {copiedKey === 'modal_tron_addr' ? (
-                  <>
-                    <Check className="w-3 h-3 text-emerald-400" />
-                    <span className="text-emerald-400">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3 h-3" />
-                    <span>Copy</span>
-                  </>
-                )}
-              </button>
-            </div>
-            <div className="text-[11px] font-mono text-red-200 break-all bg-black/40 p-2 rounded-lg select-all">
-              {tronAddress}
-            </div>
-          </div>
-
-          {/* Copy All Details Button */}
-          <button
-            type="button"
-            onClick={() => handleCopyAllPaymentDetails(cur, tronAddress, amt, memo)}
-            className="w-full py-2 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-slate-700/50 text-slate-200 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-          >
-            <Copy className="w-3.5 h-3.5 text-slate-400" />
-            <span>Copy All Details (for Binance, Bybit, OKX)</span>
-          </button>
-
-          {/* On-Chain Verification Trigger */}
-          <div className="pt-1 border-t border-red-950/60">
-            <button
-              type="button"
-              disabled={isCheckingOnChain}
-              onClick={() => checkDepositOnChainStatus(activeDepositId || '', true)}
-              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isCheckingOnChain ? 'animate-spin' : ''}`} />
-              <span>{isCheckingOnChain ? 'Checking Blockchain...' : 'I Have Paid — Check Status'}</span>
-            </button>
-            <p className="text-[10px] text-slate-400 text-center mt-1.5">
-              Auto-verifies on TRON blockchain. Instant credit upon confirmation!
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Render Solana Wallet Choice Modal
-  const renderSolanaWalletModal = (cur: CurrencyConfig) => {
-    if (!showSolanaModal) return null;
-
-    const amt = depositAmountUsd || activeDepositQuote?.amountUsdt || 10;
-    const symbol = 'SOL';
-    const cryptoAmount = activeDepositQuote?.expectedCryptoAmount || Math.round((amt / 180) * 10000) / 10000;
-    const memo = activeDepositQuote?.paymentReference || telegramUserId || 'DEP-SOL';
-    const solAddress = activeDepositQuote?.depositAddress || getEffectiveTreasuryAddress(cur);
-    const links = activeDepositQuote?.walletLinks;
-
-    const phantomUrl = links?.phantomUrl || `https://phantom.app/ul/browse/${encodeURIComponent(`solana:${solAddress}?amount=${cryptoAmount}&memo=${memo}`)}`;
-    const solanaPayUri = links?.solanaPayUri || `solana:${solAddress}?amount=${cryptoAmount}&reference=${memo}&memo=${encodeURIComponent(memo)}`;
-
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-        <div className="w-full max-w-sm rounded-3xl bg-[#090e1c] border border-purple-500/40 p-4 space-y-3.5 shadow-2xl relative max-h-[92vh] overflow-y-auto">
-          {/* Close button */}
-          <button
-            type="button"
-            onClick={() => setShowSolanaModal(false)}
-            className="absolute top-3.5 right-3.5 p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all cursor-pointer z-10"
-          >
-            <X className="w-4 h-4" />
-          </button>
-
-          {/* Modal Header */}
-          <div className="text-center pt-1 space-y-1">
-            <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-purple-600/30 via-[#9945FF]/20 to-[#14F195]/20 border border-purple-400/50 flex items-center justify-center shadow-lg mb-1">
-              <Sparkles className="w-6 h-6 text-purple-400" />
-            </div>
-            <h3 className="text-base font-black text-white font-display tracking-tight">
-              Pay with Solana Wallet
-            </h3>
-            <p className="text-[11px] text-purple-300 font-mono font-bold leading-snug px-1">
-              Solana Mainnet-Beta
-            </p>
-          </div>
-
-          {/* Deposit Summary Box */}
-          <div className="p-3 rounded-2xl bg-[#040711] border border-purple-950/80 space-y-2 text-xs">
-            <div className="flex justify-between items-center text-slate-300">
-              <span className="text-slate-400">Deposit Amount:</span>
-              <span className="font-bold text-white font-mono">${amt.toFixed(2)} USD</span>
-            </div>
-            <div className="flex justify-between items-center text-purple-300">
-              <span className="text-slate-400">Exact SOL to Send:</span>
-              <div className="flex items-center gap-1.5">
-                <span className="font-black text-purple-200 font-mono text-sm">{cryptoAmount} SOL</span>
-                <button
-                  type="button"
-                  onClick={() => handleCopy(cryptoAmount.toString(), 'modal_sol_amt', 'SOL Amount')}
-                  className="text-purple-400 hover:text-white cursor-pointer"
-                  title="Copy Amount"
-                >
-                  {copiedKey === 'modal_sol_amt' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-            </div>
-            <div className="flex justify-between items-center text-amber-300 pt-1 border-t border-purple-950/50">
-              <span className="text-slate-400">Transfer Memo:</span>
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono font-bold">{memo}</span>
-                <button
-                  type="button"
-                  onClick={() => handleCopy(memo, 'modal_sol_memo', 'Memo')}
-                  className="text-purple-400 hover:text-white cursor-pointer"
-                  title="Copy Memo"
-                >
-                  {copiedKey === 'modal_sol_memo' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Wallet Actions */}
-          <div className="space-y-2 pt-1">
-            {/* 1. Pay with Phantom */}
-            <a
-              href={phantomUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => {
-                e.preventDefault();
-                openSafeUrl(phantomUrl, solanaPayUri);
-              }}
-              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#9945FF] to-[#7B2CBF] hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-[0_0_20px_rgba(153,69,255,0.35)] transition-all cursor-pointer border border-purple-400/40 text-center select-none"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm">👻</span>
-                <div className="text-left">
-                  <div className="leading-tight">Pay with Phantom</div>
-                  <div className="text-[9px] font-normal text-purple-100 opacity-90">Auto-fills address, {cryptoAmount} SOL & memo</div>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4" />
-            </a>
-
-            {/* 2. Solana Pay Standard URI */}
-            <a
-              href={solanaPayUri}
-              onClick={(e) => {
-                e.preventDefault();
-                openSafeUrl(solanaPayUri);
-              }}
-              className="w-full py-2.5 px-4 rounded-xl bg-[#130b24] hover:bg-[#1e113a] border border-purple-500/30 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between transition-all cursor-pointer shadow-md active:scale-95"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm">⚡</span>
-                <div className="text-left">
-                  <div className="leading-tight">Pay with Solana Pay</div>
-                  <div className="text-[9px] font-normal text-slate-300">Opens Solana Pay compatible wallets</div>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-slate-400" />
-            </a>
-          </div>
-
-          {/* Copyable Address Box */}
-          <div className="p-2.5 rounded-xl bg-[#050811] border border-purple-950/70 space-y-1.5">
-            <div className="flex items-center justify-between text-[10px] text-slate-400 uppercase font-bold tracking-wider">
-              <span>Official Solana Address:</span>
-              <button
-                type="button"
-                onClick={() => handleCopy(solAddress, 'modal_sol_addr', 'Solana Address')}
-                className="text-purple-400 hover:text-white flex items-center gap-1 font-sans cursor-pointer"
-              >
-                {copiedKey === 'modal_sol_addr' ? (
-                  <>
-                    <Check className="w-3 h-3 text-emerald-400" />
-                    <span className="text-emerald-400">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3 h-3" />
-                    <span>Copy</span>
-                  </>
-                )}
-              </button>
-            </div>
-            <div className="text-[11px] font-mono text-purple-200 break-all bg-black/40 p-2 rounded-lg select-all">
-              {solAddress}
-            </div>
-          </div>
-
-          {/* Copy All Details Button */}
-          <button
-            type="button"
-            onClick={() => handleCopyAllPaymentDetails(cur, solAddress, amt, memo)}
-            className="w-full py-2 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-slate-700/50 text-slate-200 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-          >
-            <Copy className="w-3.5 h-3.5 text-slate-400" />
-            <span>Copy All Details (for Binance, Bybit, OKX)</span>
-          </button>
-
-          {/* On-Chain Verification Trigger */}
-          <div className="pt-1 border-t border-purple-950/60">
-            <button
-              type="button"
-              disabled={isCheckingOnChain}
-              onClick={() => checkDepositOnChainStatus(activeDepositId || '', true)}
-              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isCheckingOnChain ? 'animate-spin' : ''}`} />
-              <span>{isCheckingOnChain ? 'Checking Blockchain...' : 'I Have Paid — Check Status'}</span>
-            </button>
-            <p className="text-[10px] text-slate-400 text-center mt-1.5">
-              Auto-verifies on Solana blockchain. Instant credit upon confirmation!
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  // Compatibility aliases
+  const renderTonWalletModal = renderTwoWalletModal;
+  const renderEvmWalletModal = renderTwoWalletModal;
+  const renderTronWalletModal = renderTwoWalletModal;
+  const renderSolanaWalletModal = renderTwoWalletModal;
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -1945,7 +1512,7 @@ Payment Reference / Memo: ${memo}`;
           {/* Supported Wallets Tag matching Screenshot 1 */}
           <div className="w-full py-1.5 px-3 rounded-full bg-[#0d162b] border border-cyan-500/20 text-[11px] text-cyan-300 font-semibold flex items-center justify-center gap-1.5">
             <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[3]" />
-            <span>Binance • Telegram Wallet • MetaMask • Phantom • OKX • Any App</span>
+            <span>Keeper (Tonkeeper) • Trust Wallet • Telegram Wallet</span>
           </div>
         </div>
 
@@ -2010,7 +1577,7 @@ Payment Reference / Memo: ${memo}`;
               </button>
             </div>
             <p className="text-[10px] text-slate-400">
-              Tip: In Trust Wallet or MetaMask, use this contract to import the token if not already visible.
+              Tip: In Trust Wallet, use this contract to import the token if not already visible.
             </p>
           </div>
         )}
@@ -2435,6 +2002,92 @@ Payment Reference / Memo: ${memo}`;
           </div>
         </div>
 
+        {/* Step 4: Choose Wallet (Two-Wallet Protocol: Keeper & Trust Wallet) */}
+        <div className="rounded-2xl bg-[#090e1c] border border-cyan-500/30 p-3.5 space-y-3 shadow-xl">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5 font-display">
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Choose Wallet (Two-Wallet Protocol)</span>
+            </h4>
+            <span className="text-[10px] text-cyan-300 font-mono font-bold bg-cyan-950/80 px-2 py-0.5 rounded-full border border-cyan-800/40">
+              {cur.network}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {/* Wallet 1: Keeper (Tonkeeper) */}
+            {cur.networkType === 'TON' ? (
+              <button
+                type="button"
+                onClick={() => handleOpenPaymentWithWallet(cur, 'KEEPER')}
+                className="w-full p-3 rounded-xl bg-gradient-to-r from-[#0098EA] via-[#00B4D8] to-[#0077B5] hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-[0_0_20px_rgba(0,180,216,0.35)] transition-all cursor-pointer border border-cyan-300/40"
+              >
+                <div className="flex items-center gap-2 text-left">
+                  <span className="text-base">🟢</span>
+                  <div>
+                    <div className="leading-tight font-black">Pay with Keeper</div>
+                    <div className="text-[9px] font-normal text-cyan-100 opacity-90">Auto-fills {activeDepositQuote?.expectedCryptoAmount || (Math.round((depositAmountUsd / 5.20) * 10000) / 10000)} TON & memo</div>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-white" />
+              </button>
+            ) : (
+              <div className="w-full p-3 rounded-xl bg-slate-900/40 border border-slate-800 text-slate-500 text-xs flex items-center justify-between opacity-60">
+                <div className="flex items-center gap-2 text-left">
+                  <span className="text-base grayscale opacity-60">⚪</span>
+                  <div>
+                    <div className="leading-tight font-bold text-slate-400">Keeper (TON Only)</div>
+                    <div className="text-[9px] font-normal text-slate-500">Keeper does not support {cur.network}</div>
+                  </div>
+                </div>
+                <span className="text-[9px] font-mono font-bold uppercase bg-slate-800 px-1.5 py-0.5 rounded text-slate-400">Disabled</span>
+              </div>
+            )}
+
+            {/* Wallet 2: Trust Wallet (All 8 currencies supported) */}
+            <button
+              type="button"
+              onClick={() => handleOpenPaymentWithWallet(cur, 'TRUST_WALLET')}
+              className="w-full p-3 rounded-xl bg-gradient-to-r from-[#0500FF] via-[#0052FF] to-[#00A3FF] hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-[0_0_20px_rgba(0,82,255,0.35)] transition-all cursor-pointer border border-blue-400/40"
+            >
+              <div className="flex items-center gap-2 text-left">
+                <ShieldCheck className="w-4 h-4 text-emerald-300 shrink-0" />
+                <div>
+                  <div className="leading-tight font-black">Pay with Trust Wallet</div>
+                  <div className="text-[9px] font-normal text-blue-100 opacity-90">Direct send for {cur.id === 'BASE' ? baseAsset : cur.symbol} on {cur.network}</div>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-white" />
+            </button>
+          </div>
+
+          {/* If TON: Additional official actions */}
+          {cur.networkType === 'TON' && (
+            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-cyan-950/40">
+              <button
+                type="button"
+                onClick={openTelegramWallet}
+                className="py-2 px-3 rounded-xl bg-[#0c162c] hover:bg-[#132247] border border-cyan-500/30 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                <span>💎</span>
+                <span>Telegram Wallet</span>
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await connectTonWallet();
+                  } catch {}
+                }}
+                className="py-2 px-3 rounded-xl bg-[#141b33] hover:bg-[#1c2647] border border-blue-500/40 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                <span>🔗</span>
+                <span>TON Connect</span>
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Payment Verification / Proof Submission Form */}
         <form onSubmit={handleVerifyDeposit} className="rounded-2xl bg-[#090e1c] border border-cyan-500/30 p-3.5 space-y-3 shadow-xl">
           <div className="flex items-center justify-between">
@@ -2526,11 +2179,8 @@ Payment Reference / Memo: ${memo}`;
           )}
         </form>
 
-        {/* Network-Specific Payment Modals */}
-        {renderTonWalletModal(cur)}
-        {renderEvmWalletModal(cur)}
-        {renderTronWalletModal(cur)}
-        {renderSolanaWalletModal(cur)}
+        {/* Two-Wallet Multi-Chain Modal */}
+        {renderTwoWalletModal(cur)}
       </div>
     );
   }

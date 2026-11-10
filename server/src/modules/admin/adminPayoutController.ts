@@ -727,10 +727,10 @@ export class AdminPayoutController {
       });
 
       sendSuccess(res, {
-        trustWalletEvm: map['TRUST_WALLET_EVM_ADDRESS'] || process.env.TREASURY_EVM_ADDRESS || process.env.TRUST_WALLET_EVM_ADDRESS || '0x71C8360216Ac3456952771bEc438F5e85d99623C',
-        trustWalletTron: map['TRUST_WALLET_TRON_ADDRESS'] || process.env.TREASURY_TRON_ADDRESS || process.env.TREASURY_TRON_ADORESS || process.env.TRUST_WALLET_TRON_ADDRESS || 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
-        trustWalletTon: map['TRUST_WALLET_TON_ADDRESS'] || process.env.TREASURY_TON_ADDRESS || process.env.TRUST_WALLET_TON_ADDRESS || 'EQBvW8Z5huBkMJYdn3PCDKNKKqiqXDjvjjx29JqYpn8SoGSq',
-        trustWalletSol: map['TRUST_WALLET_SOL_ADDRESS'] || process.env.TREASURY_SOL_ADDRESS || process.env.TRUST_WALLET_SOL_ADDRESS || '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
+        trustWalletEvm: map['TRUST_WALLET_EVM_ADDRESS'] || process.env.TREASURY_EVM_ADDRESS || process.env.TRUST_WALLET_EVM_ADDRESS || '0xc25C9522eD01EC3C857d44133F33F7A765aB7eB1',
+        trustWalletTron: map['TRUST_WALLET_TRON_ADDRESS'] || process.env.TREASURY_TRON_ADDRESS || process.env.TRUST_WALLET_TRON_ADDRESS || 'TJLEgXHdGG3fxwn1UiHvpDoqz29FmJshCv',
+        trustWalletTon: map['TRUST_WALLET_TON_ADDRESS'] || process.env.TREASURY_TON_ADDRESS || process.env.TRUST_WALLET_TON_ADDRESS || 'UQBGdgDogsxtpbFIvzAFnIByU3E3PlXsdkt_xyuG4S-gzvgR',
+        trustWalletSol: map['TRUST_WALLET_SOL_ADDRESS'] || process.env.TREASURY_SOL_ADDRESS || process.env.TRUST_WALLET_SOL_ADDRESS || 'ER74j5s2PgVPx9dsT7wqyMSM7RgY4LKrFt9c1NFp92Qk',
       });
     } catch {
       sendError(res, 'Failed to fetch treasury settings', 500, 'SERVER_ERROR');
