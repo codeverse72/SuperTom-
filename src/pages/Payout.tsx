@@ -280,7 +280,7 @@ export const Payout: React.FC = () => {
     openSafeUrl('https://t.me/wallet');
   };
 
-  // Open Tonkeeper Direct Deep Link / Universal Link with pre-filled amount and memo
+  // Open Tonkeeper via official Universal Link with pre-filled amount and memo
   const handleOpenTonkeeper = (
     address: string, 
     memo: string, 
@@ -299,44 +299,19 @@ export const Payout: React.FC = () => {
     // Calculate exact nanotons (1 TON = 1e9 nanotons)
     const finalAmount = (amountNum !== undefined && amountNum > 0) ? amountNum : (depositAmountUsd > 0 ? depositAmountUsd : 1);
     const amountInNanoTon = Math.round(finalAmount * 1_000_000_000);
-    const memoParam = memo ? `&text=${encodeURIComponent(memo)}` : '';
-
-    const directScheme = `ton://transfer/${targetTonAddress}?amount=${amountInNanoTon}${memoParam}`;
-    const universalUrl = `https://app.tonkeeper.com/transfer/${targetTonAddress}?amount=${amountInNanoTon}${memoParam}`;
-
-    const webApp = window.Telegram?.WebApp;
     
-    // Strategy 1: Telegram WebApp openLink with universal HTTPS link
-    if (webApp?.openLink) {
-      try {
-        webApp.openLink(universalUrl);
-      } catch (err) {
-        console.warn('Telegram openLink universal failed:', err);
-      }
+    // Build query params
+    const params = new URLSearchParams();
+    params.set('amount', amountInNanoTon.toString());
+    if (memo && memo.trim()) {
+      params.set('text', memo.trim());
     }
 
-    // Strategy 2: Direct OS URI protocol trigger (launches Tonkeeper native app on mobile)
-    try {
-      const link = document.createElement('a');
-      link.href = directScheme;
-      link.rel = 'noopener noreferrer';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch {
-      try {
-        window.location.href = directScheme;
-      } catch {
-        // Fallback
-      }
-    }
+    // Official Tonkeeper HTTPS Universal Link (compliant with Telegram WebApp SDK, prevents ERR_UNKNOWN_URL_SCHEME)
+    // Mobile OS (iOS / Android) natively intercepts app.tonkeeper.com and opens Tonkeeper app
+    const universalUrl = `https://app.tonkeeper.com/transfer/${targetTonAddress}?${params.toString()}`;
 
-    // Strategy 3: Standard browser fallback outside Telegram
-    if (!webApp) {
-      setTimeout(() => {
-        window.open(universalUrl, '_blank', 'noopener,noreferrer');
-      }, 600);
-    }
+    openSafeUrl(universalUrl);
   };
 
   const handleCopyAllPaymentDetails = (
@@ -819,16 +794,16 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
         </div>
 
         {/* Uniform Primary Wallet Button */}
-        <a
-          href={`ton://transfer/${(treasuryAddress && treasuryAddress.length >= 48) ? treasuryAddress : 'UQBGdgDogaxtpbFIvzAFnIByU3E3Plxsdkt_xyuG4S-gzvgR'}?amount=${Math.round((depositAmountUsd > 0 ? depositAmountUsd : 1) * 1_000_000_000)}${telegramUserId ? `&text=${encodeURIComponent(telegramUserId)}` : ''}`}
-          onClick={(e) => {
+        <button
+          type="button"
+          onClick={() => {
             handleOpenTonkeeper(treasuryAddress, telegramUserId, cur, depositAmountUsd);
           }}
           className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#0098EA] via-[#00B4D8] to-[#0077B5] hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(0,180,216,0.35)] transition-all cursor-pointer border border-cyan-300/40 text-center select-none"
         >
           <span>OPEN IN TELEGRAM WALLET / ANY TON WALLET</span>
           <ExternalLink className="w-4 h-4" />
-        </a>
+        </button>
 
         {/* Deposit Amount Selector matching Screenshot 1 */}
         <div className="rounded-2xl bg-[#090e1c] border border-cyan-500/30 p-3.5 space-y-3 shadow-xl">
