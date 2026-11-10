@@ -230,6 +230,42 @@ export interface DepositStatusResponseDto {
   isCompleted: boolean;
 }
 
+export interface TonRateResponseDto {
+  priceUsd: number;
+  timestamp: number;
+}
+
+export interface CreateTonDepositRequestDto {
+  amountUsd: number;
+  notes?: string;
+}
+
+export interface CreateTonDepositResponseDto {
+  id: string;
+  depositReference: string;
+  telegramId: string;
+  amountUsd: number;
+  tonAmount: number;
+  nanoTon: string;
+  tonPriceUsd: number;
+  receivingAddress: string;
+  deepLinkTonkeeper: string;
+  deepLinkTon: string;
+  status: string;
+  expiresAt?: number;
+}
+
+export interface CheckTonDepositResponseDto {
+  verified: boolean;
+  status: string;
+  message: string;
+  txHash?: string;
+  senderAddress?: string;
+  amountTon?: number;
+  amountPoops?: number;
+  newBalance?: number;
+}
+
 export interface TreasuryWalletsResponseDto {
   wallets: Record<string, {
     currency: string;

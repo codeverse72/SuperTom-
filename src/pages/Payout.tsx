@@ -26,15 +26,17 @@ import {
   X,
   Lock,
   Unlock,
-  Crown
+  Crown,
+  Loader2
 } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { formatNumber, poopsToUsdt } from '../utils/probability';
 import { MIN_WITHDRAWAL_POOPS } from '../config/gameConfig';
 import { validateNetworkAddress } from '../utils/validation';
 import { paymentService } from '../services/paymentService';
+import { tonConnectService } from '../services/tonConnectService';
 import { QRCode } from '../components/QRCode';
-import { DepositDto, WithdrawalEntitlementDto } from '../services/types';
+import { DepositDto, WithdrawalEntitlementDto, CreateTonDepositResponseDto } from '../services/types';
 import { CampaignBanner } from '../components/CampaignBanner';
 import { sound } from '../utils/sound';
 
@@ -244,6 +246,27 @@ export const Payout: React.FC = () => {
   const [depositError, setDepositError] = useState<string | null>(null);
   const [activeDepositId, setActiveDepositId] = useState<string | null>(null);
 
+  // TON Connect & Live Blockchain Verification State
+  const [tonRateUsd, setTonRateUsd] = useState<number>(2.45);
+  const [isOpeningWallet, setIsOpeningWallet] = useState<boolean>(false);
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState<boolean>(false);
+  const [isCheckingStatus, setIsCheckingStatus] = useState<boolean>(false);
+  const [activeTonDeposit, setActiveTonDeposit] = useState<CreateTonDepositResponseDto | null>(null);
+  const [paymentSuccessTx, setPaymentSuccessTx] = useState<{
+    txHash: string;
+    amountTon?: number;
+    poops?: number;
+  } | null>(null);
+  const [isTonWalletConnected, setIsTonWalletConnected] = useState<boolean>(false);
+  const [connectedWalletName, setConnectedWalletName] = useState<string | null>(null);
+
+  // Dynamic calculated TON equivalent using real-time market exchange rate
+  const liveTonEquivalent = useMemo(() => {
+    const rate = tonRateUsd > 0 ? tonRateUsd : 2.45;
+    const amount = depositAmountUsd / rate;
+    return Number(amount.toFixed(4));
+  }, [depositAmountUsd, tonRateUsd]);
+
   // Withdrawal Form State (Screenshot 3)
   const [withdrawAddress, setWithdrawAddress] = useState('');
   const [withdrawAmountUsd, setWithdrawAmountUsd] = useState('');
@@ -312,6 +335,207 @@ export const Payout: React.FC = () => {
     const universalUrl = `https://app.tonkeeper.com/transfer/${targetTonAddress}?${params.toString()}`;
 
     openSafeUrl(universalUrl);
+  };
+
+  // Synchronize TON Connect status & live TON exchange rate
+  useEffect(() => {
+    // 1. Fetch live market rate
+    paymentService.getTonRate().then((res) => {
+      if (res.success && res.data?.priceUsd) {
+        setTonRateUsd(res.data.priceUsd);
+      }
+    }).catch(() => {});
+
+    // 2. Setup TON Connect UI listener
+    const ui = tonConnectService.getTonConnectUI();
+    if (ui) {
+      setIsTonWalletConnected(ui.connected);
+      if (ui.wallet) {
+        setConnectedWalletName(ui.wallet.device?.appName || ui.wallet.name || 'TON Wallet');
+      }
+      const unsubscribe = ui.onStatusChange((wallet) => {
+        setIsTonWalletConnected(!!wallet);
+        if (wallet) {
+          setConnectedWalletName(wallet.device?.appName || wallet.name || 'TON Wallet');
+        } else {
+          setConnectedWalletName(null);
+        }
+      });
+      return () => {
+        unsubscribe();
+      };
+    }
+  }, []);
+
+  // Auto-polling for incoming blockchain deposit when payment verification is active
+  useEffect(() => {
+    if (!isVerifyingPayment) return;
+    const depositId = activeTonDeposit?.id || activeDepositId;
+    if (!depositId) return;
+
+    let pollCount = 0;
+    const maxPolls = 30; // poll every 4 seconds for 2 minutes
+    const interval = setInterval(async () => {
+      pollCount++;
+      if (pollCount > maxPolls) {
+        clearInterval(interval);
+        return;
+      }
+      await handleCheckPaymentStatus(false);
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [isVerifyingPayment, activeTonDeposit?.id, activeDepositId]);
+
+  const handleCheckPaymentStatus = async (manual: boolean = false) => {
+    const depositId = activeTonDeposit?.id || activeDepositId;
+    if (!depositId) return;
+
+    if (manual) {
+      sound.playClick();
+      setIsCheckingStatus(true);
+    }
+
+    try {
+      const res = await paymentService.checkTonDepositOnChain(depositId);
+      if (res.success && res.data) {
+        if (res.data.verified) {
+          sound.playReward();
+          setDepositStatus('COMPLETED');
+          setIsVerifyingPayment(false);
+          setPaymentSuccessTx({
+            txHash: res.data.txHash || '',
+            amountTon: res.data.amountTon,
+            poops: res.data.amountPoops,
+          });
+
+          try {
+            const confetti = (await import('canvas-confetti')).default;
+            confetti({
+              particleCount: 100,
+              spread: 75,
+              origin: { y: 0.6 },
+            });
+          } catch {}
+
+          showToast(
+            'Deposit Verified!',
+            `Payment of ${res.data.amountTon || activeTonDeposit?.tonAmount} TON confirmed on blockchain! Balance updated.`,
+            'reward'
+          );
+
+          refreshDeposits();
+          refreshWithdrawals();
+          fetchEntitlement();
+          if (selectedPlanForDeposit) {
+            setSelectedPlanForDeposit(null);
+          }
+          return;
+        } else if (manual) {
+          showToast(
+            'Payment Pending',
+            res.data.message || 'Payment not detected on blockchain yet. Please ensure you sent the transfer with the comment and try again.',
+            'info'
+          );
+        }
+      }
+    } catch (err: any) {
+      if (manual) {
+        showToast('Status Check', err.message || 'Unable to query blockchain at this moment.', 'warning');
+      }
+    } finally {
+      if (manual) {
+        setIsCheckingStatus(false);
+      }
+    }
+  };
+
+  const handleOpenTonWalletDeposit = async (curConfig?: CurrencyConfig) => {
+    sound.playClick();
+    if (isOpeningWallet) return;
+    setIsOpeningWallet(true);
+
+    try {
+      // 1. Create tracked deposit intent on backend with real-time TON price & unique reference
+      const createRes = await paymentService.createTonDeposit({
+        amountUsd: depositAmountUsd,
+        notes: selectedPlanForDeposit 
+          ? `[Biscuit Purchase: ${selectedPlanForDeposit.name}]` 
+          : undefined,
+      });
+
+      if (!createRes.success || !createRes.data) {
+        showToast('Error', createRes.error?.message || 'Failed to initialize deposit request', 'error');
+        setIsOpeningWallet(false);
+        return;
+      }
+
+      const tonDeposit = createRes.data;
+      setActiveTonDeposit(tonDeposit);
+      setActiveDepositId(tonDeposit.id);
+      setDepositStatus('WAITING_FOR_PAYMENT');
+      setPaymentSuccessTx(null);
+
+      // 2. Preferred integration: TON Connect
+      let sentViaTonConnect = false;
+      const ui = tonConnectService.getTonConnectUI();
+      
+      if (ui && ui.connected) {
+        showToast('Approve in Wallet', `Please approve transfer of ${tonDeposit.tonAmount} TON in your connected wallet.`, 'info');
+        const txRes = await tonConnectService.sendDepositTransaction({
+          receivingAddress: tonDeposit.receivingAddress,
+          nanoTon: tonDeposit.nanoTon,
+          comment: tonDeposit.depositReference,
+        });
+
+        if (txRes.success) {
+          sentViaTonConnect = true;
+          showToast('Transaction Sent', 'Transaction submitted from wallet. Verifying on blockchain...', 'info');
+        } else if (txRes.error?.toLowerCase().includes('reject') || txRes.error?.toLowerCase().includes('cancel')) {
+          showToast('Transaction Cancelled', 'You cancelled the transaction in your wallet.', 'warning');
+          setIsOpeningWallet(false);
+          return;
+        }
+      }
+
+      // 3. Fallback: Deep-Link / Universal Link
+      // If TON Connect was not used or not connected, open Tonkeeper HTTPS Universal Link
+      // Format: https://app.tonkeeper.com/transfer/RECEIVING_ADDRESS?amount=NANOTON_AMOUNT&text=DEPOSIT_REFERENCE
+      if (!sentViaTonConnect) {
+        openSafeUrl(tonDeposit.deepLinkTonkeeper);
+      }
+
+      // 4. Activate live payment verification state
+      setIsVerifyingPayment(true);
+
+    } catch (err: any) {
+      console.error('Wallet deposit error:', err);
+      showToast('Error', err.message || 'Failed to initialize deposit', 'error');
+    } finally {
+      setIsOpeningWallet(false);
+    }
+  };
+
+  const handleConnectTonWallet = async () => {
+    sound.playClick();
+    try {
+      const wallet = await tonConnectService.connectWallet();
+      if (wallet) {
+        setIsTonWalletConnected(true);
+        setConnectedWalletName(wallet.device?.appName || wallet.name || 'TON Wallet');
+        showToast('Wallet Connected', `Connected to ${wallet.device?.appName || wallet.name || 'TON Wallet'}`, 'reward');
+      }
+    } catch (e: any) {
+      showToast('Connection Failed', e.message || 'Failed to connect wallet', 'warning');
+    }
+  };
+
+  const handleDisconnectTonWallet = async () => {
+    sound.playClick();
+    await tonConnectService.disconnectWallet();
+    setIsTonWalletConnected(false);
+    setConnectedWalletName(null);
+    showToast('Wallet Disconnected', 'Disconnected from TON wallet', 'info');
   };
 
   const handleCopyAllPaymentDetails = (
@@ -793,16 +1017,55 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
           </p>
         </div>
 
+        {/* TON Connect Wallet Connection Status Bar */}
+        <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-[#090e1c] border border-cyan-500/20 text-xs">
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${isTonWalletConnected ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-slate-500'}`} />
+            <span className="text-slate-300 font-medium">
+              {isTonWalletConnected ? `Connected: ${connectedWalletName || 'TON Wallet'}` : 'TON Connect: Ready'}
+            </span>
+          </div>
+          {isTonWalletConnected ? (
+            <button
+              type="button"
+              onClick={handleDisconnectTonWallet}
+              className="text-[11px] text-rose-400 hover:text-rose-300 font-bold transition-all cursor-pointer"
+            >
+              Disconnect
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleConnectTonWallet}
+              className="text-[11px] text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1 transition-all cursor-pointer"
+            >
+              <span>Connect Wallet</span>
+              <ChevronRight className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+
         {/* Uniform Primary Wallet Button */}
         <button
           type="button"
-          onClick={() => {
-            handleOpenTonkeeper(treasuryAddress, telegramUserId, cur, depositAmountUsd);
-          }}
-          className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#0098EA] via-[#00B4D8] to-[#0077B5] hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(0,180,216,0.35)] transition-all cursor-pointer border border-cyan-300/40 text-center select-none"
+          onClick={() => handleOpenTonWalletDeposit(cur)}
+          disabled={isOpeningWallet}
+          className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#0098EA] via-[#00B4D8] to-[#0077B5] hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(0,180,216,0.35)] transition-all cursor-pointer border border-cyan-300/40 text-center select-none disabled:opacity-75"
         >
-          <span>OPEN IN TELEGRAM WALLET / ANY TON WALLET</span>
-          <ExternalLink className="w-4 h-4" />
+          {isOpeningWallet ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin text-white" />
+              <span>PREPARING PAYMENT REQUEST...</span>
+            </>
+          ) : (
+            <>
+              <span>OPEN IN TELEGRAM WALLET / ANY TON WALLET</span>
+              <span className="opacity-90 font-mono text-[11px] font-normal">
+                (≈ {liveTonEquivalent} TON)
+              </span>
+              <ExternalLink className="w-4 h-4" />
+            </>
+          )}
         </button>
 
         {/* Deposit Amount Selector matching Screenshot 1 */}
@@ -892,10 +1155,100 @@ Note: Paste in Binance, OKX, Bybit, Trust Wallet or any crypto wallet!`;
               />
             </div>
             <div className="text-right text-[11px] font-mono text-cyan-300">
-              ≈ {(depositAmountUsd * 2000).toLocaleString()} Poops 💩
+              <div>≈ {(depositAmountUsd * 2000).toLocaleString()} Poops 💩</div>
+              <div className="text-cyan-400 font-bold">≈ {liveTonEquivalent} TON</div>
             </div>
           </div>
         </div>
+
+        {/* Live Blockchain Verification Card */}
+        {activeTonDeposit && (
+          <div className="rounded-2xl bg-[#090e1c] border border-cyan-500/40 p-3.5 space-y-3 shadow-xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {depositStatus === 'COMPLETED' ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                ) : (
+                  <RefreshCw className={`w-5 h-5 text-cyan-400 ${isVerifyingPayment ? 'animate-spin' : ''}`} />
+                )}
+                <div>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                    {depositStatus === 'COMPLETED' ? 'Deposit Confirmed & Credited' : 'Verifying Blockchain Payment'}
+                  </h4>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    Ref: {activeTonDeposit.depositReference}
+                  </span>
+                </div>
+              </div>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono border ${
+                depositStatus === 'COMPLETED'
+                  ? 'bg-emerald-950 text-emerald-400 border-emerald-500/40'
+                  : 'bg-cyan-950 text-cyan-300 border-cyan-500/40 animate-pulse'
+              }`}>
+                {depositStatus === 'COMPLETED' ? 'CONFIRMED' : 'WAITING FOR PAYMENT'}
+              </span>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-[#050811] border border-cyan-950/70 space-y-1.5 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Selected Amount:</span>
+                <span className="text-white font-mono font-bold">${activeTonDeposit.amountUsd.toFixed(2)} USD</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Equivalent TON:</span>
+                <span className="text-cyan-300 font-mono font-bold">{activeTonDeposit.tonAmount} TON</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Transfer Comment / Memo:</span>
+                <span className="text-amber-300 font-mono font-bold select-all">{activeTonDeposit.depositReference}</span>
+              </div>
+              {paymentSuccessTx?.txHash && (
+                <div className="flex justify-between pt-1 border-t border-cyan-900/40">
+                  <span className="text-emerald-400 font-bold">Transaction Hash:</span>
+                  <a
+                    href={`https://tonviewer.com/transaction/${paymentSuccessTx.txHash}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-cyan-400 font-mono underline hover:text-white"
+                  >
+                    {paymentSuccessTx.txHash.slice(0, 8)}...{paymentSuccessTx.txHash.slice(-6)}
+                  </a>
+                </div>
+              )}
+            </div>
+
+            {depositStatus !== 'COMPLETED' && (
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleCheckPaymentStatus(true)}
+                  disabled={isCheckingStatus}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md active:scale-95 disabled:opacity-60"
+                >
+                  {isCheckingStatus ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Checking Chain...</span>
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Check Payment Status</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => openSafeUrl(activeTonDeposit.deepLinkTonkeeper)}
+                  className="py-2.5 px-3 rounded-xl bg-[#0d162b] hover:bg-[#121e3b] border border-cyan-500/30 text-cyan-200 text-xs font-bold transition-all cursor-pointer"
+                >
+                  Reopen Wallet
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Payment Verification / Proof Submission Form */}
         <form onSubmit={handleVerifyDeposit} className="rounded-2xl bg-[#090e1c] border border-cyan-500/30 p-3.5 space-y-3 shadow-xl">
