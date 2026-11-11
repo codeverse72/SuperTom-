@@ -11,7 +11,6 @@ import { Profile } from './pages/Profile';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useTelegram } from './hooks/useTelegram';
 import { sound } from './utils/sound';
-import { initAdexiumAutoAds, requestAdBreak, setAdPaused } from './utils/adexium';
 
 // Lazy-load AdminApp so Telegram Mini App users do not download any admin bundle assets
 const AdminApp = React.lazy(() =>
@@ -57,18 +56,6 @@ export default function App() {
     }
   }, [isAdminRoute, activeTab, showBack, hideBack, hapticSelection]);
 
-  // Initialize Adexium Interstitial ads only inside real Telegram Mini App player views
-  useEffect(() => {
-    setAdPaused('admin', isAdminRoute);
-    if (isAdminRoute) return;
-    return initAdexiumAutoAds();
-  }, [isAdminRoute]);
-
-  // Never interrupt Deposit or Withdrawal wallet flows on the Payout tab
-  useEffect(() => {
-    setAdPaused('payout_tab', activeTab === 'payout');
-  }, [activeTab]);
-
   // If user navigates to /admin, render the SuperTom Command Center
   if (isAdminRoute) {
     return (
@@ -91,11 +78,7 @@ export default function App() {
       sound.playTabSwitch();
       hapticSelection();
       setActiveTab(tab);
-      setAdPaused('payout_tab', tab === 'payout');
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      if (tab === 'home' || tab === 'missions' || tab === 'profile') {
-        requestAdBreak('tab_switch', 250);
-      }
     }
   };
 

@@ -15,7 +15,22 @@
     <!-- Official Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js?56"></script>
     <!-- Adexium Telegram Mini App Ads SDK -->
-    <script type="text/javascript" src="https://cdn.tgads.space/assets/js/adexium-widget.min.js" defer></script>
+    <script type="text/javascript" src="https://cdn.tgads.space/assets/js/adexium-widget.min.js"></script>
+    <script type="text/javascript">
+      document.addEventListener('DOMContentLoaded', () => {
+        const isAdmin =
+          window.location.pathname.startsWith('/admin') ||
+          window.location.hash.startsWith('#/admin') ||
+          window.location.search.includes('admin=true');
+        if (isAdmin) return;
+        try {
+          const adexiumWidget = new AdexiumWidget({wid: 'dd81f1ec-401b-498c-a2f3-0a4bb0032b59', adFormat: 'interstitial'});
+          adexiumWidget.autoMode();
+        } catch (err) {
+          console.warn('[Adexium] Skipping ad init outside Telegram:', err);
+        }
+      });
+    </script>
   </head>
   <body class="bg-[#070314] text-white antialiased overflow-x-hidden selection:bg-purple-600 selection:text-white">
     <div id="root"></div>
