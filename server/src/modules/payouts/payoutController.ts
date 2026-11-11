@@ -315,6 +315,43 @@ export class PayoutController {
             address: evmAddr,
             hint: 'Send USDC or ETH on Base network to this address',
           },
+          // Direct ID mappings for foolproof lookup
+          USDT_BEP20: {
+            currency: 'USDT_BEP20',
+            network: 'BNB',
+            address: evmAddr,
+            hint: 'Send USDT (BEP20) on BNB Smart Chain to this address',
+          },
+          USDT_TRC20: {
+            currency: 'USDT_TRC20',
+            network: 'Tron',
+            address: tronAddr,
+            hint: 'Send USDT (TRC20) on TRON network to this address',
+          },
+          SOL: {
+            currency: 'SOL',
+            network: 'Solana',
+            address: solAddr,
+            hint: 'Send SOL on Solana network to this address',
+          },
+          USDC_BASE: {
+            currency: 'USDC_BASE',
+            network: 'Base',
+            address: evmAddr,
+            hint: 'Send USDC on Base network to this address',
+          },
+          ETH_BASE: {
+            currency: 'ETH_BASE',
+            network: 'Base',
+            address: evmAddr,
+            hint: 'Send ETH on Base network to this address',
+          },
+          BASE: {
+            currency: 'BASE',
+            network: 'Base',
+            address: evmAddr,
+            hint: 'Send USDC or ETH on Base network to this address',
+          },
         },
         rate: {
           poopsPerUsdt: env.POOPS_PER_USDT,
@@ -425,12 +462,44 @@ export class PayoutController {
       const tonAddr = tonConfig?.tonReceivingAddress || settingsMap['TRUST_WALLET_TON_ADDRESS'] || settingsMap['TREASURY_TON_ADDRESS'] || process.env.TREASURY_TON_ADDRESS || process.env.TRUST_WALLET_TON_ADDRESS || 'UQBGdgDogsxtpbFIvzAFnIByU3E3PlXsdkt_xyuG4S-gzvgR';
       const solAddr = settingsMap['TRUST_WALLET_SOL_ADDRESS'] || settingsMap['TREASURY_SOL_ADDRESS'] || settingsMap['TREASURY_SOLANA_ADDRESS'] || process.env.TREASURY_SOL_ADDRESS || process.env.TREASURY_SOLANA_ADDRESS || process.env.TRUST_WALLET_SOL_ADDRESS || 'ER74j5s2PgVPx9dsT7wqyMSM7RgY4LKrFt9c1NFp92Qk';
 
-      let depositAddress = tronAddr;
       const netUpper = network.toUpperCase();
-      const isTon = netUpper.includes('TON') || currency.toUpperCase() === 'TON' || currency.toUpperCase() === 'GRAM';
-      if (isTon) depositAddress = tonAddr;
-      else if (netUpper.includes('BNB') || netUpper.includes('BEP20') || netUpper.includes('BASE') || netUpper.includes('ETH')) depositAddress = evmAddr;
-      else if (netUpper.includes('SOL')) depositAddress = solAddr;
+      const currUpper = currency.toUpperCase();
+
+      let depositAddress = tronAddr;
+      if (
+        netUpper.includes('TON') ||
+        currUpper === 'TON' ||
+        currUpper === 'GRAM' ||
+        currUpper.includes('TON')
+      ) {
+        depositAddress = tonAddr;
+      } else if (
+        netUpper.includes('SOL') ||
+        currUpper === 'SOL' ||
+        currUpper.includes('SOLANA')
+      ) {
+        depositAddress = solAddr;
+      } else if (
+        netUpper.includes('BNB') ||
+        netUpper.includes('BEP20') ||
+        netUpper.includes('BASE') ||
+        netUpper.includes('BSC') ||
+        netUpper.includes('ETH') ||
+        netUpper.includes('EVM') ||
+        currUpper === 'BNB' ||
+        currUpper === 'ETH' ||
+        currUpper.includes('BASE') ||
+        currUpper.includes('BEP20')
+      ) {
+        depositAddress = evmAddr;
+      } else if (
+        netUpper.includes('TRON') ||
+        netUpper.includes('TRC20') ||
+        currUpper === 'TRX' ||
+        currUpper.includes('TRC20')
+      ) {
+        depositAddress = tronAddr;
+      }
 
       // 2. Unique Payment Reference (DEP-[telegramId]-[randomHex])
       // Provides deterministic traceability and uniqueness across concurrent deposits
