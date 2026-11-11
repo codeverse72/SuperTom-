@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, Sparkles, Cookie, ArrowRight, ServerOff } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { BISCUIT_CONFIGS } from '../config/gameConfig';
 import { PLAN_USDT_RATES } from '../pages/Store';
 import { BiscuitSvg } from './BiscuitSvg';
 import { SYSTEM_MESSAGES } from '../config/featureConfig';
+import { requestAdBreak, setAdPaused } from '../utils/adexium';
 
 interface FeedingModalProps {
   isOpen: boolean;
@@ -15,6 +16,11 @@ interface FeedingModalProps {
 export const FeedingModal: React.FC<FeedingModalProps> = ({ isOpen, onClose, onNavigateToStore }) => {
   const { biscuitCatalog, biscuitInventory, feedTom, showToast, setSelectedPlanForDeposit } = useGame();
   const [selectedBiscuitId, setSelectedBiscuitId] = useState<string>('common');
+
+  useEffect(() => {
+    setAdPaused('feeding_modal', isOpen);
+    return () => setAdPaused('feeding_modal', false);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -45,6 +51,8 @@ export const FeedingModal: React.FC<FeedingModalProps> = ({ isOpen, onClose, onN
         'reward'
       );
       onClose();
+      setAdPaused('feeding_modal', false);
+      requestAdBreak('feed_complete', 350);
     }
   };
 

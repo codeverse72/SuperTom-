@@ -6,6 +6,7 @@ import { useGame } from '../context/GameContext';
 import { SPIN_REWARDS, SpinRewardConfig } from '../config/gameConfig';
 import { sound } from '../utils/sound';
 import { SpinClaimResultDto } from '../services/types';
+import { requestAdBreak, setAdPaused } from '../utils/adexium';
 
 export const SpinWheelModal: React.FC = () => {
   const { 
@@ -29,6 +30,11 @@ export const SpinWheelModal: React.FC = () => {
       refreshSpinStatus();
     }
   }, [isWheelOpen, refreshSpinStatus]);
+
+  useEffect(() => {
+    setAdPaused('spin_wheel', isWheelOpen);
+    return () => setAdPaused('spin_wheel', false);
+  }, [isWheelOpen]);
 
   const numSectors = SPIN_REWARDS.length;
   const sectorAngle = 360 / numSectors;
@@ -117,6 +123,8 @@ export const SpinWheelModal: React.FC = () => {
     setWonReward(null);
     setWonClaimData(null);
     setSpinError(null);
+    setAdPaused('spin_wheel', false);
+    requestAdBreak('spin_complete', 350);
   };
 
   if (!isWheelOpen) return null;
