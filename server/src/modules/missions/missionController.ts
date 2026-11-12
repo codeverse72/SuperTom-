@@ -85,7 +85,7 @@ export const SEED_MISSIONS = [
   {
     id: WATCH_ADS_MISSION_ID,
     title: 'Watch 30 Ads Daily',
-    description: 'Watch 30 Adexium ads per day to earn 500 Poops (resets daily at 00:00 UTC)',
+    description: 'Watch 30 sponsored ads per day to earn 500 Poops (resets daily at 00:00 UTC)',
     rewardPoops: WATCH_ADS_REWARD_POOPS,
     category: MissionCategory.DAILY,
     verificationType: 'GAME_ACTION' as const,

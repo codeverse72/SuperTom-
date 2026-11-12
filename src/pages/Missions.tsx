@@ -25,7 +25,7 @@ import { Mission, MissionCategory } from '../config/gameConfig';
 import { formatNumber } from '../utils/probability';
 import { sound } from '../utils/sound';
 import { shareViaTelegram, generateReferralLink } from '../utils/telegram';
-import { showAdexiumRewardedAd } from '../utils/adexiumRewarded';
+import { showRewardedAdWithWaterfall } from '../utils/adsgramAds';
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Send,
@@ -58,7 +58,7 @@ export const Missions: React.FC = () => {
     if (verifyingId) return;
     setVerifyingId(mission.id);
     try {
-      const adResult = await showAdexiumRewardedAd();
+      const adResult = await showRewardedAdWithWaterfall();
       if (!adResult.completed) {
         showToast('Ad Unavailable', adResult.message || 'Please watch the full ad to progress.', 'info');
         return;

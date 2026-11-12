@@ -273,7 +273,7 @@ export const INITIAL_MISSIONS: Mission[] = [
   {
     id: 'm7_watch_30_ads',
     title: 'Watch 30 Ads Daily',
-    description: 'Watch 30 Adexium ads per day to earn 500 Poops (resets daily at 00:00 UTC)',
+    description: 'Watch 30 sponsored ads per day to earn 500 Poops (resets daily at 00:00 UTC)',
     reward: 500,
     category: 'daily',
     icon: 'Tv',
