@@ -8,6 +8,7 @@ import { LedgerService } from '../ledger/ledgerService.js';
 import { env } from '../../config/env.js';
 import { DepositVerificationService } from './depositVerificationService.js';
 import { WithdrawalEntitlementService } from './withdrawalEntitlementService.js';
+import { AutoDepositMonitor } from './autoDepositMonitor.js';
 
 const withdrawalRequestSchema = z.object({
   walletAddress: z.string().min(10, 'Wallet address is required'),
@@ -781,9 +782,14 @@ export class PayoutController {
           amountPoops,
           network,
           txHash: cleanHash,
-          status: 'PENDING',
+          status: 'DETECTING',
           notes: notes ? notes.trim() : `User submitted deposit on ${network}`,
         },
+      });
+
+      // Trigger automated on-chain verification immediately in background
+      AutoDepositMonitor.verifyAndFinalizeDeposit(deposit).catch((err) => {
+        console.warn(`[AutoDeposit] Instant verification background task error for ${deposit.id}:`, err);
       });
 
       sendSuccess(res, {
@@ -793,8 +799,8 @@ export class PayoutController {
         amountPoops: Number(deposit.amountPoops),
         network: deposit.network,
         txHash: deposit.txHash,
-        status: 'Pending' as const,
-        message: 'Deposit proof submitted successfully. Pending admin on-chain verification.',
+        status: 'DETECTING' as const,
+        message: 'Deposit transaction received! Automated blockchain verification is verifying confirmations.',
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Deposit submission failed';

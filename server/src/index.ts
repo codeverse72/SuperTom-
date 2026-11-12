@@ -6,6 +6,7 @@ import { CampaignService } from './modules/campaign/campaignService.js';
 import { PayoutAutomationService } from './modules/payoutAutomation/payoutAutomationService.js';
 import { TelegramBotController } from './modules/telegramBot/telegramBotController.js';
 import { MiningService } from './modules/mining/miningService.js';
+import { AutoDepositMonitor } from './modules/payouts/autoDepositMonitor.js';
 
 async function bootstrap() {
   const app = createApp();
@@ -15,6 +16,9 @@ async function bootstrap() {
 
   // Verify and register Telegram Bot Webhook
   await TelegramBotController.ensureWebhookRegistered();
+
+  // Start Autonomous Blockchain Deposit Detection & Verification System
+  AutoDepositMonitor.start();
 
   const server = app.listen(env.PORT, env.HOST, () => {
     logger.info(`👑 SuperTom Backend Server running on http://${env.HOST}:${env.PORT}`);
@@ -76,6 +80,7 @@ async function bootstrap() {
   // Graceful shutdown handling for Render deployments
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}. Initiating graceful shutdown...`);
+    AutoDepositMonitor.stop();
     clearInterval(campaignSchedulerInterval);
     clearInterval(payoutAutomationInterval);
     clearInterval(miningSchedulerInterval);

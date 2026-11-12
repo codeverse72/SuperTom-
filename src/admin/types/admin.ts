@@ -221,6 +221,9 @@ export interface DepositItem {
   expectedCryptoAmount?: number | null;
   txHash?: string | null;
   status: string;
+  confirmations?: number | null;
+  requiredConfirmations?: number | null;
+  blockNumber?: string | null;
   notes?: string | null;
   createdAt: string;
 }

@@ -12,6 +12,7 @@ import {
 } from '../missions/missionController.js';
 
 export const ADEXIUM_PLACEMENT_ID = 'b073a77c-3963-43dc-a846-99b5382cd341';
+export const DEFAULT_ADSGRAM_BLOCK_ID = process.env.ADSGRAM_BLOCK_ID || '59392';
 export const AD_SESSION_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 export const MIN_VIEW_DURATION_MS = 4000; // Minimum 4 seconds playback before completion
 export const AD_SESSION_COOLDOWN_MS = 8000; // Minimum 8 seconds between new ad sessions
@@ -103,6 +104,10 @@ export class AdController {
         return;
       }
 
+      const { provider: requestedProvider } = (req.body as { provider?: string }) || {};
+      const provider = requestedProvider === 'adexium' ? 'adexium' : 'adsgram';
+      const placementId = provider === 'adexium' ? ADEXIUM_PLACEMENT_ID : DEFAULT_ADSGRAM_BLOCK_ID;
+
       const sessionId = crypto.randomUUID();
       const nonce = crypto.randomBytes(16).toString('hex');
       const expiresAt = new Date(now.getTime() + AD_SESSION_EXPIRY_MS);
@@ -112,8 +117,8 @@ export class AdController {
         data: {
           id: sessionId,
           userId,
-          provider: 'adexium',
-          placementId: ADEXIUM_PLACEMENT_ID,
+          provider,
+          placementId,
           status: 'PENDING',
           isCompleted: false,
           sessionNonce: nonce,
@@ -127,8 +132,8 @@ export class AdController {
       sendSuccess(res, {
         sessionId,
         sessionToken,
-        provider: 'adexium',
-        placementId: ADEXIUM_PLACEMENT_ID,
+        provider,
+        placementId,
         expiresAt: expiresAt.toISOString(),
       });
     } catch (err) {

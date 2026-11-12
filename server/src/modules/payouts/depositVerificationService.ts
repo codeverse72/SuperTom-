@@ -459,6 +459,10 @@ Your account balance has been updated immediately!`;
         throw new Error('This transaction hash has already been credited to another deposit');
       }
 
+      if (!deposit.userId) {
+        throw new Error('Cannot finalize deposit without an associated userId');
+      }
+
       const amountUsdtNum = Number(deposit.amountUsdt);
       const amountPoops = deposit.amountPoops;
 

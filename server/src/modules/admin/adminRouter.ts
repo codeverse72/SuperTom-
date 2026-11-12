@@ -162,6 +162,9 @@ adminRouter.put(
   AdminPayoutController.updateTonConfig
 );
 
+// Blockchain API & RPC Diagnostic Health
+adminRouter.get('/rpc-health', AdminPayoutController.getRpcHealth);
+
 // Ledger & Transaction Management
 adminRouter.get('/transactions', AdminTransactionController.listTransactions);
 

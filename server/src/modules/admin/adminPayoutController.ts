@@ -8,6 +8,7 @@ import { CampaignService } from '../campaign/campaignService.js';
 import { PayoutAutomationService } from '../payoutAutomation/payoutAutomationService.js';
 import { DepositVerificationService } from '../payouts/depositVerificationService.js';
 import { WithdrawalEntitlementService } from '../payouts/withdrawalEntitlementService.js';
+import { AutoDepositMonitor } from '../payouts/autoDepositMonitor.js';
 import { logger } from '../../utils/logger.js';
 import { WithdrawalStatus, DepositStatus } from '@prisma/client';
 
@@ -445,8 +446,8 @@ export class AdminPayoutController {
         deposits: deposits.map((d) => ({
           id: d.id,
           userId: d.userId,
-          telegramId: d.user.telegramId.toString(),
-          username: d.user.username || d.user.firstName,
+          telegramId: d.user ? d.user.telegramId.toString() : 'N/A',
+          username: d.user ? (d.user.username || d.user.firstName) : 'Unidentified User',
           amountPoops: Number(d.amountPoops),
           amountUsdt: Number(d.amountUsdt),
           network: d.network,
@@ -456,6 +457,9 @@ export class AdminPayoutController {
           expectedCryptoAmount: d.expectedCryptoAmount ? Number(d.expectedCryptoAmount) : null,
           txHash: d.txHash,
           status: d.status,
+          confirmations: d.confirmations ?? 0,
+          requiredConfirmations: d.requiredConfirmations ?? 1,
+          blockNumber: d.blockNumber ? d.blockNumber.toString() : null,
           notes: d.notes,
           createdAt: d.createdAt,
         })),
@@ -555,6 +559,12 @@ export class AdminPayoutController {
           throw new Error('Deposit not found');
         }
 
+        if (!deposit.userId) {
+          throw new Error('Cannot manually confirm an unidentified deposit without an associated user');
+        }
+
+        const depositUserId = deposit.userId;
+
         if (!['PENDING', 'WAITING_FOR_PAYMENT', 'PAYMENT_DETECTED', 'CONFIRMING'].includes(deposit.status)) {
           throw new Error(`Cannot confirm deposit with status: ${deposit.status}`);
         }
@@ -579,7 +589,7 @@ export class AdminPayoutController {
 
         // 1. Credit Poops to user balance via Ledger
         await LedgerService.executeBalanceTransaction(tx, {
-          userId: deposit.userId,
+          userId: depositUserId,
           type: 'DEPOSIT_CREDIT',
           amount: deposit.amountPoops,
           referenceId: deposit.id,
@@ -591,7 +601,7 @@ export class AdminPayoutController {
         try {
           await CampaignService.processDepositForCampaign(tx, {
             id: deposit.id,
-            userId: deposit.userId,
+            userId: depositUserId,
             amountUsdt: deposit.amountUsdt,
           });
         } catch (cErr) {
@@ -601,7 +611,7 @@ export class AdminPayoutController {
         // 1.6 Grant withdrawal entitlement ($3 for 3 withdrawals, $5 for unlimited)
         try {
           await WithdrawalEntitlementService.processDepositConfirmed(tx, {
-            userId: deposit.userId,
+            userId: depositUserId,
             amountUsdt: Number(deposit.amountUsdt),
           });
         } catch (wErr) {
@@ -611,7 +621,7 @@ export class AdminPayoutController {
         // 2. Adjust mining speed if a plan boost applies
         if (appliedBoost > 0) {
           await tx.miningSettlement.update({
-            where: { userId: deposit.userId },
+            where: { userId: depositUserId },
             data: {
               boostRatePerHour: { increment: appliedBoost },
               totalRatePerHour: { increment: appliedBoost },
@@ -621,7 +631,7 @@ export class AdminPayoutController {
 
         // 3. Send Telegram confirmation receipt to the user
         try {
-          const userRec = await tx.user.findUnique({ where: { id: deposit.userId } });
+          const userRec = await tx.user.findUnique({ where: { id: depositUserId } });
           if (userRec?.telegramId) {
             await DepositVerificationService.sendTelegramDepositNotification(
               userRec.telegramId,
@@ -934,6 +944,19 @@ export class AdminPayoutController {
       sendSuccess(res, { message: 'TON configuration updated', config: updated });
     } catch (err) {
       sendError(res, 'Failed to update TON config', 500, 'SERVER_ERROR');
+    }
+  }
+
+  /**
+   * GET /api/v1/admin/rpc-health
+   * Blockchain API & RPC Health diagnostic for all supported networks
+   */
+  public static async getRpcHealth(_req: AuthenticatedAdminRequest, res: Response): Promise<void> {
+    try {
+      const health = await AutoDepositMonitor.getRpcHealth();
+      sendSuccess(res, health);
+    } catch (err: unknown) {
+      sendError(res, 'Failed to fetch RPC health metrics', 500, 'SERVER_ERROR');
     }
   }
 }

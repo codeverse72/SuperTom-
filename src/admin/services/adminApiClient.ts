@@ -338,6 +338,10 @@ class AdminApiClient {
     });
   }
 
+  public async getRpcHealth() {
+    return this.request<Record<string, { status: 'healthy' | 'degraded'; latestBlock?: number; latencyMs?: number; error?: string }>>('/rpc-health');
+  }
+
   public async getTreasurySettings() {
     return this.request<{
       trustWalletEvm: string;

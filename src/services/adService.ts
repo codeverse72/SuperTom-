@@ -35,8 +35,8 @@ export const adService = {
   /**
    * Cryptographically creates a backend-verified rewarded ad session.
    */
-  async createSession(): Promise<ApiResponse<CreateAdSessionResponse>> {
-    return apiClient.post<CreateAdSessionResponse>('/ads/session/create', {});
+  async createSession(provider: string = 'adsgram'): Promise<ApiResponse<CreateAdSessionResponse>> {
+    return apiClient.post<CreateAdSessionResponse>('/ads/session/create', { provider });
   },
 
   /**
