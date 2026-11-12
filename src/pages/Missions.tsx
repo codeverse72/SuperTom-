@@ -17,13 +17,15 @@ import {
   Gift,
   ArrowRight,
   RefreshCw,
-  Copy
+  Copy,
+  Tv
 } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { Mission, MissionCategory } from '../config/gameConfig';
 import { formatNumber } from '../utils/probability';
 import { sound } from '../utils/sound';
 import { shareViaTelegram, generateReferralLink } from '../utils/telegram';
+import { showAdexiumRewardedAd } from '../utils/adexiumRewarded';
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Send,
@@ -36,7 +38,8 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Clock,
   Disc,
   Sparkles,
-  Trophy
+  Trophy,
+  Tv
 };
 
 export const Missions: React.FC = () => {
@@ -48,6 +51,23 @@ export const Missions: React.FC = () => {
 
   const isInviteMission = (m: Mission) =>
     m.id === 'm4_invite_3' || m.id === 'm4' || m.id.includes('invite') || m.title.toLowerCase().includes('invite');
+
+  const isWatchAdsMission = (m: Mission) => m.id === 'm7_watch_30_ads';
+
+  const handleWatchAdQuest = async (mission: Mission) => {
+    if (verifyingId) return;
+    setVerifyingId(mission.id);
+    try {
+      const adResult = await showAdexiumRewardedAd();
+      if (!adResult.completed) {
+        showToast('Ad Unavailable', adResult.message || 'Please watch the full ad to progress.', 'info');
+        return;
+      }
+      await verifyMission(mission.id);
+    } finally {
+      setVerifyingId(null);
+    }
+  };
 
   const getReferralUrl = () => {
     const refCode = user?.referralCode || 'TOMVIP';
@@ -111,6 +131,11 @@ export const Missions: React.FC = () => {
       setClaimingId(mission.id);
       claimMission(mission.id);
       setTimeout(() => setClaimingId(null), 1000);
+      return;
+    }
+
+    if (isWatchAdsMission(mission)) {
+      await handleWatchAdQuest(mission);
       return;
     }
 
@@ -474,6 +499,26 @@ export const Missions: React.FC = () => {
                         </>
                       )}
                     </div>
+                  ) : isWatchAdsMission(mission) ? (
+                    <button
+                      onClick={() => handleMissionInteraction(mission)}
+                      disabled={verifyingId === mission.id}
+                      className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white border border-purple-300/40 text-xs font-bold flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
+                    >
+                      {verifyingId === mission.id ? (
+                        <>
+                          <RefreshCw className="w-3 h-3 animate-spin" />
+                          <span>Watching Ad...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Tv className="w-3.5 h-3.5 text-amber-300" />
+                          <span>
+                            {mission.progress > 0 ? `Watch Ad (${mission.progress}/${mission.total})` : 'Watch Ad'}
+                          </span>
+                        </>
+                      )}
+                    </button>
                   ) : mission.status === 'verify' || verifyingId === mission.id ? (
                     <button
                       onClick={() => handleMissionInteraction(mission)}

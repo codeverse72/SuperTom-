@@ -10,6 +10,7 @@ import { LedgerService } from '../ledger/ledgerService.js';
 import { MiningService } from '../mining/miningService.js';
 import { ReferralService } from '../referrals/referralService.js';
 import { WithdrawalEntitlementService } from '../payouts/withdrawalEntitlementService.js';
+import { ensureCoreMissionsSeeded, mapMissionToDto } from '../missions/missionController.js';
 
 const telegramAuthSchema = z.object({
   initData: z.string().min(1, 'initData is required'),
@@ -239,7 +240,8 @@ export class AuthController {
         balance: result.user.poopsBalance,
       });
 
-      // 2. Fetch inventory and active missions in parallel (biscuits are cached in-memory)
+      // 2. Ensure core missions exist, then fetch inventory and active missions in parallel
+      await ensureCoreMissionsSeeded();
       const [inventories, activeBiscuits, missions] = await Promise.all([
         prisma.userInventory.findMany({ where: { userId: result.user.id } }),
         getCachedBiscuitProducts(),
@@ -267,52 +269,17 @@ export class AuthController {
       }
 
       const now = new Date();
-      const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-
-      const mappedMissions = missions.map((m) => {
-        const userProgress = m.userMissions[0];
-        let status = userProgress?.status ? (userProgress.status.toLowerCase() as string) : 'start';
-        let progress = userProgress?.progress ?? 0;
-        let total = userProgress?.total ?? 1;
-
-        const isDaily = m.category === 'DAILY';
-        const claimedBeforeToday = userProgress?.claimedAt && new Date(userProgress.claimedAt) < startOfToday;
-
-        if (isDaily && claimedBeforeToday) {
-          status = 'start';
-          progress = 0;
-        }
-
-        if (status === 'start' || status === 'in_progress') {
-          if (m.id === 'm4_invite_3') {
-            total = 3;
-            progress = Math.min(3, userStats?._count.referees ?? 0);
-            if (progress >= total) status = 'completed';
-          } else if (m.id === 'm5_feed_5_biscuits') {
-            total = 5;
-            progress = Math.min(5, userStats?._count.feedingEvents ?? 0);
-            if (progress >= total) status = 'completed';
-          } else if (m.id === 'm6_reach_level_5') {
-            total = 5;
-            progress = Math.min(5, result.user.level ?? 1);
-            if (progress >= total) status = 'completed';
-          }
-        }
-
-        return {
-          id: m.id,
-          title: m.title,
-          description: m.description,
-          rewardPoops: Number(m.rewardPoops),
-          category: m.category.toLowerCase(),
-          icon: m.icon,
-          badge: m.badge || undefined,
-          actionUrl: m.actionUrl || undefined,
-          status,
-          progress,
-          total,
-        };
-      });
+      const mappedMissions = missions.map((m) =>
+        mapMissionToDto(
+          m,
+          {
+            level: result.user.level,
+            refereesCount: userStats?._count.referees,
+            feedingEventsCount: userStats?._count.feedingEvents,
+          },
+          now
+        )
+      );
 
       const mappedBiscuits = activeBiscuits.map((b) => ({
         id: b.id,

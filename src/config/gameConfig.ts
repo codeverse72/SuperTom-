@@ -271,6 +271,18 @@ export const INITIAL_MISSIONS: Mission[] = [
     badge: 'Daily Treat'
   },
   {
+    id: 'm7_watch_30_ads',
+    title: 'Watch 30 Ads Daily',
+    description: 'Watch 30 Adexium ads per day to earn 500 Poops (resets daily at 00:00 UTC)',
+    reward: 500,
+    category: 'daily',
+    icon: 'Tv',
+    status: 'start',
+    progress: 0,
+    total: 30,
+    badge: 'Daily Ads'
+  },
+  {
     id: 'm8',
     title: 'Stay Active for 1 Hour',
     description: 'Keep your mini app session active and supervise royal digestion',

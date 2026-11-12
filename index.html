@@ -25,6 +25,7 @@
         if (isAdmin) return;
         try {
           const adexiumWidget = new AdexiumWidget({wid: 'dd81f1ec-401b-498c-a2f3-0a4bb0032b59', adFormat: 'interstitial'});
+          window.__adexiumWidget = adexiumWidget;
           adexiumWidget.autoMode();
         } catch (err) {
           console.warn('[Adexium] Skipping ad init outside Telegram:', err);

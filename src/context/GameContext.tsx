@@ -11,7 +11,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { 
   INITIAL_MISSIONS, 
-  Mission, 
+  Mission,
+  MissionStatus,
   SPIN_REWARDS,
   SpinRewardConfig,
   BiscuitConfig,
@@ -113,7 +114,7 @@ interface GameContextType {
     error?: string;
   }>;
   startMission: (missionId: string) => void;
-  verifyMission: (missionId: string) => void;
+  verifyMission: (missionId: string) => Promise<{ verified: boolean; progress?: number; total?: number; status?: MissionStatus } | null>;
   claimMission: (missionId: string) => { success: boolean; reward?: number; title?: string };
   requestWithdrawal: (address: string, amount: number, network?: string) => Promise<{ success: boolean; error?: string; code?: string }>;
   refreshWithdrawals: () => Promise<void>;
@@ -688,22 +689,62 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     verifyMission(missionId);
   };
 
-  const verifyMission = (missionId: string) => {
+  const verifyMission = async (
+    missionId: string
+  ): Promise<{ verified: boolean; progress?: number; total?: number; status?: MissionStatus } | null> => {
     if (!isFeatureAvailable('mission_verification')) {
       triggerNotice('Mission Verification', SYSTEM_MESSAGES.MISSION_VERIFY_UNAVAILABLE, 'Verification Unavailable');
-      return;
+      return null;
     }
 
-    missionService.verifyMission(missionId).then((res) => {
-      if (res.success && res.data) {
-        setMissions((prev) =>
-          prev.map((m) =>
-            m.id === missionId ? { ...m, status: res.data!.verified ? 'completed' : 'verify' } : m
-          )
+    const res = await missionService.verifyMission(missionId);
+    if (res.success && res.data) {
+      const serverMission = res.data.mission;
+      const nextStatus = (serverMission?.status || (res.data.verified ? 'completed' : 'verify')) as MissionStatus;
+
+      setMissions((prev) =>
+        prev.map((m) =>
+          m.id === missionId
+            ? {
+                ...m,
+                status: nextStatus,
+                progress: serverMission?.progress ?? m.progress,
+                total: serverMission?.total ?? m.total,
+              }
+            : m
+        )
+      );
+
+      if (missionId === 'm7_watch_30_ads') {
+        if (res.data.verified) {
+          showToast('Quest Complete!', 'All 30 ads watched today! Claim your 500 Poops reward.', 'reward');
+        } else {
+          showToast(
+            'Ad Watched!',
+            `Progress: ${serverMission?.progress ?? 0}/${serverMission?.total ?? 30} ads today`,
+            'success'
+          );
+        }
+      } else {
+        showToast(
+          'Mission Status',
+          res.data.verified ? 'Mission verified! Ready to claim.' : 'Verification pending.',
+          'info'
         );
-        showToast('Mission Status', res.data.verified ? 'Mission verified! Ready to claim.' : 'Verification pending.', 'info');
       }
-    });
+
+      return {
+        verified: res.data.verified,
+        progress: serverMission?.progress,
+        total: serverMission?.total,
+        status: nextStatus,
+      };
+    }
+
+    if (res.error) {
+      showToast('Verification Failed', res.error.message || 'Could not verify mission right now.', 'error');
+    }
+    return null;
   };
 
   const claimMission = (missionId: string): { success: boolean; reward?: number; title?: string } => {

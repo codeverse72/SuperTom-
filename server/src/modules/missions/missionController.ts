@@ -6,6 +6,15 @@ import { LedgerService } from '../ledger/ledgerService.js';
 import { env } from '../../config/env.js';
 import { MissionCategory } from '@prisma/client';
 
+export const WATCH_ADS_MISSION_ID = 'm7_watch_30_ads';
+export const WATCH_ADS_DAILY_TARGET = 30;
+export const WATCH_ADS_REWARD_POOPS = 500n;
+export const WATCH_ADS_COOLDOWN_MS = 10_000;
+
+export function getUtcDayStart(date: Date = new Date()): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
 // Default standard missions matching frontend initial catalog
 export const SEED_MISSIONS = [
   {
@@ -73,7 +82,130 @@ export const SEED_MISSIONS = [
     icon: 'Crown',
     badge: 'Milestone',
   },
+  {
+    id: WATCH_ADS_MISSION_ID,
+    title: 'Watch 30 Ads Daily',
+    description: 'Watch 30 Adexium ads per day to earn 500 Poops (resets daily at 00:00 UTC)',
+    rewardPoops: WATCH_ADS_REWARD_POOPS,
+    category: MissionCategory.DAILY,
+    verificationType: 'GAME_ACTION' as const,
+    icon: 'Tv',
+    badge: 'Daily Ads',
+  },
 ];
+
+let coreMissionsEnsured = false;
+
+/**
+ * Ensures all core SEED_MISSIONS exist in DB (safe for already-seeded production DBs).
+ */
+export async function ensureCoreMissionsSeeded(): Promise<void> {
+  if (coreMissionsEnsured) return;
+
+  const watchAdsSeed = SEED_MISSIONS.find((m) => m.id === WATCH_ADS_MISSION_ID);
+  const existingIds = await prisma.mission.findMany({
+    select: { id: true },
+  });
+  const present = new Set(existingIds.map((m) => m.id));
+
+  if (present.size === 0) {
+    for (const m of SEED_MISSIONS) {
+      await prisma.mission.upsert({
+        where: { id: m.id },
+        create: m,
+        update: {},
+      });
+    }
+  } else if (watchAdsSeed && !present.has(WATCH_ADS_MISSION_ID)) {
+    await prisma.mission.upsert({
+      where: { id: watchAdsSeed.id },
+      create: watchAdsSeed,
+      update: {},
+    });
+  }
+
+  coreMissionsEnsured = true;
+}
+
+export interface MissionProgressSource {
+  status: string;
+  progress: number;
+  total: number;
+  claimedAt?: Date | string | null;
+  updatedAt?: Date | string | null;
+}
+
+export interface MissionMappingUserStats {
+  level?: number | null;
+  refereesCount?: number;
+  feedingEventsCount?: number;
+}
+
+export function mapMissionToDto(
+  m: {
+    id: string;
+    title: string;
+    description: string;
+    rewardPoops: bigint;
+    category: MissionCategory;
+    icon: string;
+    badge: string | null;
+    actionUrl: string | null;
+    userMissions?: MissionProgressSource[];
+  },
+  userStats: MissionMappingUserStats,
+  now: Date = new Date()
+) {
+  const userProgress = m.userMissions?.[0];
+  const isDaily = m.category === MissionCategory.DAILY;
+  const isWatchAds = m.id === WATCH_ADS_MISSION_ID;
+  const startOfToday = getUtcDayStart(now);
+
+  let status = userProgress?.status ? userProgress.status.toLowerCase() : 'start';
+  let progress = userProgress?.progress ?? 0;
+  let total = isWatchAds ? WATCH_ADS_DAILY_TARGET : (userProgress?.total ?? 1);
+
+  const claimedBeforeToday = Boolean(userProgress?.claimedAt && new Date(userProgress.claimedAt) < startOfToday);
+  const updatedBeforeToday = Boolean(userProgress?.updatedAt && new Date(userProgress.updatedAt) < startOfToday);
+
+  if (isDaily && (claimedBeforeToday || (isWatchAds && updatedBeforeToday))) {
+    status = 'start';
+    progress = 0;
+  }
+
+  if (status === 'start' || status === 'in_progress') {
+    if (m.id === 'm4_invite_3') {
+      total = 3;
+      progress = Math.min(3, userStats.refereesCount ?? 0);
+      if (progress >= total) status = 'completed';
+    } else if (m.id === 'm5_feed_5_biscuits') {
+      total = 5;
+      progress = Math.min(5, userStats.feedingEventsCount ?? 0);
+      if (progress >= total) status = 'completed';
+    } else if (m.id === 'm6_reach_level_5') {
+      total = 5;
+      progress = Math.min(5, userStats.level ?? 1);
+      if (progress >= total) status = 'completed';
+    } else if (isWatchAds) {
+      total = WATCH_ADS_DAILY_TARGET;
+      if (progress >= total) status = 'completed';
+    }
+  }
+
+  return {
+    id: m.id,
+    title: m.title,
+    description: m.description,
+    rewardPoops: Number(m.rewardPoops),
+    category: m.category.toLowerCase() as 'daily' | 'social' | 'special',
+    icon: m.icon,
+    badge: m.badge || undefined,
+    actionUrl: m.actionUrl || undefined,
+    status: status as 'start' | 'in_progress' | 'verify' | 'completed' | 'claimed',
+    progress,
+    total,
+  };
+}
 
 export class MissionController {
   /**
@@ -109,17 +241,7 @@ export class MissionController {
     }
 
     try {
-      // Fast check: seed missions only if table is completely empty
-      const missionCount = await prisma.mission.count();
-      if (missionCount === 0) {
-        for (const m of SEED_MISSIONS) {
-          await prisma.mission.upsert({
-            where: { id: m.id },
-            create: m,
-            update: {},
-          });
-        }
-      }
+      await ensureCoreMissionsSeeded();
 
       const missions = await prisma.mission.findMany({
         where: { isActive: true },
@@ -139,54 +261,18 @@ export class MissionController {
         },
       });
 
-      const response = missions.map((m) => {
-        const userProgress = m.userMissions[0];
-        let status = userProgress?.status ? (userProgress.status.toLowerCase() as string) : 'start';
-        let progress = userProgress?.progress ?? 0;
-        let total = userProgress?.total ?? 1;
-
-        // Daily mission reset logic (resets at 00:00 UTC)
-        const now = new Date();
-        const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-        const isDaily = m.category === MissionCategory.DAILY;
-        const claimedBeforeToday = userProgress?.claimedAt && new Date(userProgress.claimedAt) < startOfToday;
-
-        if (isDaily && claimedBeforeToday) {
-          status = 'start';
-          progress = 0;
-        }
-
-        // Dynamic checks for game actions
-        if (status === 'start' || status === 'in_progress') {
-          if (m.id === 'm4_invite_3') {
-            total = 3;
-            progress = Math.min(3, user?._count.referees ?? 0);
-            if (progress >= total) status = 'completed';
-          } else if (m.id === 'm5_feed_5_biscuits') {
-            total = 5;
-            progress = Math.min(5, user?._count.feedingEvents ?? 0);
-            if (progress >= total) status = 'completed';
-          } else if (m.id === 'm6_reach_level_5') {
-            total = 5;
-            progress = Math.min(5, user?.level ?? 1);
-            if (progress >= total) status = 'completed';
-          }
-        }
-
-        return {
-          id: m.id,
-          title: m.title,
-          description: m.description,
-          rewardPoops: Number(m.rewardPoops),
-          category: m.category.toLowerCase() as 'daily' | 'social' | 'special',
-          icon: m.icon,
-          badge: m.badge || undefined,
-          actionUrl: m.actionUrl || undefined,
-          status: status as 'start' | 'in_progress' | 'verify' | 'completed' | 'claimed',
-          progress,
-          total,
-        };
-      });
+      const now = new Date();
+      const response = missions.map((m) =>
+        mapMissionToDto(
+          m,
+          {
+            level: user?.level,
+            refereesCount: user?._count.referees,
+            feedingEventsCount: user?._count.feedingEvents,
+          },
+          now
+        )
+      );
 
       sendSuccess(res, response);
     } catch {
@@ -208,12 +294,118 @@ export class MissionController {
     }
 
     try {
+      await ensureCoreMissionsSeeded();
+
       const mission = await prisma.mission.findUnique({
         where: { id: missionId },
       });
 
       if (!mission) {
         sendError(res, 'Mission not found', 404, 'MISSION_NOT_FOUND');
+        return;
+      }
+
+      if (mission.id === WATCH_ADS_MISSION_ID) {
+        const now = new Date();
+        const startOfToday = getUtcDayStart(now);
+
+        const adResult = await prisma.$transaction(async (tx) => {
+          const existing = await tx.userMission.findUnique({
+            where: { userId_missionId: { userId, missionId } },
+          });
+
+          if (
+            existing &&
+            existing.status === 'CLAIMED' &&
+            existing.claimedAt &&
+            new Date(existing.claimedAt) >= startOfToday
+          ) {
+            return { errorStatus: 400, errorCode: 'MISSION_ALREADY_CLAIMED', errorMsg: 'Daily ad quest already claimed today. Come back after 00:00 UTC!' } as const;
+          }
+
+          const isFromPreviousDay =
+            Boolean(existing?.claimedAt && new Date(existing.claimedAt) < startOfToday) ||
+            Boolean(existing?.updatedAt && new Date(existing.updatedAt) < startOfToday);
+
+          const currentProgress = !existing || isFromPreviousDay ? 0 : existing.progress;
+
+          if (currentProgress >= WATCH_ADS_DAILY_TARGET) {
+            const updated = await tx.userMission.upsert({
+              where: { userId_missionId: { userId, missionId } },
+              create: {
+                userId,
+                missionId,
+                status: 'COMPLETED',
+                progress: WATCH_ADS_DAILY_TARGET,
+                total: WATCH_ADS_DAILY_TARGET,
+              },
+              update: {
+                status: 'COMPLETED',
+                progress: WATCH_ADS_DAILY_TARGET,
+                total: WATCH_ADS_DAILY_TARGET,
+                ...(isFromPreviousDay ? { claimedAt: null } : {}),
+              },
+            });
+            return { verified: true, missionProgress: updated.progress, newStatus: updated.status } as const;
+          }
+
+          if (
+            existing &&
+            !isFromPreviousDay &&
+            currentProgress > 0 &&
+            now.getTime() - new Date(existing.updatedAt).getTime() < WATCH_ADS_COOLDOWN_MS
+          ) {
+            return {
+              errorStatus: 429,
+              errorCode: 'AD_WATCH_COOLDOWN',
+              errorMsg: 'Please finish watching the current ad before continuing.',
+            } as const;
+          }
+
+          const nextProgress = Math.min(WATCH_ADS_DAILY_TARGET, currentProgress + 1);
+          const nextVerified = nextProgress >= WATCH_ADS_DAILY_TARGET;
+          const nextStatus = nextVerified ? 'COMPLETED' : 'IN_PROGRESS';
+
+          await tx.userMission.upsert({
+            where: { userId_missionId: { userId, missionId } },
+            create: {
+              userId,
+              missionId,
+              status: nextStatus,
+              progress: nextProgress,
+              total: WATCH_ADS_DAILY_TARGET,
+            },
+            update: {
+              status: nextStatus,
+              progress: nextProgress,
+              total: WATCH_ADS_DAILY_TARGET,
+              ...(isFromPreviousDay ? { claimedAt: null } : {}),
+            },
+          });
+
+          return { verified: nextVerified, missionProgress: nextProgress, newStatus: nextStatus } as const;
+        });
+
+        if ('errorMsg' in adResult && adResult.errorMsg) {
+          sendError(res, adResult.errorMsg, adResult.errorStatus, adResult.errorCode);
+          return;
+        }
+
+        sendSuccess(res, {
+          verified: adResult.verified,
+          mission: {
+            id: mission.id,
+            title: mission.title,
+            description: mission.description,
+            rewardPoops: Number(mission.rewardPoops),
+            category: mission.category.toLowerCase(),
+            icon: mission.icon,
+            badge: mission.badge || undefined,
+            status: adResult.newStatus.toLowerCase(),
+            progress: adResult.missionProgress,
+            total: WATCH_ADS_DAILY_TARGET,
+          },
+        });
         return;
       }
 
@@ -321,16 +513,26 @@ export class MissionController {
         }
 
         const now = new Date();
-        const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+        const startOfToday = getUtcDayStart(now);
         const isDaily = userMission.mission.category === MissionCategory.DAILY;
+        const isWatchAds = userMission.mission.id === WATCH_ADS_MISSION_ID;
         const claimedToday = userMission.claimedAt && new Date(userMission.claimedAt) >= startOfToday;
+        const updatedBeforeToday = new Date(userMission.updatedAt) < startOfToday;
 
         if (userMission.status === 'CLAIMED' && (!isDaily || claimedToday)) {
           throw new Error('Mission reward has already been claimed');
         }
 
-        if (userMission.status !== 'COMPLETED' && (!isDaily || userMission.status === 'START')) {
+        if (isDaily && ((userMission.claimedAt && !claimedToday) || (isWatchAds && updatedBeforeToday))) {
+          throw new Error('Daily mission reset at 00:00 UTC. Complete it today to claim.');
+        }
+
+        if (userMission.status !== 'COMPLETED') {
           throw new Error('Mission conditions not yet fulfilled');
+        }
+
+        if (isWatchAds && userMission.progress < WATCH_ADS_DAILY_TARGET) {
+          throw new Error('Watch all 30 ads today before claiming this reward');
         }
 
         // 1. Mark mission claimed
