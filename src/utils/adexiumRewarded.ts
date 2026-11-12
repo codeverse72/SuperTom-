@@ -205,7 +205,17 @@ export async function showAdexiumRewardedAd(): Promise<RewardedAdResult> {
         // Placement #15008 is an Interstitial format. We send motivated: false so Adexium's
         // bid engine fulfills the ad without rejecting it for policy violation.
         if (typeof widget!.requestAd === 'function') {
-          const ads = await widget!.requestAd('interstitial', false);
+          let ads = await widget!.requestAd('interstitial', false);
+
+          // If first auction returned no fill, wait 1.2s and retry once in case DSP auction was in cooldown
+          if ((!ads || ads.length === 0) && !settled) {
+            console.log('[Adexium] First attempt empty, retrying bid auction...');
+            await new Promise((r) => setTimeout(r, 1200));
+            if (!settled) {
+              ads = await widget!.requestAd('interstitial', false);
+            }
+          }
+
           if (Array.isArray(ads) && ads.length > 0) {
             showAd(ads, (ads[0] as any)?.adFormat || 'interstitial');
           }
