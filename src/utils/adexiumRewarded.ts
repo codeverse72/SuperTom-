@@ -44,19 +44,13 @@ function getAdexiumRewardedWidget(): AdexiumWidgetInstance | null {
     (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ADEXIUM_REWARDED_WID?.trim() ||
     DEFAULT_ADEXIUM_WID;
 
-  if (configuredWid === DEFAULT_ADEXIUM_WID && window.__adexiumWidget) {
-    return window.__adexiumWidget;
-  }
-
+  // Keep a dedicated widget instance separate from autoMode() so background
+  // auto-fetch ticks (every 10s) cannot emit stray 'noAdFound'/'adReceived' events.
   if (!window.__adexiumRewardedWidget) {
-    const widget = new window.AdexiumWidget({
+    window.__adexiumRewardedWidget = new window.AdexiumWidget({
       wid: configuredWid,
       adFormat: 'interstitial',
     });
-    window.__adexiumRewardedWidget = widget;
-    if (configuredWid === DEFAULT_ADEXIUM_WID) {
-      window.__adexiumWidget = widget;
-    }
   }
 
   return window.__adexiumRewardedWidget;
