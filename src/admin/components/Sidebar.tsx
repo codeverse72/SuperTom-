@@ -15,6 +15,7 @@ import {
   Crown,
   Radio,
   Coins,
+  Megaphone,
 } from 'lucide-react';
 import { useAdminAuth } from '../context/AdminAuthContext';
 import { Badge } from './Badge';
@@ -30,6 +31,7 @@ export type AdminTab =
   | 'payoutAutomation'
   | 'tonConfig'
   | 'campaign'
+  | 'broadcast'
   | 'transactions'
   | 'referrals'
   | 'audit';
@@ -53,6 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab }) => {
     { id: 'payoutAutomation' as AdminTab, label: 'Payout Automation', icon: Radio },
     { id: 'tonConfig' as AdminTab, label: 'TON Configuration', icon: Coins },
     { id: 'campaign' as AdminTab, label: '5K Celebration', icon: Flame },
+    { id: 'broadcast' as AdminTab, label: 'User Broadcast', icon: Megaphone },
     { id: 'transactions' as AdminTab, label: 'Ledger Audit', icon: FileText },
     { id: 'referrals' as AdminTab, label: 'Referral Tree', icon: Network },
     { id: 'audit' as AdminTab, label: 'Admin Audit Trail', icon: ShieldAlert },

@@ -757,6 +757,79 @@ class AdminApiClient {
       }>;
     }>('/payout-automation/analytics');
   }
+
+  // === Telegram Broadcast & Wake-Up Center ===
+  public async getBroadcastOverview() {
+    return this.request<{
+      botConfigured: boolean;
+      templates: Array<{
+        id: string;
+        name: string;
+        category: 'wake-up' | 'engagement' | 'quests' | 'growth' | 'announcement';
+        badge: string;
+        defaultAudience: 'all_active' | 'inactive_24h' | 'inactive_72h' | 'inactive_7d' | 'low_balance';
+        ctaText: string;
+        includeSecondaryButtons: boolean;
+        message: string;
+      }>;
+      audienceCounts: Record<'all_active' | 'inactive_24h' | 'inactive_72h' | 'inactive_7d' | 'low_balance', number>;
+      activeJob: any | null;
+      recentJobs: any[];
+      history: Array<{
+        id: string;
+        jobId?: string;
+        action: string;
+        adminName: string;
+        adminEmail: string;
+        createdAt: string;
+        audience?: string;
+        templateId?: string;
+        totalTargets?: number;
+        sentCount?: number;
+        failedCount?: number;
+        blockedCount?: number;
+        status?: string;
+        messagePreview?: string;
+      }>;
+    }>('/broadcast/overview');
+  }
+
+  public async sendBroadcastTest(payload: {
+    targetIdentifier: string;
+    message: string;
+    includeMiniAppButton: boolean;
+    ctaText?: string;
+    includeSecondaryButtons: boolean;
+  }) {
+    return this.request<{ message: string; chatId: string }>('/broadcast/test', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  public async sendBroadcast(payload: {
+    audience: 'all_active' | 'inactive_24h' | 'inactive_72h' | 'inactive_7d' | 'low_balance';
+    message: string;
+    templateId?: string | null;
+    includeMiniAppButton: boolean;
+    ctaText?: string;
+    includeSecondaryButtons: boolean;
+  }) {
+    return this.request<{ job: any }>('/broadcast/send', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  public async getBroadcastJobStatus(jobId: string) {
+    return this.request<{ job: any }>(`/broadcast/jobs/${jobId}`);
+  }
+
+  public async cancelBroadcastJob(jobId: string) {
+    return this.request<{ job: any; message: string }>(`/broadcast/jobs/${jobId}/cancel`, {
+      method: 'POST',
+    });
+  }
 }
 
 export const adminApi = new AdminApiClient();

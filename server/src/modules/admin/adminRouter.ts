@@ -12,6 +12,7 @@ import { AdminTransactionController } from './adminTransactionController.js';
 import { AdminReferralController } from './adminReferralController.js';
 import { AdminAuditLogController } from './adminAuditLogController.js';
 import { AdminCampaignController } from './adminCampaignController.js';
+import { AdminBroadcastController } from './adminBroadcastController.js';
 import { PayoutAutomationController } from '../payoutAutomation/payoutAutomationController.js';
 
 export const adminRouter = Router();
@@ -258,5 +259,24 @@ adminRouter.post(
   PayoutAutomationController.testSendAnnouncement
 );
 adminRouter.get('/payout-automation/analytics', PayoutAutomationController.getAnalytics);
+
+// Telegram User Broadcast & Wake-Up Center
+adminRouter.get('/broadcast/overview', AdminBroadcastController.getOverview);
+adminRouter.post(
+  '/broadcast/test',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  AdminBroadcastController.sendTestMessage
+);
+adminRouter.post(
+  '/broadcast/send',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  AdminBroadcastController.sendBroadcast
+);
+adminRouter.get('/broadcast/jobs/:id', AdminBroadcastController.getJobStatus);
+adminRouter.post(
+  '/broadcast/jobs/:id/cancel',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  AdminBroadcastController.cancelJob
+);
 
 

@@ -13,6 +13,7 @@ import { PayoutsPage } from './pages/PayoutsPage';
 import { PayoutAutomationPage } from './pages/PayoutAutomationPage';
 import { TonConfigPage } from './pages/TonConfigPage';
 import { CampaignPage } from './pages/CampaignPage';
+import { BroadcastPage } from './pages/BroadcastPage';
 import { TransactionsPage } from './pages/TransactionsPage';
 import { ReferralsPage } from './pages/ReferralsPage';
 import { AuditLogsPage } from './pages/AuditLogsPage';
@@ -80,6 +81,10 @@ const AdminContent: React.FC = () => {
       title: '5K Members Achievement Celebration',
       subtitle: 'Manage 30% instant cashback, tiered daily rewards, participant schedules, and batch disbursements.',
     },
+    broadcast: {
+      title: 'User Broadcast & Wake-Up Center',
+      subtitle: 'Send targeted Telegram bot announcements and pre-built wake-up templates to re-engage players.',
+    },
     transactions: {
       title: 'Double-Entry Audit Ledger',
       subtitle: 'Immutable record of every balance debit, credit, and administrative adjustment.',
@@ -117,6 +122,7 @@ const AdminContent: React.FC = () => {
           {activeTab === 'payoutAutomation' && <PayoutAutomationPage />}
           {activeTab === 'tonConfig' && <TonConfigPage />}
           {activeTab === 'campaign' && <CampaignPage />}
+          {activeTab === 'broadcast' && <BroadcastPage />}
           {activeTab === 'transactions' && <TransactionsPage />}
           {activeTab === 'referrals' && <ReferralsPage />}
           {activeTab === 'audit' && <AuditLogsPage />}
