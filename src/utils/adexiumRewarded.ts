@@ -201,7 +201,24 @@ export async function showAdexiumRewardedAd(): Promise<RewardedAdResult> {
 
     (async () => {
       try {
-        console.log('[Adexium] Requesting ad for placement #15008...');
+        console.log('[Adexium] Preparing clean ad state for placement #15008...');
+
+        // Clear any previous showStates or rate limit locks in Adexium's afV2 fraud validator
+        try {
+          const w = widget as any;
+          if (w.afV2) {
+            if (typeof w.afV2.reset === 'function') w.afV2.reset();
+            if (typeof w.afV2.clearShowState === 'function') w.afV2.clearShowState(DEFAULT_ADEXIUM_WID);
+          }
+          localStorage.removeItem('tg-ads-co-interstitialuserData');
+          localStorage.removeItem('tg-ads-co-interstitiallastAdViewed');
+          if (typeof w.initTelegram === 'function') {
+            w.initTelegram();
+          }
+        } catch (e) {
+          console.warn('[Adexium] State reset error:', e);
+        }
+
         // Placement #15008 is an Interstitial format. We send motivated: false so Adexium's
         // bid engine fulfills the ad without rejecting it for policy violation.
         if (typeof widget!.requestAd === 'function') {
