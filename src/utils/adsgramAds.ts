@@ -50,6 +50,15 @@ function getAdexiumRewardedWidOverride(): string | undefined {
     ?.VITE_ADEXIUM_REWARDED_WID?.trim();
 }
 
+function getPrimaryAdProvider(): 'adexium' | 'adsgram' {
+  const envVal = (import.meta as { env?: Record<string, string | undefined> }).env
+    ?.VITE_PRIMARY_AD_PROVIDER?.toLowerCase().trim();
+  if (envVal === 'adsgram') return 'adsgram';
+  // Default to Adexium placement #15008 (verified Active) so users can watch ads immediately
+  // without seeing the Adsgram moderation popup while unit 59392 is reviewed.
+  return 'adexium';
+}
+
 /**
  * Triggers an Adsgram Rewarded Video ad (`blockId: "59392"` by default).
  * Resolves `completed: true` only if the user finishes watching the ad (`result.done === true`).
@@ -132,35 +141,62 @@ export async function showAdsgramRewardedAd(): Promise<RewardedAdRunResult> {
 
 /**
  * Primary Watch-Ads waterfall:
- * 1. Runs Adsgram Reward block (`59392` by default).
- * 2. Only falls back to Adexium rewarded if `VITE_ADEXIUM_REWARDED_WID` is explicitly set
- *    (keeping non-rewarded Adexium Interstitial `#14982` compliant with Adexium rules).
+ * By default runs Adexium active placement #15008 so ads play immediately while Adsgram
+ * unit 59392 finishes moderation. Can be set to 'adsgram' via VITE_PRIMARY_AD_PROVIDER.
  */
 export async function showRewardedAdWithWaterfall(): Promise<RewardedAdRunResult> {
+  const primary = getPrimaryAdProvider();
+
+  if (primary === 'adexium') {
+    const adexiumRes = await showAdexiumRewardedAd();
+    if (adexiumRes.completed) {
+      return { completed: true, provider: 'adexium' };
+    }
+
+    if (adexiumRes.reason === 'closed_early' || adexiumRes.reason === 'busy') {
+      return {
+        completed: false,
+        provider: 'adexium',
+        reason: adexiumRes.reason === 'closed_early' ? 'skipped' : 'busy',
+        message: adexiumRes.message || 'Please finish the ad to earn quest progress.',
+      };
+    }
+
+    // Fallback to Adsgram if Adexium had no inventory or SDK issue
+    const adsgramRes = await showAdsgramRewardedAd();
+    if (adsgramRes.completed) {
+      return adsgramRes;
+    }
+
+    return {
+      completed: false,
+      provider: 'adexium',
+      reason: adexiumRes.reason === 'no_ad' ? 'no_ad' : 'error',
+      message: adexiumRes.message || adsgramRes.message || 'No sponsored ads are available right now. Please try again shortly.',
+    };
+  }
+
+  // Primary: Adsgram
   const adsgramRes = await showAdsgramRewardedAd();
   if (adsgramRes.completed) {
     return adsgramRes;
   }
 
-  // If user skipped/closed early or another ad is already playing, do not trigger fallback
   if (adsgramRes.reason === 'skipped' || adsgramRes.reason === 'busy') {
     return adsgramRes;
   }
 
-  const dedicatedAdexiumWid = getAdexiumRewardedWidOverride();
-  if (dedicatedAdexiumWid) {
-    const adexiumRes = await showAdexiumRewardedAd();
-    if (adexiumRes.completed) {
-      return { completed: true, provider: 'adexium' };
-    }
-    return {
-      completed: false,
-      provider: 'adexium',
-      reason: adexiumRes.reason === 'closed_early' ? 'skipped' : 'no_ad',
-      message: adexiumRes.message || adsgramRes.message,
-    };
+  // Fallback to Adexium
+  const adexiumRes = await showAdexiumRewardedAd();
+  if (adexiumRes.completed) {
+    return { completed: true, provider: 'adexium' };
   }
 
-  return adsgramRes;
+  return {
+    completed: false,
+    provider: 'adexium',
+    reason: adexiumRes.reason === 'closed_early' ? 'skipped' : 'no_ad',
+    message: adexiumRes.message || adsgramRes.message,
+  };
 }
 
