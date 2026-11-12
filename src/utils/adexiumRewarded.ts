@@ -7,8 +7,9 @@
 export interface AdexiumWidgetInstance {
   on: (event: string, cb: (...args: any[]) => void) => void;
   off: (event: string, cb: (...args: any[]) => void) => void;
-  requestRewardedAd: (adFormat?: string) => void;
-  displayAd: (ad: unknown) => void;
+  requestAd?: (adFormat?: string, motivated?: boolean) => Promise<unknown[]>;
+  requestRewardedAd?: (adFormat?: string) => void;
+  displayAd: (ad: unknown, adFormat?: string) => void;
   autoMode: () => void;
 }
 
@@ -19,6 +20,7 @@ export interface AdexiumWidgetConstructor {
 declare global {
   interface Window {
     AdexiumWidget?: AdexiumWidgetConstructor;
+    adexiumWidget?: AdexiumWidgetInstance;
     __adexiumWidget?: AdexiumWidgetInstance;
     __adexiumRewardedWidget?: AdexiumWidgetInstance;
   }
@@ -40,60 +42,59 @@ function getAdexiumRewardedWidget(): AdexiumWidgetInstance | null {
     return null;
   }
 
-  if (window.__adexiumRewardedWidget) {
-    return window.__adexiumRewardedWidget;
+  // 1. Strictly reuse the single verified widget created in index.html to avoid duplicate session fraud checks
+  if (window.__adexiumWidget) {
+    return window.__adexiumWidget;
+  }
+  if (window.adexiumWidget) {
+    return window.adexiumWidget;
   }
 
-  const configuredWid =
-    (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ADEXIUM_REWARDED_WID?.trim() ||
-    DEFAULT_ADEXIUM_WID;
-
+  // 2. Only if not yet created, initialize once as window.__adexiumWidget
   if (window.AdexiumWidget) {
     try {
-      window.__adexiumRewardedWidget = new window.AdexiumWidget({
-        wid: configuredWid,
+      const widget = new window.AdexiumWidget({
+        wid: DEFAULT_ADEXIUM_WID,
         adFormat: 'interstitial',
       });
-      return window.__adexiumRewardedWidget;
-    } catch {
-      if (window.__adexiumWidget) {
-        return window.__adexiumWidget;
-      }
+      window.__adexiumWidget = widget;
+      return widget;
+    } catch (err) {
+      console.warn('[Adexium] Singleton creation failed:', err);
     }
   }
 
-  return (window.__adexiumWidget as AdexiumWidgetInstance) || null;
+  return null;
 }
 
 /**
- * Triggers an Adexium rewarded interstitial ad and waits for completion.
+ * Triggers an Adexium interstitial ad on demand for the Daily Watch Ads mission and waits for completion.
  */
-export function showAdexiumRewardedAd(): Promise<RewardedAdResult> {
+export async function showAdexiumRewardedAd(): Promise<RewardedAdResult> {
   if (activeAdPromise) {
-    return Promise.resolve({
+    return {
       completed: false,
       reason: 'busy',
       message: 'An ad is already loading or playing.',
-    });
+    };
   }
 
-  let widget: AdexiumWidgetInstance | null = null;
-  try {
-    widget = getAdexiumRewardedWidget();
-  } catch (err) {
-    return Promise.resolve({
-      completed: false,
-      reason: 'sdk_unavailable',
-      message: err instanceof Error ? err.message : 'Unable to initialize Adexium ads in this environment.',
-    });
+  let widget = getAdexiumRewardedWidget();
+  if (!widget) {
+    // Wait up to 3s for SDK hydration inside Telegram WebView
+    for (let i = 0; i < 6; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      widget = getAdexiumRewardedWidget();
+      if (widget) break;
+    }
   }
 
-  if (!widget || typeof widget.requestRewardedAd !== 'function') {
-    return Promise.resolve({
+  if (!widget) {
+    return {
       completed: false,
       reason: 'sdk_unavailable',
-      message: 'Ad service is still loading or blocked. Please disable ad blockers and try again inside Telegram.',
-    });
+      message: 'Ad service is connecting. Please wait a moment and tap again inside Telegram.',
+    };
   }
 
   activeAdPromise = new Promise<RewardedAdResult>((resolve) => {
@@ -128,16 +129,24 @@ export function showAdexiumRewardedAd(): Promise<RewardedAdResult> {
       });
     }, AD_REQUEST_TIMEOUT_MS);
 
-    const onAdReceived = (ad: unknown) => {
+    let adShown = false;
+    const showAd = (ad: unknown, format?: string) => {
+      if (adShown) return;
+      adShown = true;
       try {
-        widget!.displayAd(ad);
-      } catch {
+        widget!.displayAd(ad, format || 'interstitial');
+      } catch (e) {
+        console.warn('[Adexium] displayAd error:', e);
         finish({
           completed: false,
           reason: 'error',
           message: 'Failed to display the ad. Please try again.',
         });
       }
+    };
+
+    const onAdReceived = (ad: unknown, format?: string) => {
+      showAd(ad, format);
     };
 
     const onAdDisplayed = () => {
@@ -190,15 +199,34 @@ export function showAdexiumRewardedAd(): Promise<RewardedAdResult> {
     widget!.on('noAdFound', onNoAdFound);
     widget!.on('requestAdError', onRequestError);
 
-    try {
-      widget!.requestRewardedAd('interstitial');
-    } catch {
-      finish({
-        completed: false,
-        reason: 'error',
-        message: 'Failed to request an ad. Please try again.',
-      });
-    }
+    (async () => {
+      try {
+        console.log('[Adexium] Requesting ad for placement #15008...');
+        // Placement #15008 is an Interstitial format. We send motivated: false so Adexium's
+        // bid engine fulfills the ad without rejecting it for policy violation.
+        if (typeof widget!.requestAd === 'function') {
+          const ads = await widget!.requestAd('interstitial', false);
+          if (Array.isArray(ads) && ads.length > 0) {
+            showAd(ads, (ads[0] as any)?.adFormat || 'interstitial');
+          }
+        } else if (typeof widget!.requestRewardedAd === 'function') {
+          widget!.requestRewardedAd('interstitial');
+        } else {
+          finish({
+            completed: false,
+            reason: 'sdk_unavailable',
+            message: 'Ad service is not ready. Please try again shortly.',
+          });
+        }
+      } catch (err) {
+        console.warn('[Adexium] Request error:', err);
+        finish({
+          completed: false,
+          reason: 'error',
+          message: 'Failed to request an ad. Please try again.',
+        });
+      }
+    })();
   });
 
   return activeAdPromise;
