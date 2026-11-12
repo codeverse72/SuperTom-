@@ -40,7 +40,7 @@ const envSchema = z.object({
   POOPS_PER_USDT: z.string().default('2000').transform((val) => parseInt(val, 10)),
   MIN_WITHDRAWAL_POOPS: z.string().default('2000').transform((val) => parseInt(val, 10)),
   MINING_BASE_RATE: z.string().default('10').transform((val) => parseInt(val, 10)),
-  REFERRAL_SIGNUP_BONUS_POOPS: z.string().default('2000').transform((val) => parseInt(val, 10)),
+  REFERRAL_SIGNUP_BONUS_POOPS: z.string().default('450').transform((val) => parseInt(val, 10)),
   REFERRAL_COMMISSION_PERCENT: z.string().default('10').transform((val) => parseInt(val, 10)),
 });
 

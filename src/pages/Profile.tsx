@@ -312,7 +312,7 @@ export const Profile: React.FC = () => {
             </div>
             <div className="py-4 space-y-3">
               <p className="text-xs text-purple-200/90 leading-relaxed">
-                Earn <strong className="text-amber-300">2,000 Poops</strong> for every friend who joins SuperTom via your referral link, plus 10% of their biscuit production!
+                Earn <strong className="text-amber-300">450 Poops</strong> for every friend who joins SuperTom via your referral link, plus 10% of their biscuit production!
               </p>
 
               <div className="p-3 rounded-2xl bg-purple-950/80 border border-purple-500/30 flex items-center justify-between gap-2">

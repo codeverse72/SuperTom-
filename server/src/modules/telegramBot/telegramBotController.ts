@@ -195,7 +195,7 @@ export class TelegramBotController {
           validReferralCode = rawRefCode;
           referrerName = referrer.firstName || (referrer.username ? `@${referrer.username}` : 'a fellow feline miner');
 
-          // Immediately credit Referrer with +2,000 Poops and update in Supabase!
+          // Immediately credit Referrer with configured referral bonus (default +450 Poops) and update in Supabase!
           await ReferralService.attributeAndCreditReferral({
             referrerId: referrer.id,
             refereeId: user.id,
@@ -203,7 +203,7 @@ export class TelegramBotController {
             refereeTelegramId: fromId,
           });
 
-          logger.info(`[TelegramBot] Referrer ${referrer.id} immediately credited +2,000 Poops for referee ${user.id} opening bot via /start!`);
+          logger.info(`[TelegramBot] Referrer ${referrer.id} immediately credited +${env.REFERRAL_SIGNUP_BONUS_POOPS} Poops for referee ${user.id} opening bot via /start!`);
         }
       } catch (refErr) {
         logger.warn('[TelegramBot] Referral lookup failed:', refErr);

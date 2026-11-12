@@ -36,6 +36,12 @@ export class ReferralService {
       return { success: false, reason: 'SELF_REFERRAL_NOT_ALLOWED' };
     }
 
+    const referralRewardPoops =
+      Number.isSafeInteger(env.REFERRAL_SIGNUP_BONUS_POOPS) && env.REFERRAL_SIGNUP_BONUS_POOPS > 0
+        ? env.REFERRAL_SIGNUP_BONUS_POOPS
+        : 450;
+    const referralRewardBigInt = BigInt(referralRewardPoops);
+
     try {
       // 2. Check if a Referral record already exists for this referee (idempotency check)
       const existingReferral = await prisma.referral.findUnique({
@@ -64,18 +70,18 @@ export class ReferralService {
           data: {
             referrerId,
             refereeId,
-            rewardPoops: 2000n,
+            rewardPoops: referralRewardBigInt,
             commissionPercent: 10,
             totalCommissionPoops: 0n,
             status: 'REWARDED',
           },
         });
 
-        // Credit Referrer with 2,000 Poops bonus via double-entry Ledger
+        // Credit Referrer with configured referral bonus (default 450 Poops) via double-entry Ledger
         const { balanceAfter: referrerBalance } = await LedgerService.executeBalanceTransaction(tx, {
           userId: referrerId,
           type: 'REFERRAL_BONUS',
-          amount: 2000n,
+          amount: referralRewardBigInt,
           description: `Referral bonus: ${refereeName || 'Friend'} opened SuperTom via your invite`,
           idempotencyKey: `ref_bonus_${referrerId}_${refereeId}`,
         });
@@ -136,18 +142,19 @@ export class ReferralService {
         };
       });
 
+      const formattedReward = referralRewardPoops.toLocaleString('en-US');
       logger.info(
-        `[ReferralService] Referral successfully rewarded! Referrer ${referrerId} credited +2,000 Poops (new bal: ${result.referrerBalance}). Referee ${refereeId} credited +1,000 Poops (new bal: ${result.refereeBalance}). Total referees: ${result.totalReferees}`
+        `[ReferralService] Referral successfully rewarded! Referrer ${referrerId} credited +${formattedReward} Poops (new bal: ${result.referrerBalance}). Referee ${refereeId} credited +1,000 Poops (new bal: ${result.refereeBalance}). Total referees: ${result.totalReferees}`
       );
 
       // 4. Send instant Telegram celebratory notification to the Referrer
-      this.notifyReferrerViaTelegram(referrerId, refereeName, result.totalReferees).catch((err) => {
+      this.notifyReferrerViaTelegram(referrerId, refereeName, result.totalReferees, referralRewardPoops).catch((err) => {
         logger.warn('[ReferralService] Telegram referrer alert dispatch failed (non-fatal):', err);
       });
 
       return {
         success: true,
-        rewardPoops: 2000,
+        rewardPoops: referralRewardPoops,
         totalReferees: result.totalReferees,
       };
     } catch (error) {
@@ -162,7 +169,8 @@ export class ReferralService {
   private static async notifyReferrerViaTelegram(
     referrerId: string,
     refereeName: string | undefined,
-    totalReferees: number
+    totalReferees: number,
+    rewardPoops: number
   ): Promise<void> {
     const token = env.TELEGRAM_BOT_TOKEN;
     if (!token || token === 'TEST_BOT_TOKEN_PLACEHOLDER') return;
@@ -180,7 +188,7 @@ export class ReferralService {
       ``,
       `🌟 <b>${friendName}</b> just opened SuperTom using your invite link!`,
       ``,
-      `💰 <b>+2,000 Poops</b> has been credited directly to your balance!`,
+      `💰 <b>+${rewardPoops.toLocaleString('en-US')} Poops</b> has been credited directly to your balance!`,
       `👥 Total friends invited: <b>${totalReferees}</b>`,
       `👑 You earn <b>+10%</b> lifetime mining commission on everything they mine!`,
     ].join('\n');

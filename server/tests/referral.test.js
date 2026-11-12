@@ -1,6 +1,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
+const REFERRAL_REWARD_POOPS = 450n;
+
 describe('Referral System: Reward Only When Referent Opens Bot', () => {
   describe('1. Bot Launch Qualification Rule', () => {
     test('Referrer should NOT receive reward when link is generated or shared without referent opening bot', () => {
@@ -14,7 +16,7 @@ describe('Referral System: Reward Only When Referent Opens Bot', () => {
 
       // If referent has not launched the bot:
       if (referentOpenedBot) {
-        referrerBalance += 2000n;
+        referrerBalance += REFERRAL_REWARD_POOPS;
         referralRecordCreated = true;
       }
 
@@ -29,11 +31,11 @@ describe('Referral System: Reward Only When Referent Opens Bot', () => {
 
       if (referentOpenedBot) {
         // Triggered upon auth in authController
-        referrerBalance += 2000n;
+        referrerBalance += REFERRAL_REWARD_POOPS;
         referentBalance += 1000n; // Welcome starter bonus
       }
 
-      assert.equal(referrerBalance, 7000n, 'Referrer must receive 2,000 Poops upon referent bot opening');
+      assert.equal(referrerBalance, 5450n, 'Referrer must receive 450 Poops upon referent bot opening');
       assert.equal(referentBalance, 1000n, 'Referent must receive 1,000 Poops welcome bonus');
     });
   });
@@ -86,12 +88,12 @@ describe('Referral System: Reward Only When Referent Opens Bot', () => {
       if (hasLaunchedApp) {
         const storedCode = pendingMap.get(refereeTgId.toString());
         if (storedCode) {
-          referrerBalance += 2000n;
+          referrerBalance += REFERRAL_REWARD_POOPS;
           pendingMap.delete(refereeTgId.toString());
         }
       }
 
-      assert.equal(referrerBalance, 12000n, 'Referrer reward credited once bot is opened');
+      assert.equal(referrerBalance, 10450n, 'Referrer reward credited once bot is opened');
       assert.equal(pendingMap.has(refereeTgId.toString()), false, 'Pending attribution cleared');
     });
   });

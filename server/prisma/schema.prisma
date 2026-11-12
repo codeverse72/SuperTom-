@@ -308,7 +308,7 @@ model Referral {
   id                   String         @id @default(uuid())
   referrerId           String
   refereeId            String         @unique
-  rewardPoops          BigInt         @default(2000)
+  rewardPoops          BigInt         @default(450)
   commissionPercent    Int            @default(10)
   totalCommissionPoops BigInt         @default(0)
   status               ReferralStatus @default(QUALIFIED)
