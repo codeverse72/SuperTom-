@@ -36,24 +36,33 @@ const AD_REQUEST_TIMEOUT_MS = 60_000;
 let activeAdPromise: Promise<RewardedAdResult> | null = null;
 
 function getAdexiumRewardedWidget(): AdexiumWidgetInstance | null {
-  if (typeof window === 'undefined' || !window.AdexiumWidget) {
+  if (typeof window === 'undefined') {
     return null;
+  }
+
+  if (window.__adexiumRewardedWidget) {
+    return window.__adexiumRewardedWidget;
   }
 
   const configuredWid =
     (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ADEXIUM_REWARDED_WID?.trim() ||
     DEFAULT_ADEXIUM_WID;
 
-  // Keep a dedicated widget instance separate from autoMode() so background
-  // auto-fetch ticks (every 10s) cannot emit stray 'noAdFound'/'adReceived' events.
-  if (!window.__adexiumRewardedWidget) {
-    window.__adexiumRewardedWidget = new window.AdexiumWidget({
-      wid: configuredWid,
-      adFormat: 'interstitial',
-    });
+  if (window.AdexiumWidget) {
+    try {
+      window.__adexiumRewardedWidget = new window.AdexiumWidget({
+        wid: configuredWid,
+        adFormat: 'interstitial',
+      });
+      return window.__adexiumRewardedWidget;
+    } catch {
+      if (window.__adexiumWidget) {
+        return window.__adexiumWidget;
+      }
+    }
   }
 
-  return window.__adexiumRewardedWidget;
+  return (window.__adexiumWidget as AdexiumWidgetInstance) || null;
 }
 
 /**

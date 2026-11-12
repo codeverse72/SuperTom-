@@ -17,20 +17,46 @@
     <!-- Adexium Telegram Mini App Ads SDK -->
     <script type="text/javascript" src="https://cdn.tgads.space/assets/js/adexium-widget.min.js"></script>
     <script type="text/javascript">
-      document.addEventListener('DOMContentLoaded', () => {
-        const isAdmin =
-          window.location.pathname.startsWith('/admin') ||
-          window.location.hash.startsWith('#/admin') ||
-          window.location.search.includes('admin=true');
+      (function() {
+        var wid = 'b073a77c-3963-43dc-a846-99b5382cd341';
+        var isAdmin = window.location.pathname.startsWith('/admin') ||
+                      window.location.hash.startsWith('#/admin') ||
+                      window.location.search.includes('admin=true');
         if (isAdmin) return;
-        try {
-          const adexiumWidget = new AdexiumWidget({wid: 'b073a77c-3963-43dc-a846-99b5382cd341', adFormat: 'interstitial'});
-          window.__adexiumWidget = adexiumWidget;
-          adexiumWidget.autoMode();
-        } catch (err) {
-          console.warn('[Adexium] Skipping ad init outside Telegram:', err);
+
+        function initAdexium() {
+          if (window.__adexiumWidget) return;
+          try {
+            if (typeof AdexiumWidget !== 'undefined') {
+              var adexiumWidget = new AdexiumWidget({ wid: wid, adFormat: 'interstitial' });
+              window.adexiumWidget = adexiumWidget;
+              window.__adexiumWidget = adexiumWidget;
+              adexiumWidget.autoMode();
+              console.log('[Adexium] AutoMode successfully active for placement #15008');
+            }
+          } catch (err) {
+            console.warn('[Adexium] Init attempt skipped/retrying:', err);
+          }
         }
-      });
+
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+          initAdexium();
+        } else {
+          document.addEventListener('DOMContentLoaded', initAdexium);
+        }
+        window.addEventListener('load', initAdexium);
+
+        // Retry every 400ms for up to 6 seconds to ensure Telegram WebApp context is fully loaded
+        var attempts = 0;
+        var interval = setInterval(function() {
+          attempts++;
+          if (window.__adexiumWidget || attempts > 15) {
+            clearInterval(interval);
+            return;
+          }
+          initAdexium();
+        }, 400);
+      })();
     </script>
   </head>
   <body class="bg-[#070314] text-white antialiased overflow-x-hidden selection:bg-purple-600 selection:text-white">
