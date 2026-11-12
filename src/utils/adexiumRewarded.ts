@@ -30,7 +30,7 @@ export interface RewardedAdResult {
   message?: string;
 }
 
-const DEFAULT_ADEXIUM_WID = 'dd81f1ec-401b-498c-a2f3-0a4bb0032b59';
+const DEFAULT_ADEXIUM_WID = 'b073a77c-3963-43dc-a846-99b5382cd341';
 const AD_REQUEST_TIMEOUT_MS = 60_000;
 
 let activeAdPromise: Promise<RewardedAdResult> | null = null;
