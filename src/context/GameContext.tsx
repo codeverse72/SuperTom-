@@ -116,6 +116,7 @@ interface GameContextType {
   startMission: (missionId: string) => void;
   verifyMission: (missionId: string) => Promise<{ verified: boolean; progress?: number; total?: number; status?: MissionStatus } | null>;
   claimMission: (missionId: string) => { success: boolean; reward?: number; title?: string };
+  refreshMissions: () => Promise<void>;
   requestWithdrawal: (address: string, amount: number, network?: string) => Promise<{ success: boolean; error?: string; code?: string }>;
   refreshWithdrawals: () => Promise<void>;
   submitDeposit: (amountUsdt: number, network: string, txHash: string, notes?: string) => Promise<{ success: boolean; error?: string }>;
@@ -766,6 +767,31 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true };
   };
 
+  const refreshMissions = useCallback(async (): Promise<void> => {
+    try {
+      const res = await missionService.getMissions();
+      if (res.success && res.data && Array.isArray(res.data)) {
+        setMissions(
+          res.data.map((m: any) => ({
+            id: m.id,
+            title: m.title,
+            description: m.description,
+            reward: m.rewardPoops ?? m.reward,
+            category: m.category,
+            icon: m.icon,
+            status: m.status,
+            progress: m.progress,
+            total: m.total,
+            badge: m.badge,
+            actionUrl: m.actionUrl,
+          }))
+        );
+      }
+    } catch (err) {
+      console.warn('[GameContext] refreshMissions failed:', err);
+    }
+  }, [setMissions]);
+
   // Withdrawals
   const refreshWithdrawals = useCallback(async (): Promise<void> => {
     try {
@@ -958,6 +984,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         startMission,
         verifyMission,
         claimMission,
+        refreshMissions,
         requestWithdrawal,
         refreshWithdrawals,
         submitDeposit,

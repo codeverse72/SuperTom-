@@ -328,9 +328,11 @@ export class MissionController {
             Boolean(existing?.updatedAt && new Date(existing.updatedAt) < startOfToday);
 
           const currentProgress = !existing || isFromPreviousDay ? 0 : existing.progress;
+          const isVerified = currentProgress >= WATCH_ADS_DAILY_TARGET;
+          const status = isVerified ? 'COMPLETED' : currentProgress > 0 ? 'IN_PROGRESS' : 'START';
 
-          if (currentProgress >= WATCH_ADS_DAILY_TARGET) {
-            const updated = await tx.userMission.upsert({
+          if (isVerified && existing?.status !== 'COMPLETED') {
+            await tx.userMission.upsert({
               where: { userId_missionId: { userId, missionId } },
               create: {
                 userId,
@@ -346,44 +348,9 @@ export class MissionController {
                 ...(isFromPreviousDay ? { claimedAt: null } : {}),
               },
             });
-            return { verified: true, missionProgress: updated.progress, newStatus: updated.status } as const;
           }
 
-          if (
-            existing &&
-            !isFromPreviousDay &&
-            currentProgress > 0 &&
-            now.getTime() - new Date(existing.updatedAt).getTime() < WATCH_ADS_COOLDOWN_MS
-          ) {
-            return {
-              errorStatus: 429,
-              errorCode: 'AD_WATCH_COOLDOWN',
-              errorMsg: 'Please finish watching the current ad before continuing.',
-            } as const;
-          }
-
-          const nextProgress = Math.min(WATCH_ADS_DAILY_TARGET, currentProgress + 1);
-          const nextVerified = nextProgress >= WATCH_ADS_DAILY_TARGET;
-          const nextStatus = nextVerified ? 'COMPLETED' : 'IN_PROGRESS';
-
-          await tx.userMission.upsert({
-            where: { userId_missionId: { userId, missionId } },
-            create: {
-              userId,
-              missionId,
-              status: nextStatus,
-              progress: nextProgress,
-              total: WATCH_ADS_DAILY_TARGET,
-            },
-            update: {
-              status: nextStatus,
-              progress: nextProgress,
-              total: WATCH_ADS_DAILY_TARGET,
-              ...(isFromPreviousDay ? { claimedAt: null } : {}),
-            },
-          });
-
-          return { verified: nextVerified, missionProgress: nextProgress, newStatus: nextStatus } as const;
+          return { verified: isVerified, missionProgress: currentProgress, newStatus: status } as const;
         });
 
         if ('errorMsg' in adResult && adResult.errorMsg) {

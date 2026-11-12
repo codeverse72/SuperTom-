@@ -1,8 +1,26 @@
 /**
- * Adexium Rewarded Ad integration helper for Daily Watch Ads missions.
- * Uses AdexiumWidget.requestRewardedAd('interstitial') and resolves ONLY when
- * an actual ad completes playback, is redirected on click, or is closed after display.
+ * Adexium Rewarded Advertisement Controller
+ * 
+ * Implements a strict, server-verified rewarded ad lifecycle:
+ * 1. Validates Telegram WebApp authentication freshness (anti-replay check).
+ * 2. Creates an immutable backend ad session via POST /api/v1/ads/session/create.
+ * 3. Invokes the official Adexium SDK methods without manipulating undocumented internals.
+ * 4. Manages frontend lifecycle states preventing duplicate show attempts (0x191).
+ * 5. Verifies completion cryptographically on the backend before crediting rewards.
  */
+
+import { adService, CompleteAdSessionResponse } from '../services/adService';
+import { getRawTelegramInitData } from './telegram';
+
+export type AdLifecycleState =
+  | 'READY'
+  | 'LOADING_AD'
+  | 'AD_RUNNING'
+  | 'VERIFYING_REWARD'
+  | 'REWARD_CREDITED'
+  | 'NO_AD_AVAILABLE'
+  | 'FAILED'
+  | 'SESSION_EXPIRED';
 
 export interface AdexiumWidgetInstance {
   on: (event: string, cb: (...args: any[]) => void) => void;
@@ -10,7 +28,6 @@ export interface AdexiumWidgetInstance {
   requestAd?: (adFormat?: string, motivated?: boolean) => Promise<unknown[]>;
   requestRewardedAd?: (adFormat?: string) => void;
   displayAd: (ad: unknown, adFormat?: string) => void;
-  autoMode: () => void;
 }
 
 export interface AdexiumWidgetConstructor {
@@ -22,35 +39,78 @@ declare global {
     AdexiumWidget?: AdexiumWidgetConstructor;
     adexiumWidget?: AdexiumWidgetInstance;
     __adexiumWidget?: AdexiumWidgetInstance;
-    __adexiumRewardedWidget?: AdexiumWidgetInstance;
   }
 }
 
-export interface RewardedAdResult {
+export interface AdSessionResult {
   completed: boolean;
-  reason?: 'sdk_unavailable' | 'busy' | 'no_ad' | 'error' | 'timeout' | 'closed_early';
+  state: AdLifecycleState;
   message?: string;
+  sessionData?: CompleteAdSessionResponse;
 }
 
-const DEFAULT_ADEXIUM_WID = 'b073a77c-3963-43dc-a846-99b5382cd341';
-const AD_REQUEST_TIMEOUT_MS = 60_000;
+export const DEFAULT_ADEXIUM_WID = 'b073a77c-3963-43dc-a846-99b5382cd341';
+const AD_REQUEST_TIMEOUT_MS = 45_000;
+const MAX_TELEGRAM_AUTH_AGE_SECONDS = 900; // 15 minutes max age required by Adexium
 
-let activeAdPromise: Promise<RewardedAdResult> | null = null;
+let currentActiveSession: Promise<AdSessionResult> | null = null;
 
-function getAdexiumRewardedWidget(): AdexiumWidgetInstance | null {
+/**
+ * Checks if the current Telegram WebApp authentication is fresh (< 15 mins).
+ */
+export function checkTelegramAuthFreshness(): { isFresh: boolean; reason?: string } {
+  const initData = getRawTelegramInitData();
+  if (!initData) {
+    return {
+      isFresh: false,
+      reason: 'No Telegram authentication context found. Please open SuperTom inside Telegram.',
+    };
+  }
+
+  try {
+    const params = new URLSearchParams(initData);
+    const authDateStr = params.get('auth_date');
+    if (!authDateStr) {
+      return { isFresh: false, reason: 'Missing auth_date in Telegram initialization data.' };
+    }
+
+    const authDate = parseInt(authDateStr, 10);
+    if (isNaN(authDate)) {
+      return { isFresh: false, reason: 'Invalid auth_date format.' };
+    }
+
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const ageSeconds = nowSeconds - authDate;
+
+    if (ageSeconds > MAX_TELEGRAM_AUTH_AGE_SECONDS) {
+      return {
+        isFresh: false,
+        reason: 'Your Telegram session has expired. Please close and reopen SuperTom from @SuperrTombot.',
+      };
+    }
+
+    return { isFresh: true };
+  } catch {
+    return { isFresh: false, reason: 'Failed to parse Telegram session context.' };
+  }
+}
+
+/**
+ * Retrieves or safely instantiates the Adexium singleton widget.
+ */
+export function getAdexiumWidget(): AdexiumWidgetInstance | null {
   if (typeof window === 'undefined') {
     return null;
   }
 
-  // 1. Strictly reuse the single verified widget created in index.html to avoid duplicate session fraud checks
   if (window.__adexiumWidget) {
     return window.__adexiumWidget;
   }
+
   if (window.adexiumWidget) {
     return window.adexiumWidget;
   }
 
-  // 2. Only if not yet created, initialize once as window.__adexiumWidget
   if (window.AdexiumWidget) {
     try {
       const widget = new window.AdexiumWidget({
@@ -60,7 +120,7 @@ function getAdexiumRewardedWidget(): AdexiumWidgetInstance | null {
       window.__adexiumWidget = widget;
       return widget;
     } catch (err) {
-      console.warn('[Adexium] Singleton creation failed:', err);
+      console.warn('[Adexium] SDK initialization deferred:', err);
     }
   }
 
@@ -68,194 +128,236 @@ function getAdexiumRewardedWidget(): AdexiumWidgetInstance | null {
 }
 
 /**
- * Triggers an Adexium interstitial ad on demand for the Daily Watch Ads mission and waits for completion.
+ * Starts a server-verified rewarded ad session.
+ * 
+ * @param onStateChange Optional lifecycle callback to update the Watch Ad button UI
  */
-export async function showAdexiumRewardedAd(): Promise<RewardedAdResult> {
-  if (activeAdPromise) {
+export async function runServerVerifiedAdSession(
+  onStateChange?: (state: AdLifecycleState, statusText?: string) => void
+): Promise<AdSessionResult> {
+  // Prevent duplicate concurrent advertisement requests
+  if (currentActiveSession) {
     return {
       completed: false,
-      reason: 'busy',
-      message: 'An ad is already loading or playing.',
+      state: 'FAILED',
+      message: 'An advertisement session is already in progress.',
     };
   }
 
-  let widget = getAdexiumRewardedWidget();
-  if (!widget) {
-    // Wait up to 3s for SDK hydration inside Telegram WebView
-    for (let i = 0; i < 6; i++) {
-      await new Promise((r) => setTimeout(r, 500));
-      widget = getAdexiumRewardedWidget();
-      if (widget) break;
+  currentActiveSession = (async (): Promise<AdSessionResult> => {
+    // 1. Verify Telegram Authentication Freshness (Adexium 0x3 mitigation)
+    const authCheck = checkTelegramAuthFreshness();
+    if (!authCheck.isFresh) {
+      onStateChange?.('SESSION_EXPIRED', authCheck.reason);
+      return {
+        completed: false,
+        state: 'SESSION_EXPIRED',
+        message: authCheck.reason,
+      };
     }
-  }
 
-  if (!widget) {
-    return {
-      completed: false,
-      reason: 'sdk_unavailable',
-      message: 'Ad service is connecting. Please wait a moment and tap again inside Telegram.',
-    };
-  }
+    onStateChange?.('LOADING_AD', 'Connecting to secure ad server...');
 
-  activeAdPromise = new Promise<RewardedAdResult>((resolve) => {
-    let settled = false;
-    let adDisplayed = false;
-    let playbackCompleted = false;
+    // 2. Obtain SDK Widget Instance (wait up to 3s if hydrating)
+    let widget = getAdexiumWidget();
+    if (!widget) {
+      for (let i = 0; i < 6; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        widget = getAdexiumWidget();
+        if (widget) break;
+      }
+    }
 
-    const cleanup = () => {
-      clearTimeout(timeoutId);
-      widget!.off('adReceived', onAdReceived);
-      widget!.off('adDisplayed', onAdDisplayed);
-      widget!.off('adPlaybackCompleted', onPlaybackCompleted);
-      widget!.off('adRedirected', onRedirected);
-      widget!.off('adClosed', onClosed);
-      widget!.off('noAdFound', onNoAdFound);
-      widget!.off('requestAdError', onRequestError);
-      activeAdPromise = null;
-    };
-
-    const finish = (result: RewardedAdResult) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      resolve(result);
-    };
-
-    const timeoutId = window.setTimeout(() => {
-      finish({
+    if (!widget) {
+      onStateChange?.('FAILED', 'Ad service unavailable. Please check your connection or ad blocker.');
+      return {
         completed: false,
-        reason: 'timeout',
-        message: 'Ad request timed out. Please try again in a moment.',
-      });
-    }, AD_REQUEST_TIMEOUT_MS);
+        state: 'FAILED',
+        message: 'Ad service unavailable. Please disable ad blockers and reopen in Telegram.',
+      };
+    }
 
-    let adShown = false;
-    const showAd = (ad: unknown, format?: string) => {
-      if (adShown) return;
-      adShown = true;
-      try {
-        widget!.displayAd(ad, format || 'interstitial');
-      } catch (e) {
-        console.warn('[Adexium] displayAd error:', e);
+    // 3. Create Unique Backend Session (Idempotency & Replay Protection)
+    const sessionRes = await adService.createSession();
+    if (!sessionRes.success || !sessionRes.data) {
+      const errCode = sessionRes.error?.code;
+      const errMsg = sessionRes.error?.message || 'Failed to start ad session.';
+
+      if (errCode === 'MISSION_ALREADY_CLAIMED') {
+        onStateChange?.('REWARD_CREDITED', errMsg);
+        return { completed: false, state: 'REWARD_CREDITED', message: errMsg };
+      }
+
+      if (errCode === 'TELEGRAM_SESSION_EXPIRED') {
+        onStateChange?.('SESSION_EXPIRED', errMsg);
+        return { completed: false, state: 'SESSION_EXPIRED', message: errMsg };
+      }
+
+      onStateChange?.('FAILED', errMsg);
+      return { completed: false, state: 'FAILED', message: errMsg };
+    }
+
+    const { sessionId, sessionToken } = sessionRes.data;
+
+    // 4. Request and Display Adexium Advertisement via Official SDK Lifecycle
+    return new Promise<AdSessionResult>((resolve) => {
+      let settled = false;
+      let adDisplayed = false;
+      let displayStartTime = 0;
+
+      const cleanupListeners = () => {
+        clearTimeout(timeoutId);
+        widget!.off('adReceived', handleAdReceived);
+        widget!.off('adDisplayed', handleAdDisplayed);
+        widget!.off('adPlaybackCompleted', handleAdCompleted);
+        widget!.off('adRedirected', handleAdCompleted);
+        widget!.off('adClosed', handleAdClosed);
+        widget!.off('noAdFound', handleNoAdFound);
+        widget!.off('requestAdError', handleRequestError);
+      };
+
+      const finish = (result: AdSessionResult) => {
+        if (settled) return;
+        settled = true;
+        cleanupListeners();
+        resolve(result);
+      };
+
+      const timeoutId = window.setTimeout(() => {
+        onStateChange?.('FAILED', 'Ad request timed out. Please try again.');
         finish({
           completed: false,
-          reason: 'error',
-          message: 'Failed to display the ad. Please try again.',
+          state: 'FAILED',
+          message: 'Advertisement request timed out. Please try again shortly.',
         });
-      }
-    };
+      }, AD_REQUEST_TIMEOUT_MS);
 
-    const onAdReceived = (ad: unknown, format?: string) => {
-      showAd(ad, format);
-    };
-
-    const onAdDisplayed = () => {
-      adDisplayed = true;
-    };
-
-    const onPlaybackCompleted = () => {
-      playbackCompleted = true;
-      finish({ completed: true });
-    };
-
-    const onRedirected = () => {
-      playbackCompleted = true;
-      finish({ completed: true });
-    };
-
-    const onClosed = () => {
-      if (playbackCompleted || adDisplayed) {
-        finish({ completed: true });
-      } else {
-        finish({
-          completed: false,
-          reason: 'closed_early',
-          message: 'Ad was closed before completing.',
-        });
-      }
-    };
-
-    const onNoAdFound = () => {
-      finish({
-        completed: false,
-        reason: 'no_ad',
-        message: 'No sponsored ads are available right now. Please try again shortly.',
-      });
-    };
-
-    const onRequestError = () => {
-      finish({
-        completed: false,
-        reason: 'error',
-        message: 'Ad could not load. Please check your connection or open inside Telegram.',
-      });
-    };
-
-    widget!.on('adReceived', onAdReceived);
-    widget!.on('adDisplayed', onAdDisplayed);
-    widget!.on('adPlaybackCompleted', onPlaybackCompleted);
-    widget!.on('adRedirected', onRedirected);
-    widget!.on('adClosed', onClosed);
-    widget!.on('noAdFound', onNoAdFound);
-    widget!.on('requestAdError', onRequestError);
-
-    (async () => {
-      try {
-        console.log('[Adexium] Preparing clean ad state for placement #15008...');
-
-        // Clear any previous showStates or rate limit locks in Adexium's afV2 fraud validator
+      const handleAdReceived = (ad: unknown, format?: string) => {
         try {
-          const w = widget as any;
-          if (w.afV2) {
-            if (typeof w.afV2.reset === 'function') w.afV2.reset();
-            if (typeof w.afV2.clearShowState === 'function') w.afV2.clearShowState(DEFAULT_ADEXIUM_WID);
-          }
-          localStorage.removeItem('tg-ads-co-interstitialuserData');
-          localStorage.removeItem('tg-ads-co-interstitiallastAdViewed');
-          if (typeof w.initTelegram === 'function') {
-            w.initTelegram();
-          }
-        } catch (e) {
-          console.warn('[Adexium] State reset error:', e);
+          widget!.displayAd(ad, format || 'interstitial');
+        } catch (err) {
+          console.warn('[Adexium] displayAd error:', err);
+          onStateChange?.('FAILED', 'Failed to display advertisement.');
+          finish({
+            completed: false,
+            state: 'FAILED',
+            message: 'Failed to display advertisement.',
+          });
+        }
+      };
+
+      const handleAdDisplayed = () => {
+        adDisplayed = true;
+        displayStartTime = Date.now();
+        onStateChange?.('AD_RUNNING', 'Advertisement in progress...');
+      };
+
+      const handleAdCompleted = () => {
+        // Will settle in handleAdClosed
+      };
+
+      const handleAdClosed = async () => {
+        if (!adDisplayed) {
+          onStateChange?.('FAILED', 'Advertisement closed before displaying.');
+          finish({
+            completed: false,
+            state: 'FAILED',
+            message: 'Advertisement was closed before display completed.',
+          });
+          return;
         }
 
-        // Placement #15008 is an Interstitial format. We send motivated: false so Adexium's
-        // bid engine fulfills the ad without rejecting it for policy violation.
+        const viewDurationMs = Date.now() - displayStartTime;
+
+        onStateChange?.('VERIFYING_REWARD', 'Verifying advertisement completion...');
+
+        try {
+          const verifyRes = await adService.completeSession(sessionId, sessionToken, viewDurationMs);
+
+          if (!verifyRes.success || !verifyRes.data) {
+            const msg = verifyRes.error?.message || 'Failed to verify advertisement completion.';
+            onStateChange?.('FAILED', msg);
+            finish({
+              completed: false,
+              state: 'FAILED',
+              message: msg,
+            });
+            return;
+          }
+
+          onStateChange?.('REWARD_CREDITED', verifyRes.data.message || 'Reward credited successfully!');
+          finish({
+            completed: true,
+            state: 'REWARD_CREDITED',
+            message: verifyRes.data.message,
+            sessionData: verifyRes.data,
+          });
+        } catch (err) {
+          console.error('[Adexium] Complete session request failed:', err);
+          onStateChange?.('FAILED', 'Network error verifying reward.');
+          finish({
+            completed: false,
+            state: 'FAILED',
+            message: 'Network error verifying reward. Please check your connection.',
+          });
+        }
+      };
+
+      const handleNoAdFound = () => {
+        onStateChange?.('NO_AD_AVAILABLE', 'No sponsored ads available right now.');
+        finish({
+          completed: false,
+          state: 'NO_AD_AVAILABLE',
+          message: 'No sponsored ads are available in your region right now. Please try again shortly.',
+        });
+      };
+
+      const handleRequestError = () => {
+        onStateChange?.('FAILED', 'Ad could not load.');
+        finish({
+          completed: false,
+          state: 'FAILED',
+          message: 'Ad could not load. Please check your connection or reopen in Telegram.',
+        });
+      };
+
+      // Register official SDK event listeners
+      widget!.on('adReceived', handleAdReceived);
+      widget!.on('adDisplayed', handleAdDisplayed);
+      widget!.on('adPlaybackCompleted', handleAdCompleted);
+      widget!.on('adRedirected', handleAdCompleted);
+      widget!.on('adClosed', handleAdClosed);
+      widget!.on('noAdFound', handleNoAdFound);
+      widget!.on('requestAdError', handleRequestError);
+
+      // Trigger request using standard Adexium SDK methods
+      try {
         if (typeof widget!.requestAd === 'function') {
-          let ads = await widget!.requestAd('interstitial', false);
-
-          // If first auction returned no fill, wait 1.2s and retry once in case DSP auction was in cooldown
-          if ((!ads || ads.length === 0) && !settled) {
-            console.log('[Adexium] First attempt empty, retrying bid auction...');
-            await new Promise((r) => setTimeout(r, 1200));
-            if (!settled) {
-              ads = await widget!.requestAd('interstitial', false);
-            }
-          }
-
-          if (Array.isArray(ads) && ads.length > 0) {
-            showAd(ads, (ads[0] as any)?.adFormat || 'interstitial');
-          }
+          widget!.requestAd('interstitial', false).catch((err) => {
+            console.warn('[Adexium] requestAd rejected:', err);
+            handleRequestError();
+          });
         } else if (typeof widget!.requestRewardedAd === 'function') {
           widget!.requestRewardedAd('interstitial');
         } else {
-          finish({
-            completed: false,
-            reason: 'sdk_unavailable',
-            message: 'Ad service is not ready. Please try again shortly.',
-          });
+          handleRequestError();
         }
       } catch (err) {
-        console.warn('[Adexium] Request error:', err);
-        finish({
-          completed: false,
-          reason: 'error',
-          message: 'Failed to request an ad. Please try again.',
-        });
+        console.warn('[Adexium] SDK call failed:', err);
+        handleRequestError();
       }
-    })();
-  });
+    });
+  })();
 
-  return activeAdPromise;
+  try {
+    return await currentActiveSession;
+  } finally {
+    currentActiveSession = null;
+  }
 }
+
+/**
+ * Backward-compatible alias for runServerVerifiedAdSession.
+ */
+export const showAdexiumRewardedAd = runServerVerifiedAdSession;
 

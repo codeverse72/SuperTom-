@@ -18,14 +18,15 @@ import {
   ArrowRight,
   RefreshCw,
   Copy,
-  Tv
+  Tv,
+  AlertCircle
 } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { Mission, MissionCategory } from '../config/gameConfig';
 import { formatNumber } from '../utils/probability';
 import { sound } from '../utils/sound';
 import { shareViaTelegram, generateReferralLink } from '../utils/telegram';
-import { showAdexiumRewardedAd } from '../utils/adexiumRewarded';
+import { runServerVerifiedAdSession, AdLifecycleState } from '../utils/adexiumRewarded';
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Send,
@@ -43,11 +44,13 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 export const Missions: React.FC = () => {
-  const { missions, verifyMission, claimMission, user, showToast } = useGame();
+  const { missions, verifyMission, claimMission, refreshMissions, user, showToast } = useGame();
   const [activeCategory, setActiveCategory] = useState<MissionCategory | 'all'>('all');
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [copiedMissionId, setCopiedMissionId] = useState<string | null>(null);
+  const [adButtonState, setAdButtonState] = useState<AdLifecycleState>('READY');
+  const [adStatusMessage, setAdStatusMessage] = useState<string | null>(null);
 
   const isInviteMission = (m: Mission) =>
     m.id === 'm4_invite_3' || m.id === 'm4' || m.id.includes('invite') || m.title.toLowerCase().includes('invite');
@@ -55,17 +58,65 @@ export const Missions: React.FC = () => {
   const isWatchAdsMission = (m: Mission) => m.id === 'm7_watch_30_ads';
 
   const handleWatchAdQuest = async (mission: Mission) => {
-    if (verifyingId) return;
-    setVerifyingId(mission.id);
-    try {
-      const adResult = await showAdexiumRewardedAd();
-      if (!adResult.completed) {
-        showToast('Ad Unavailable', adResult.message || 'Please watch the full ad to progress.', 'info');
-        return;
+    if (
+      adButtonState === 'LOADING_AD' ||
+      adButtonState === 'AD_RUNNING' ||
+      adButtonState === 'VERIFYING_REWARD'
+    ) {
+      return;
+    }
+
+    sound.playTap();
+
+    const result = await runServerVerifiedAdSession((state, statusText) => {
+      setAdButtonState(state);
+      if (statusText) setAdStatusMessage(statusText);
+    });
+
+    if (result.completed) {
+      sound.playReward();
+      showToast(
+        'Reward Credited!',
+        result.message || 'Ad reward verified and credited to your quest!',
+        'reward'
+      );
+      await refreshMissions();
+      setTimeout(() => {
+        setAdButtonState('READY');
+        setAdStatusMessage(null);
+      }, 2500);
+    } else {
+      if (result.state === 'NO_AD_AVAILABLE') {
+        showToast(
+          'No Ad Available',
+          result.message || 'No sponsored ads are available right now. Please try again shortly.',
+          'info'
+        );
+        setTimeout(() => {
+          setAdButtonState('READY');
+          setAdStatusMessage(null);
+        }, 3500);
+      } else if (result.state === 'SESSION_EXPIRED') {
+        showToast(
+          'Session Expired',
+          result.message || 'Please close and reopen SuperTom from @SuperrTombot.',
+          'error'
+        );
+        setTimeout(() => {
+          setAdButtonState('READY');
+          setAdStatusMessage(null);
+        }, 5000);
+      } else {
+        showToast(
+          'Ad Notice',
+          result.message || 'Could not complete advertisement session.',
+          'info'
+        );
+        setTimeout(() => {
+          setAdButtonState('READY');
+          setAdStatusMessage(null);
+        }, 3500);
       }
-      await verifyMission(mission.id);
-    } finally {
-      setVerifyingId(null);
     }
   };
 
@@ -500,25 +551,99 @@ export const Missions: React.FC = () => {
                       )}
                     </div>
                   ) : isWatchAdsMission(mission) ? (
-                    <button
-                      onClick={() => handleMissionInteraction(mission)}
-                      disabled={verifyingId === mission.id}
-                      className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white border border-purple-300/40 text-xs font-bold flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
-                    >
-                      {verifyingId === mission.id ? (
-                        <>
-                          <RefreshCw className="w-3 h-3 animate-spin" />
-                          <span>Watching Ad...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Tv className="w-3.5 h-3.5 text-amber-300" />
-                          <span>
-                            {mission.progress > 0 ? `Watch Ad (${mission.progress}/${mission.total})` : 'Watch Ad'}
-                          </span>
-                        </>
-                      )}
-                    </button>
+                    (() => {
+                      switch (adButtonState) {
+                        case 'LOADING_AD':
+                          return (
+                            <button
+                              disabled
+                              className="px-3.5 py-1.5 rounded-xl bg-purple-900/80 border border-purple-400/40 text-purple-200 text-xs font-bold flex items-center gap-1.5 shadow-md cursor-wait opacity-80"
+                              title={adStatusMessage || 'Connecting to secure ad server...'}
+                            >
+                              <RefreshCw className="w-3.5 h-3.5 text-amber-300 animate-spin" />
+                              <span>Loading Ad...</span>
+                            </button>
+                          );
+                        case 'AD_RUNNING':
+                          return (
+                            <button
+                              disabled
+                              className="px-3.5 py-1.5 rounded-xl bg-cyan-950/80 border border-cyan-400/50 text-cyan-200 text-xs font-bold flex items-center gap-1.5 shadow-md cursor-wait animate-pulse"
+                              title="Watching advertisement..."
+                            >
+                              <Tv className="w-3.5 h-3.5 text-cyan-300" />
+                              <span>Playing Ad...</span>
+                            </button>
+                          );
+                        case 'VERIFYING_REWARD':
+                          return (
+                            <button
+                              disabled
+                              className="px-3.5 py-1.5 rounded-xl bg-amber-950/80 border border-amber-400/50 text-amber-200 text-xs font-bold flex items-center gap-1.5 shadow-md cursor-wait"
+                              title="Cryptographically verifying completion..."
+                            >
+                              <RefreshCw className="w-3.5 h-3.5 text-amber-300 animate-spin" />
+                              <span>Verifying Reward...</span>
+                            </button>
+                          );
+                        case 'REWARD_CREDITED':
+                          return (
+                            <button
+                              disabled
+                              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-700 to-green-600 border border-emerald-300/60 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-900/40"
+                            >
+                              <Check className="w-3.5 h-3.5 text-emerald-200" />
+                              <span>Reward Credited!</span>
+                            </button>
+                          );
+                        case 'NO_AD_AVAILABLE':
+                          return (
+                            <button
+                              disabled
+                              className="px-3.5 py-1.5 rounded-xl bg-amber-950/70 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-1.5 shadow-md"
+                              title="No sponsored ads are available right now. Please try again shortly."
+                            >
+                              <Clock className="w-3.5 h-3.5 text-amber-400" />
+                              <span>No Ad Available</span>
+                            </button>
+                          );
+                        case 'SESSION_EXPIRED':
+                          return (
+                            <button
+                              onClick={() => handleWatchAdQuest(mission)}
+                              className="px-3.5 py-1.5 rounded-xl bg-rose-950/80 hover:bg-rose-900/80 border border-rose-500/40 text-rose-200 text-xs font-bold flex items-center gap-1.5 shadow-md cursor-pointer active:scale-95"
+                              title="Telegram session expired. Tap to retry or reopen in Telegram."
+                            >
+                              <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
+                              <span>Session Expired</span>
+                            </button>
+                          );
+                        case 'FAILED':
+                          return (
+                            <button
+                              onClick={() => handleWatchAdQuest(mission)}
+                              className="px-3.5 py-1.5 rounded-xl bg-rose-950/70 hover:bg-rose-900/70 border border-rose-500/40 text-rose-200 text-xs font-bold flex items-center gap-1.5 shadow-md cursor-pointer active:scale-95"
+                              title="Ad failed to load. Click to retry."
+                            >
+                              <RefreshCw className="w-3.5 h-3.5 text-rose-300" />
+                              <span>Retry Ad</span>
+                            </button>
+                          );
+                        case 'READY':
+                        default:
+                          return (
+                            <button
+                              onClick={() => handleWatchAdQuest(mission)}
+                              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white border border-purple-300/40 text-xs font-bold flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
+                            >
+                              <Tv className="w-3.5 h-3.5 text-amber-300" />
+                              <span>
+                                {mission.progress > 0 ? `Watch Ad (${mission.progress}/${mission.total})` : 'Watch Ad'}
+                              </span>
+                            </button>
+                          );
+                      }
+                    })()
                   ) : mission.status === 'verify' || verifyingId === mission.id ? (
                     <button
                       onClick={() => handleMissionInteraction(mission)}

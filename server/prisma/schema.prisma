@@ -137,6 +137,7 @@ model User {
   ledgerEntries   LedgerEntry[]
   wallets         UserWallet[]
   campaignParticipations UserCampaignParticipation[]
+  adSessions      AdSession[]
 
   @@index([telegramId])
   @@index([referralCode])
@@ -371,6 +372,7 @@ model LedgerEntry {
   createdAt      DateTime   @default(now())
 
   user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adSession      AdSession?
 
   @@index([userId])
   @@index([type])
@@ -654,6 +656,40 @@ model TonPaymentConfig {
   tonConnectManifestUrl   String   @default("https://super-tom.vercel.app/tonconnect-manifest.json")
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
+}
+
+// 27. Rewarded Advertisement Sessions
+enum AdSessionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+model AdSession {
+  id                String          @id @default(uuid())
+  userId            String
+  provider          String          @default("adexium") // "adexium"
+  placementId       String          // "b073a77c-3963-43dc-a846-99b5382cd341"
+  status            AdSessionStatus @default(PENDING)
+  isCompleted       Boolean         @default(false)
+  rewardAmount      BigInt          @default(0)
+  rewardLedgerId    String?         @unique
+  sessionNonce      String          @unique
+  sessionTokenHash  String?
+  ipAddress         String?
+  userAgent         String?
+  viewDurationMs    Int?
+  createdAt         DateTime        @default(now())
+  completedAt       DateTime?
+  expiresAt         DateTime
+
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rewardLedger      LedgerEntry?    @relation(fields: [rewardLedgerId], references: [id])
+
+  @@index([userId, status])
+  @@index([createdAt])
+  @@index([expiresAt])
 }
 
 

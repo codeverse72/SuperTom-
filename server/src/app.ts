@@ -16,6 +16,7 @@ import { payoutRouter } from './modules/payouts/payoutRouter.js';
 import { adminRouter } from './modules/admin/adminRouter.js';
 import { campaignRouter } from './modules/campaign/campaignRouter.js';
 import { telegramBotRouter } from './modules/telegramBot/telegramBotRouter.js';
+import { adRouter } from './modules/ads/adRouter.js';
 import { swaggerDocument } from './docs/swagger.js';
 import { sendSuccess } from './utils/apiResponse.js';
 
@@ -76,6 +77,7 @@ export function createApp(): Express {
   apiV1.use('/admin', adminRouter);
   apiV1.use('/campaign', campaignRouter);
   apiV1.use('/bot', telegramBotRouter);
+  apiV1.use('/ads', adRouter);
 
   app.use('/api/v1', apiV1);
 
