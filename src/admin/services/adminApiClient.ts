@@ -286,11 +286,12 @@ class AdminApiClient {
     });
   }
 
-  public async getDeposits(params: { page?: number; limit?: number; status?: string }) {
+  public async getDeposits(params: { page?: number; limit?: number; status?: string; search?: string }) {
     const q = new URLSearchParams();
     if (params.page) q.set('page', params.page.toString());
     if (params.limit) q.set('limit', params.limit.toString());
     if (params.status) q.set('status', params.status);
+    if (params.search) q.set('search', params.search);
     return this.request<{
       total: number;
       page: number;
@@ -309,6 +310,13 @@ class AdminApiClient {
     return this.request<{ message: string }>(`/deposits/${id}/confirm`, {
       method: 'POST',
       body: JSON.stringify({ txHash, boostPerHour }),
+    });
+  }
+
+  public async declineDeposit(id: string, reason?: string) {
+    return this.request<{ message: string }>(`/deposits/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
     });
   }
 

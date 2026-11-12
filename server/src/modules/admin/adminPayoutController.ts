@@ -373,11 +373,37 @@ export class AdminPayoutController {
       const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
       const skip = (page - 1) * limit;
 
-      const status = req.query.status as DepositStatus | undefined;
+      const status = req.query.status as string | undefined;
+      const search = req.query.search as string | undefined;
 
       const where: any = {};
-      if (status && ['PENDING', 'CONFIRMED', 'REJECTED'].includes(status)) {
-        where.status = status;
+      if (status && status !== 'ALL') {
+        const upper = status.toUpperCase();
+        if (upper === 'PENDING') {
+          where.status = {
+            in: ['PENDING', 'WAITING_FOR_PAYMENT', 'PAYMENT_DETECTED', 'CONFIRMING'],
+          };
+        } else if (upper === 'CONFIRMED') {
+          where.status = {
+            in: ['CONFIRMED', 'COMPLETED'],
+          };
+        } else if (['REJECTED', 'FAILED', 'EXPIRED', 'CREATED'].includes(upper)) {
+          where.status = upper;
+        }
+      }
+
+      if (search && search.trim()) {
+        const q = search.trim();
+        const numQ = Number(q);
+        where.OR = [
+          { txHash: { contains: q, mode: 'insensitive' } },
+          { paymentReference: { contains: q, mode: 'insensitive' } },
+          { depositAddress: { contains: q, mode: 'insensitive' } },
+          { notes: { contains: q, mode: 'insensitive' } },
+          { user: { username: { contains: q, mode: 'insensitive' } } },
+          { user: { firstName: { contains: q, mode: 'insensitive' } } },
+          ...(!isNaN(numQ) && numQ > 0 ? [{ user: { telegramId: BigInt(numQ) } }] : []),
+        ];
       }
 
       const [total, deposits, confirmedStats, pendingCount] = await Promise.all([
@@ -394,10 +420,16 @@ export class AdminPayoutController {
           },
         }),
         prisma.deposit.aggregate({
-          where: { status: 'CONFIRMED' },
+          where: { status: { in: ['CONFIRMED', 'COMPLETED'] } },
           _sum: { amountUsdt: true, amountPoops: true },
         }),
-        prisma.deposit.count({ where: { status: 'PENDING' } }),
+        prisma.deposit.count({
+          where: {
+            status: {
+              in: ['PENDING', 'WAITING_FOR_PAYMENT', 'PAYMENT_DETECTED', 'CONFIRMING'],
+            },
+          },
+        }),
       ]);
 
       sendSuccess(res, {
@@ -418,6 +450,10 @@ export class AdminPayoutController {
           amountPoops: Number(d.amountPoops),
           amountUsdt: Number(d.amountUsdt),
           network: d.network,
+          currency: d.currency,
+          depositAddress: d.depositAddress,
+          paymentReference: d.paymentReference,
+          expectedCryptoAmount: d.expectedCryptoAmount ? Number(d.expectedCryptoAmount) : null,
           txHash: d.txHash,
           status: d.status,
           notes: d.notes,
@@ -426,6 +462,66 @@ export class AdminPayoutController {
       });
     } catch {
       sendError(res, 'Failed to fetch deposits', 500, 'SERVER_ERROR');
+    }
+  }
+
+  /**
+   * POST /api/v1/admin/deposits/:id/reject
+   * Declines a pending deposit request with an optional reason.
+   */
+  public static async rejectDeposit(req: AuthenticatedAdminRequest, res: Response): Promise<void> {
+    const { id } = req.params;
+    const adminId = req.admin?.adminId;
+
+    if (!adminId) {
+      sendError(res, 'Unauthorized', 401, 'UNAUTHORIZED');
+      return;
+    }
+
+    const { reason } = (req.body || {}) as { reason?: string };
+
+    try {
+      await prisma.$transaction(async (tx) => {
+        const deposit = await tx.deposit.findUnique({ where: { id } });
+        if (!deposit) {
+          throw new Error('Deposit not found');
+        }
+
+        if (deposit.status === 'CONFIRMED' || deposit.status === 'COMPLETED') {
+          throw new Error('Cannot decline an already confirmed deposit.');
+        }
+
+        if (deposit.status === 'REJECTED') {
+          throw new Error('Deposit is already rejected.');
+        }
+
+        const rejectionNote = reason?.trim() ? `Declined by admin: ${reason.trim()}` : 'Declined by admin';
+        const updatedNotes = deposit.notes ? `${deposit.notes} | ${rejectionNote}` : rejectionNote;
+
+        await tx.deposit.update({
+          where: { id },
+          data: {
+            status: 'REJECTED',
+            notes: updatedNotes,
+          },
+        });
+      });
+
+      await recordAuditLog({
+        adminId,
+        action: 'REJECT_DEPOSIT',
+        targetEntity: 'Deposit',
+        targetId: id,
+        newValue: { status: 'REJECTED', reason: reason?.trim() || 'No reason provided' },
+        req,
+      });
+
+      sendSuccess(res, {
+        message: 'Deposit request has been declined successfully.',
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to decline deposit';
+      sendError(res, msg, 400, 'REJECT_FAILED');
     }
   }
 

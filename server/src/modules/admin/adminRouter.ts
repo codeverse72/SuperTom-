@@ -136,6 +136,11 @@ adminRouter.post(
   AdminPayoutController.confirmDeposit
 );
 adminRouter.post(
+  '/deposits/:id/reject',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  AdminPayoutController.rejectDeposit
+);
+adminRouter.post(
   '/deposits/manual-credit',
   requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
   AdminPayoutController.manualCreditDeposit

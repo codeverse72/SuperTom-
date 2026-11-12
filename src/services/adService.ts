@@ -61,3 +61,4 @@ export const adService = {
     return apiClient.get<AdSessionStatusResponse>(`/ads/session/${sessionId}`);
   },
 };
+
