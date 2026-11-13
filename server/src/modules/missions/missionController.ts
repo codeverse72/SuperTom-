@@ -17,6 +17,29 @@ export function getUtcDayStart(date: Date = new Date()): Date {
 
 // Default standard missions matching frontend initial catalog
 export const SEED_MISSIONS = [
+  // 1. TOP MISSION: WATCH 30 ADS DAILY
+  {
+    id: WATCH_ADS_MISSION_ID,
+    title: 'Watch 30 Ads Daily',
+    description: 'Watch 30 sponsored ads per day to earn 500 TomCoins (resets daily at 00:00 UTC)',
+    rewardPoops: WATCH_ADS_REWARD_POOPS,
+    category: MissionCategory.DAILY,
+    verificationType: 'GAME_ACTION' as const,
+    icon: 'Tv',
+    badge: 'Daily Ads',
+  },
+  // 2. VIRAL / GROWTH: INVITE FRIENDS
+  {
+    id: 'm4_invite_3',
+    title: 'Invite 3 Friends',
+    description: 'Bring 3 friends to King Tom’s royal kingdom',
+    rewardPoops: 2500n,
+    category: MissionCategory.DAILY,
+    verificationType: 'GAME_ACTION' as const,
+    icon: 'Users',
+    badge: 'Daily',
+  },
+  // 3. SOCIAL MISSIONS
   {
     id: 'm1_join_channel',
     title: 'Join Telegram Channel',
@@ -52,16 +75,7 @@ export const SEED_MISSIONS = [
     badge: 'Twitter / X',
     actionUrl: 'https://x.com/SuperTomGame',
   },
-  {
-    id: 'm4_invite_3',
-    title: 'Invite 3 Friends',
-    description: 'Bring 3 friends to King Tom’s royal kingdom',
-    rewardPoops: 2500n,
-    category: MissionCategory.DAILY,
-    verificationType: 'GAME_ACTION' as const,
-    icon: 'Users',
-    badge: 'Daily',
-  },
+  // 4. DAILY & IN-GAME MISSIONS
   {
     id: 'm5_feed_5_biscuits',
     title: 'Feed Tom 5 Biscuits',
@@ -81,16 +95,6 @@ export const SEED_MISSIONS = [
     verificationType: 'GAME_ACTION' as const,
     icon: 'Crown',
     badge: 'Milestone',
-  },
-  {
-    id: WATCH_ADS_MISSION_ID,
-    title: 'Watch 30 Ads Daily',
-    description: 'Watch 30 sponsored ads per day to earn 500 TomCoins (resets daily at 00:00 UTC)',
-    rewardPoops: WATCH_ADS_REWARD_POOPS,
-    category: MissionCategory.DAILY,
-    verificationType: 'GAME_ACTION' as const,
-    icon: 'Tv',
-    badge: 'Daily Ads',
   },
 ];
 
@@ -261,8 +265,21 @@ export class MissionController {
         },
       });
 
+      const getPriority = (id: string, title?: string): number => {
+        if (id === WATCH_ADS_MISSION_ID || id.includes('watch') || (title && title.toLowerCase().includes('watch'))) return 1;
+        if (id === 'm4_invite_3' || id.includes('invite') || (title && title.toLowerCase().includes('invite')) || (title && title.toLowerCase().includes('friend'))) return 2;
+        if (id === 'm1_join_channel' || id.includes('channel') || (title && title.toLowerCase().includes('channel'))) return 3;
+        if (id === 'm2_join_group' || id.includes('group') || (title && title.toLowerCase().includes('group')) || (title && title.toLowerCase().includes('community'))) return 4;
+        if (id === 'm3_follow_x' || id.includes('follow') || id.includes('x') || (title && title.toLowerCase().includes('x')) || (title && title.toLowerCase().includes('twitter'))) return 5;
+        if (id === 'm5_feed_5_biscuits' || id.includes('feed') || (title && title.toLowerCase().includes('feed'))) return 6;
+        if (id === 'm6_reach_level_5' || id.includes('level') || (title && title.toLowerCase().includes('level'))) return 7;
+        return 8;
+      };
+
+      const sortedMissions = missions.sort((a, b) => getPriority(a.id, a.title) - getPriority(b.id, b.title));
+
       const now = new Date();
-      const response = missions.map((m) =>
+      const response = sortedMissions.map((m) =>
         mapMissionToDto(
           m,
           {

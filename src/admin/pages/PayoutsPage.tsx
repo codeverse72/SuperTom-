@@ -258,8 +258,8 @@ export const PayoutsPage: React.FC = () => {
     setIsConfirmingDeposit(true);
     const boostNum = parseInt(confirmDepositBoost, 10) || 0;
     const res = await adminApi.confirmDeposit(
-      confirmDepositItem.id, 
-      depositTxHash, 
+      confirmDepositItem.id,
+      depositTxHash,
       boostNum > 0 ? boostNum : undefined
     );
     setIsConfirmingDeposit(false);
@@ -300,22 +300,20 @@ export const PayoutsPage: React.FC = () => {
         <div className="flex items-center gap-2 p-1 rounded-xl bg-[#0F0822] border border-purple-900/40">
           <button
             onClick={() => setActiveSubTab('withdrawals')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-              activeSubTab === 'withdrawals'
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeSubTab === 'withdrawals'
                 ? 'bg-purple-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-white'
-            }`}
+              }`}
           >
             <ArrowDownRight className="w-4 h-4 text-rose-400" />
             <span>USDT TRC20 Withdrawals</span>
           </button>
           <button
             onClick={() => setActiveSubTab('deposits')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-              activeSubTab === 'deposits'
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeSubTab === 'deposits'
                 ? 'bg-purple-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-white'
-            }`}
+              }`}
           >
             <ArrowUpRight className="w-4 h-4 text-emerald-400" />
             <span>Player Deposits</span>
@@ -388,11 +386,10 @@ export const PayoutsPage: React.FC = () => {
                     setWithdrawalStatus(st);
                     setWithdrawalPage(1);
                   }}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
-                    withdrawalStatus === st
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${withdrawalStatus === st
                       ? 'bg-purple-600 text-white shadow-sm'
                       : 'bg-purple-950/30 text-slate-400 hover:text-white border border-purple-900/30'
-                  }`}
+                    }`}
                 >
                   {st || 'ALL'}
                 </button>
@@ -678,11 +675,10 @@ export const PayoutsPage: React.FC = () => {
                     setDepositStatus(filter.value);
                     setDepositPage(1);
                   }}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                    depositStatus === filter.value
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${depositStatus === filter.value
                       ? 'bg-purple-600 text-white shadow-sm'
                       : 'bg-purple-950/30 text-slate-400 hover:text-white border border-purple-900/30'
-                  }`}
+                    }`}
                 >
                   {filter.label}
                 </button>

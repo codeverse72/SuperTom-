@@ -53,9 +53,20 @@ export const Missions: React.FC = () => {
   const [adStatusMessage, setAdStatusMessage] = useState<string | null>(null);
 
   const isInviteMission = (m: Mission) =>
-    m.id === 'm4_invite_3' || m.id === 'm4' || m.id.includes('invite') || m.title.toLowerCase().includes('invite');
+    m.id === 'm4_invite_3' || 
+    m.id === 'm4' || 
+    m.id === 'm5' ||
+    m.id.includes('invite') || 
+    m.title.toLowerCase().includes('invite') ||
+    m.title.toLowerCase().includes('friend') ||
+    m.title.toLowerCase().includes('share');
 
-  const isWatchAdsMission = (m: Mission) => m.id === 'm7_watch_30_ads';
+  const isWatchAdsMission = (m: Mission) => 
+    m.id === 'm7_watch_30_ads' || 
+    m.id.includes('watch_ads') || 
+    m.id.includes('watch') || 
+    m.title.toLowerCase().includes('watch') ||
+    m.title.toLowerCase().includes('ad');
 
   const handleWatchAdQuest = async (mission: Mission) => {
     if (
@@ -163,9 +174,23 @@ export const Missions: React.FC = () => {
     { id: 'special', label: 'Special', count: missions.filter(m => m.category === 'special').length },
   ];
 
-  const filteredMissions = missions.filter(m => 
-    activeCategory === 'all' ? true : m.category === activeCategory
-  );
+  const getMissionOrder = (m: Mission): number => {
+    // 1. Top of every mission: Watch Ads
+    if (isWatchAdsMission(m)) return 1;
+    // 2. Share friends mission
+    if (isInviteMission(m)) return 2;
+    // 3. Social & In-Game quests in logical progression
+    if (m.id === 'm1_join_channel' || m.id === 'm1' || m.title.toLowerCase().includes('channel')) return 3;
+    if (m.id === 'm2_join_group' || m.id === 'm2' || m.title.toLowerCase().includes('group') || m.title.toLowerCase().includes('chat') || m.title.toLowerCase().includes('community')) return 4;
+    if (m.id === 'm3_follow_x' || m.id === 'm3' || m.title.toLowerCase().includes('x') || m.title.toLowerCase().includes('twitter') || m.title.toLowerCase().includes('social')) return 5;
+    if (m.id === 'm5_feed_5_biscuits' || m.id === 'm7' || m.title.toLowerCase().includes('feed') || m.title.toLowerCase().includes('biscuit')) return 6;
+    if (m.id === 'm6_reach_level_5' || m.id === 'm6' || m.title.toLowerCase().includes('level') || m.title.toLowerCase().includes('check-in')) return 7;
+    return 8;
+  };
+
+  const filteredMissions = missions
+    .filter(m => activeCategory === 'all' ? true : m.category === activeCategory)
+    .sort((a, b) => getMissionOrder(a) - getMissionOrder(b));
 
   const totalRewardsAvailable = missions.reduce((sum, m) => sum + m.reward, 0);
 

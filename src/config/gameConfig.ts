@@ -185,7 +185,47 @@ export interface Mission {
 }
 
 export const INITIAL_MISSIONS: Mission[] = [
-  // SOCIAL MISSIONS
+  // 1. TOP MISSION: WATCH 30 ADS DAILY
+  {
+    id: 'm7_watch_30_ads',
+    title: 'Watch 30 Ads Daily',
+    description: 'Watch 30 sponsored ads per day to earn 500 TomCoins (resets daily at 00:00 UTC)',
+    reward: 500,
+    category: 'daily',
+    icon: 'Tv',
+    status: 'start',
+    progress: 0,
+    total: 30,
+    badge: 'Daily Ads'
+  },
+
+  // 2. GROWTH & VIRAL MISSIONS: INVITE & SHARE WITH FRIENDS
+  {
+    id: 'm4',
+    title: 'Invite 3 Friends',
+    description: 'Share your royal referral link and recruit 3 subjects to King Tom’s realm',
+    reward: 2000,
+    category: 'social',
+    icon: 'Users',
+    status: 'start',
+    progress: 0,
+    total: 3,
+    badge: 'Referral'
+  },
+  {
+    id: 'm5',
+    title: 'Invite 10 Friends',
+    description: 'Expand the royal feline empire and unlock massive referral commissions',
+    reward: 5000,
+    category: 'social',
+    icon: 'Crown',
+    status: 'start',
+    progress: 0,
+    total: 10,
+    badge: 'Referral VIP'
+  },
+
+  // 3. SOCIAL MISSIONS
   {
     id: 'm1',
     title: 'Join Telegram Channel',
@@ -222,32 +262,8 @@ export const INITIAL_MISSIONS: Mission[] = [
     total: 1,
     badge: 'Social'
   },
-  {
-    id: 'm4',
-    title: 'Invite 3 Friends',
-    description: 'Share your royal referral link and recruit 3 subjects to King Tom’s realm',
-    reward: 2000,
-    category: 'social',
-    icon: 'Users',
-    status: 'start',
-    progress: 0,
-    total: 3,
-    badge: 'Referral'
-  },
-  {
-    id: 'm5',
-    title: 'Invite 10 Friends',
-    description: 'Expand the royal feline empire and unlock massive referral commissions',
-    reward: 5000,
-    category: 'social',
-    icon: 'Crown',
-    status: 'start',
-    progress: 0,
-    total: 10,
-    badge: 'Referral VIP'
-  },
 
-  // DAILY MISSIONS
+  // 4. DAILY & IN-GAME ENGAGEMENT MISSIONS
   {
     id: 'm6',
     title: 'Complete Daily Check-in',
@@ -271,18 +287,6 @@ export const INITIAL_MISSIONS: Mission[] = [
     progress: 0,
     total: 10,
     badge: 'Daily Treat'
-  },
-  {
-    id: 'm7_watch_30_ads',
-    title: 'Watch 30 Ads Daily',
-    description: 'Watch 30 sponsored ads per day to earn 500 TomCoins (resets daily at 00:00 UTC)',
-    reward: 500,
-    category: 'daily',
-    icon: 'Tv',
-    status: 'start',
-    progress: 0,
-    total: 30,
-    badge: 'Daily Ads'
   },
   {
     id: 'm8',
