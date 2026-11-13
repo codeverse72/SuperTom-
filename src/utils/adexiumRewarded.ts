@@ -410,8 +410,21 @@ export async function runServerVerifiedAdSession(
       const { sessionId, sessionToken } = sessionRes.data;
       const blockId = getAdsgramBlockId();
 
+      // Check if debug/test ads are requested via query string, localStorage, or environment
+      const isDebugRequested =
+        (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ADS_DEBUG === 'true' ||
+        (typeof window !== 'undefined' && (
+          new URLSearchParams(window.location.search).get('test_ads') === 'true' ||
+          window.location.hash.includes('test_ads=true') ||
+          window.localStorage?.getItem('supertom_test_ads') === 'true'
+        ));
+
       try {
-        const controller = window.Adsgram.init({ blockId, debug: false });
+        const controller = window.Adsgram.init({
+          blockId,
+          debug: Boolean(isDebugRequested),
+          debugBannerType: 'RewardedVideo',
+        });
         onStateChange?.('AD_RUNNING', 'Advertisement in progress...');
         const startTime = Date.now();
         const result = await controller.show();

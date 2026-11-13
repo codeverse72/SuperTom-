@@ -17,6 +17,7 @@ payoutRouter.get('/treasury-wallets', PayoutController.getTreasuryWallets);
 payoutRouter.get('/payment-methods', PayoutController.getPaymentMethods);
 payoutRouter.get('/deposits', requireAuth, PayoutController.getDeposits);
 payoutRouter.post('/deposits', requireAuth, depositLimiter, PayoutController.submitDeposit);
+payoutRouter.post('/deposits/webhook', PayoutController.handleDepositWebhook);
 payoutRouter.post('/deposits/create', requireAuth, depositLimiter, PayoutController.createDeposit);
 payoutRouter.get('/deposits/:id/status', requireAuth, PayoutController.getDepositStatus);
 payoutRouter.post('/deposits/:id/check-onchain', requireAuth, depositLimiter, PayoutController.checkDepositOnChain);

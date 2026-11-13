@@ -209,7 +209,7 @@ export interface WithdrawalItem {
 
 export interface DepositItem {
   id: string;
-  userId: string;
+  userId: string | null;
   telegramId: string;
   username?: string | null;
   amountPoops: number;
@@ -219,6 +219,7 @@ export interface DepositItem {
   depositAddress?: string | null;
   paymentReference?: string | null;
   expectedCryptoAmount?: number | null;
+  fromAddress?: string | null;
   txHash?: string | null;
   status: string;
   confirmations?: number | null;

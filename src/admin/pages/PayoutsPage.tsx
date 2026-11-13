@@ -667,7 +667,9 @@ export const PayoutsPage: React.FC = () => {
               {[
                 { label: 'ALL', value: '' },
                 { label: 'PENDING', value: 'PENDING' },
-                { label: 'CONFIRMED', value: 'CONFIRMED' },
+                { label: 'CONFIRMING', value: 'CONFIRMING' },
+                { label: 'SUCCESS', value: 'SUCCESS' },
+                { label: 'UNIDENTIFIED', value: 'UNIDENTIFIED' },
                 { label: 'REJECTED', value: 'REJECTED' },
               ].map((filter) => (
                 <button
@@ -736,6 +738,11 @@ export const PayoutsPage: React.FC = () => {
                         </td>
                         <td className="py-3 px-4">
                           <Badge status={d.status} />
+                          {d.requiredConfirmations && d.requiredConfirmations > 1 && ['CONFIRMING', 'PENDING_CONFIRMATION'].includes(d.status) && (
+                            <div className="text-[10px] text-sky-400 font-mono mt-0.5">
+                              {d.confirmations || 0}/{d.requiredConfirmations} confs
+                            </div>
+                          )}
                         </td>
                         <td className="py-3 px-4 font-mono text-slate-500 text-[11px]">
                           {new Date(d.createdAt).toLocaleString()}

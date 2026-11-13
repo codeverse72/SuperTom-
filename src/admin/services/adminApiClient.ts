@@ -339,7 +339,7 @@ class AdminApiClient {
   }
 
   public async getRpcHealth() {
-    return this.request<Record<string, { status: 'healthy' | 'degraded'; latestBlock?: number; latencyMs?: number; error?: string }>>('/rpc-health');
+    return this.request<Record<string, { status: 'HEALTHY' | 'DEGRADED' | 'DOWN'; latencyMs: number; blockHeight?: number; lastChecked: string; lastError?: string }>>('/rpc-health');
   }
 
   public async getTreasurySettings() {

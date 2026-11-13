@@ -425,6 +425,50 @@ Your account balance has been updated immediately!`;
   }
 
   /**
+   * Telegram Notification: Detected incoming transaction waiting for blockchain confirmations.
+   */
+  public static async sendTelegramDepositDetectedNotification(
+    telegramId: bigint,
+    amount: number | string,
+    currency: string,
+    network: string,
+    txHash: string,
+    confirmations: number,
+    requiredConfirmations: number
+  ): Promise<void> {
+    try {
+      const token = env.TELEGRAM_BOT_TOKEN;
+      if (!token || token === 'TEST_BOT_TOKEN_PLACEHOLDER') return;
+
+      const shortHash = txHash.length > 20 ? `${txHash.slice(0, 10)}...${txHash.slice(-8)}` : txHash;
+
+      const text =
+`⏳ *Deposit Detected!*
+
+We detected an incoming deposit waiting for blockchain confirmations (${confirmations}/${requiredConfirmations}).
+
+💰 *Currency:* ${currency}
+🌐 *Network:* ${network}
+💎 *Amount:* ${amount} ${currency}
+🔗 *TXID:* \`${shortHash}\`
+
+Your balance will be credited automatically once confirmed!`;
+
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: telegramId.toString(),
+          text,
+          parse_mode: 'Markdown',
+        }),
+      });
+    } catch (err) {
+      logger.warn('Failed to send Telegram deposit detected notification:', err);
+    }
+  }
+
+  /**
    * Atomically finalize and credit a verified deposit
    */
   public static async finalizeVerifiedDeposit(

@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../config/database.js';
 import { AuthenticatedRequest } from '../../middleware/auth.js';
@@ -6,6 +6,7 @@ import { sendSuccess, sendError } from '../../utils/apiResponse.js';
 import { validateNetworkAddress } from '../../utils/crypto.js';
 import { LedgerService } from '../ledger/ledgerService.js';
 import { env } from '../../config/env.js';
+import { logger } from '../../utils/logger.js';
 import { DepositVerificationService } from './depositVerificationService.js';
 import { WithdrawalEntitlementService } from './withdrawalEntitlementService.js';
 import { AutoDepositMonitor } from './autoDepositMonitor.js';
@@ -787,9 +788,9 @@ export class PayoutController {
         },
       });
 
-      // Trigger automated on-chain verification immediately in background
-      AutoDepositMonitor.verifyAndFinalizeDeposit(deposit).catch((err) => {
-        console.warn(`[AutoDeposit] Instant verification background task error for ${deposit.id}:`, err);
+      // Trigger automated on-chain verification cycle immediately in background
+      AutoDepositMonitor.verifyPendingDeposits().catch((err) => {
+        logger.warn(`[AutoDeposit] Verification trigger error for ${deposit.id}:`, err);
       });
 
       sendSuccess(res, {
@@ -805,6 +806,27 @@ export class PayoutController {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Deposit submission failed';
       sendError(res, msg, 400, 'DEPOSIT_FAILED');
+    }
+  }
+
+  /**
+   * POST /api/v1/payouts/deposits/webhook
+   * External blockchain indexer webhook endpoint (QuickNode, Alchemy, TronGrid, TonAPI)
+   */
+  public static async handleDepositWebhook(req: Request, res: Response): Promise<void> {
+    try {
+      const { txHash, network } = (req.body as { txHash?: string; network?: string }) || {};
+      logger.info(`[DepositWebhook] Received transaction webhook event: ${txHash || 'bulk'} on ${network || 'multi'}`);
+
+      // Instantly trigger background verification sweep
+      AutoDepositMonitor.verifyPendingDeposits().catch((err) => {
+        logger.warn('[DepositWebhook] Background verification sweep error:', err);
+      });
+
+      sendSuccess(res, { received: true, message: 'Deposit webhook received and queued for verification' });
+    } catch (err: unknown) {
+      logger.error('[DepositWebhook] Error handling webhook:', err);
+      sendSuccess(res, { received: true });
     }
   }
 

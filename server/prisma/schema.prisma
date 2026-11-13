@@ -26,9 +26,9 @@ enum AdminRole {
 enum DepositStatus {
   CREATED
   WAITING_FOR_PAYMENT
+  PAYMENT_DETECTED
   DETECTING
   PENDING_CONFIRMATION
-  PAYMENT_DETECTED
   CONFIRMING
   COMPLETED
   CONFIRMED
@@ -406,9 +406,10 @@ model Deposit {
   receivedCryptoAmount  Decimal?      @db.Decimal(28, 8)
   txHash                String?       @unique
   status                DepositStatus @default(WAITING_FOR_PAYMENT)
-  confirmations         Int?          @default(0)
-  requiredConfirmations Int?          @default(1)
+  confirmations         Int           @default(0)
+  requiredConfirmations Int           @default(1)
   blockNumber           BigInt?
+  fromAddress           String?
   notes                 String?
   confirmedAt           DateTime?
   expiresAt             DateTime?
@@ -421,6 +422,7 @@ model Deposit {
   @@index([status])
   @@index([paymentReference])
   @@index([createdAt])
+  @@index([fromAddress])
 }
 
 // 17. Authenticated Administrative Staff

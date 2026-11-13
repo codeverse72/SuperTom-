@@ -446,8 +446,8 @@ export class AdminPayoutController {
         deposits: deposits.map((d) => ({
           id: d.id,
           userId: d.userId,
-          telegramId: d.user ? d.user.telegramId.toString() : 'N/A',
-          username: d.user ? (d.user.username || d.user.firstName) : 'Unidentified User',
+          telegramId: d.user ? d.user.telegramId.toString() : 'UNIDENTIFIED',
+          username: d.user ? (d.user.username || d.user.firstName) : 'Unidentified Sender',
           amountPoops: Number(d.amountPoops),
           amountUsdt: Number(d.amountUsdt),
           network: d.network,
@@ -457,9 +457,6 @@ export class AdminPayoutController {
           expectedCryptoAmount: d.expectedCryptoAmount ? Number(d.expectedCryptoAmount) : null,
           txHash: d.txHash,
           status: d.status,
-          confirmations: d.confirmations ?? 0,
-          requiredConfirmations: d.requiredConfirmations ?? 1,
-          blockNumber: d.blockNumber ? d.blockNumber.toString() : null,
           notes: d.notes,
           createdAt: d.createdAt,
         })),
@@ -559,12 +556,6 @@ export class AdminPayoutController {
           throw new Error('Deposit not found');
         }
 
-        if (!deposit.userId) {
-          throw new Error('Cannot manually confirm an unidentified deposit without an associated user');
-        }
-
-        const depositUserId = deposit.userId;
-
         if (!['PENDING', 'WAITING_FOR_PAYMENT', 'PAYMENT_DETECTED', 'CONFIRMING'].includes(deposit.status)) {
           throw new Error(`Cannot confirm deposit with status: ${deposit.status}`);
         }
@@ -578,6 +569,10 @@ export class AdminPayoutController {
           else if (n.includes('+10') || n.includes('common')) appliedBoost = 10;
         }
 
+        if (!deposit.userId) {
+          throw new Error('Cannot manually confirm an unidentified deposit without associating a user');
+        }
+
         await tx.deposit.update({
           where: { id },
           data: {
@@ -589,7 +584,7 @@ export class AdminPayoutController {
 
         // 1. Credit Poops to user balance via Ledger
         await LedgerService.executeBalanceTransaction(tx, {
-          userId: depositUserId,
+          userId: deposit.userId,
           type: 'DEPOSIT_CREDIT',
           amount: deposit.amountPoops,
           referenceId: deposit.id,
@@ -601,7 +596,7 @@ export class AdminPayoutController {
         try {
           await CampaignService.processDepositForCampaign(tx, {
             id: deposit.id,
-            userId: depositUserId,
+            userId: deposit.userId,
             amountUsdt: deposit.amountUsdt,
           });
         } catch (cErr) {
@@ -611,7 +606,7 @@ export class AdminPayoutController {
         // 1.6 Grant withdrawal entitlement ($3 for 3 withdrawals, $5 for unlimited)
         try {
           await WithdrawalEntitlementService.processDepositConfirmed(tx, {
-            userId: depositUserId,
+            userId: deposit.userId,
             amountUsdt: Number(deposit.amountUsdt),
           });
         } catch (wErr) {
@@ -621,7 +616,7 @@ export class AdminPayoutController {
         // 2. Adjust mining speed if a plan boost applies
         if (appliedBoost > 0) {
           await tx.miningSettlement.update({
-            where: { userId: depositUserId },
+            where: { userId: deposit.userId },
             data: {
               boostRatePerHour: { increment: appliedBoost },
               totalRatePerHour: { increment: appliedBoost },
@@ -631,7 +626,7 @@ export class AdminPayoutController {
 
         // 3. Send Telegram confirmation receipt to the user
         try {
-          const userRec = await tx.user.findUnique({ where: { id: depositUserId } });
+          const userRec = await tx.user.findUnique({ where: { id: deposit.userId } });
           if (userRec?.telegramId) {
             await DepositVerificationService.sendTelegramDepositNotification(
               userRec.telegramId,
@@ -948,15 +943,14 @@ export class AdminPayoutController {
   }
 
   /**
-   * GET /api/v1/admin/rpc-health
-   * Blockchain API & RPC Health diagnostic for all supported networks
+   * Diagnostic: Returns health, latency, and block height of all monitored blockchain networks
    */
-  public static async getRpcHealth(_req: AuthenticatedAdminRequest, res: Response): Promise<void> {
+  public static async getRpcHealth(req: AuthenticatedAdminRequest, res: Response): Promise<void> {
     try {
-      const health = await AutoDepositMonitor.getRpcHealth();
+      const health = AutoDepositMonitor.getHealth();
       sendSuccess(res, health);
-    } catch (err: unknown) {
-      sendError(res, 'Failed to fetch RPC health metrics', 500, 'SERVER_ERROR');
+    } catch (err) {
+      sendError(res, 'Failed to retrieve RPC health', 500, 'SERVER_ERROR');
     }
   }
 }

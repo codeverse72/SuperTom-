@@ -10,15 +10,15 @@ export const Badge: React.FC<BadgeProps> = ({ status, className = '' }) => {
 
   let styles = 'bg-slate-800 text-slate-300 border-slate-700';
 
-  if (s === 'ACTIVE' || s === 'COMPLETED' || s === 'CONFIRMED' || s === 'SUPER_ADMIN' || s === 'CONNECTED' || s === 'VERIFIED') {
+  if (s === 'ACTIVE' || s === 'COMPLETED' || s === 'CONFIRMED' || s === 'SUCCESS' || s === 'SUPER_ADMIN' || s === 'CONNECTED' || s === 'VERIFIED') {
     styles = 'bg-emerald-950/70 text-emerald-300 border-emerald-500/40 shadow-emerald-500/10';
   } else if (s === 'PENDING' || s === 'WAITING_FOR_PAYMENT' || s === 'CREATED' || s === 'IN_PROGRESS' || s === 'RUNNING' || s === 'ADMIN' || s === 'PENDING_APPROVAL') {
     styles = 'bg-amber-950/70 text-amber-300 border-amber-500/40 shadow-amber-500/10';
-  } else if (s === 'APPROVED' || s === 'CONFIRMING' || s === 'PAYMENT_DETECTED' || s === 'CONFIGURED') {
+  } else if (s === 'APPROVED' || s === 'CONFIRMING' || s === 'DETECTING' || s === 'PENDING_CONFIRMATION' || s === 'PAYMENT_DETECTED' || s === 'CONFIGURED') {
     styles = 'bg-sky-950/70 text-sky-300 border-sky-500/40 shadow-sky-500/10';
   } else if (s === 'PROCESSING' || s === 'PUBLISHED') {
     styles = 'bg-indigo-950/70 text-indigo-300 border-indigo-500/40 shadow-indigo-500/10';
-  } else if (s === 'SUSPENDED' || s === 'VERIFY' || s === 'SUPPORT') {
+  } else if (s === 'SUSPENDED' || s === 'VERIFY' || s === 'SUPPORT' || s === 'UNIDENTIFIED') {
     styles = 'bg-purple-950/70 text-purple-300 border-purple-500/40 shadow-purple-500/10';
   } else if (s === 'BANNED' || s === 'REJECTED' || s === 'CANCELLED' || s === 'EXPIRED' || s === 'FAILED' || s === 'ERROR' || s === 'DISCONNECTED') {
     styles = 'bg-rose-950/70 text-rose-300 border-rose-500/40 shadow-rose-500/10';
