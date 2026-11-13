@@ -145,6 +145,16 @@ adminRouter.post(
   requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
   AdminPayoutController.manualCreditDeposit
 );
+adminRouter.delete(
+  '/deposits/:id',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  AdminPayoutController.deleteDeposit
+);
+adminRouter.delete(
+  '/deposits',
+  requireAdminRole(['SUPER_ADMIN', 'ADMIN']),
+  AdminPayoutController.clearDeposits
+);
 
 // Receiving Trust Wallet Treasury Configuration
 adminRouter.get('/treasury-settings', AdminPayoutController.getTreasurySettings);

@@ -383,26 +383,33 @@ export class AdminPayoutController {
         if (upper === 'PENDING') {
           where.status = {
             in: [
-              'PENDING',
-              'WAITING_FOR_PAYMENT',
-              'PAYMENT_DETECTED',
-              'CONFIRMING',
               'HASH_SUBMITTED',
               'VERIFYING',
               'AWAITING_CONFIRMATIONS',
+              'PAYMENT_DETECTED',
+              'CONFIRMING',
               'DETECTING',
               'PENDING_CONFIRMATION',
-              'PENDING_PAYMENT',
-              'INITIATED',
+              'UNDER_REVIEW',
+              'PENDING',
             ],
           };
+          where.txHash = { not: null };
         } else if (upper === 'CONFIRMED' || upper === 'SUCCESS' || upper === 'COMPLETED' || upper === 'CREDITED') {
           where.status = {
             in: ['CONFIRMED', 'COMPLETED', 'CREDITED', 'SUCCESS', 'VERIFIED'],
           };
+        } else if (upper === 'INTENTS' || upper === 'WAITING_FOR_PAYMENT') {
+          where.status = 'WAITING_FOR_PAYMENT';
         } else {
           where.status = upper;
         }
+      } else {
+        // By default, exclude unsubmitted browsing intents (where user clicked deposit without transferring or submitting txHash)
+        where.OR = [
+          { txHash: { not: null } },
+          { status: { notIn: ['WAITING_FOR_PAYMENT', 'INITIATED', 'CREATED'] } },
+        ];
       }
 
       if (search && search.trim()) {
@@ -440,20 +447,18 @@ export class AdminPayoutController {
           where: {
             status: {
               in: [
-                'PENDING',
-                'WAITING_FOR_PAYMENT',
-                'PAYMENT_DETECTED',
-                'CONFIRMING',
                 'HASH_SUBMITTED',
                 'VERIFYING',
                 'AWAITING_CONFIRMATIONS',
+                'PAYMENT_DETECTED',
+                'CONFIRMING',
                 'DETECTING',
                 'PENDING_CONFIRMATION',
-                'PENDING_PAYMENT',
-                'INITIATED',
                 'UNDER_REVIEW',
+                'PENDING',
               ],
             },
+            txHash: { not: null },
           },
         }),
       ]);
@@ -983,6 +988,93 @@ export class AdminPayoutController {
       sendSuccess(res, health);
     } catch (err) {
       sendError(res, 'Failed to retrieve RPC health', 500, 'SERVER_ERROR');
+    }
+  }
+
+  /**
+   * DELETE /api/v1/admin/deposits/:id
+   * Permanently deletes a single deposit request.
+   */
+  public static async deleteDeposit(req: AuthenticatedAdminRequest, res: Response): Promise<void> {
+    const { id } = req.params;
+    const adminId = req.admin?.adminId;
+
+    if (!adminId) {
+      sendError(res, 'Unauthorized', 401, 'UNAUTHORIZED');
+      return;
+    }
+
+    try {
+      const deposit = await prisma.deposit.findUnique({ where: { id } });
+      if (!deposit) {
+        sendError(res, 'Deposit not found', 404, 'NOT_FOUND');
+        return;
+      }
+
+      await prisma.deposit.delete({ where: { id } });
+
+      await recordAuditLog({
+        adminId,
+        action: 'DELETE_DEPOSIT',
+        targetEntity: 'Deposit',
+        targetId: id,
+        previousValue: { status: deposit.status, amountUsdt: Number(deposit.amountUsdt), txHash: deposit.txHash },
+        req,
+      });
+
+      sendSuccess(res, { message: 'Deposit request deleted successfully.' });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete deposit';
+      sendError(res, msg, 400, 'DELETE_FAILED');
+    }
+  }
+
+  /**
+   * DELETE /api/v1/admin/deposits
+   * Permanently clears all or filtered deposit requests.
+   */
+  public static async clearDeposits(req: AuthenticatedAdminRequest, res: Response): Promise<void> {
+    const adminId = req.admin?.adminId;
+
+    if (!adminId) {
+      sendError(res, 'Unauthorized', 401, 'UNAUTHORIZED');
+      return;
+    }
+
+    const { status, all } = req.query as { status?: string; all?: string };
+
+    try {
+      let where: any = {};
+      if (all === 'true' || all === '1') {
+        where = {}; // Delete all deposit records
+      } else if (status) {
+        where = { status };
+      } else {
+        // By default, delete unverified/abandoned or rejected deposits
+        where = {
+          status: {
+            in: ['WAITING_FOR_PAYMENT', 'REJECTED', 'FAILED', 'EXPIRED', 'CREATED', 'INITIATED'],
+          },
+        };
+      }
+
+      const result = await prisma.deposit.deleteMany({ where });
+
+      await recordAuditLog({
+        adminId,
+        action: 'CLEAR_DEPOSITS',
+        targetEntity: 'Deposit',
+        newValue: { deletedCount: result.count, criteria: where },
+        req,
+      });
+
+      sendSuccess(res, {
+        deletedCount: result.count,
+        message: `Successfully deleted ${result.count} deposit requests.`,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to clear deposits';
+      sendError(res, msg, 400, 'CLEAR_FAILED');
     }
   }
 }

@@ -518,26 +518,45 @@ export class PayoutController {
       );
       const amountPoops = BigInt(Math.round(amountUsdt * env.POOPS_PER_USDT));
 
-      // 4. Create deposit record with WAITING_FOR_PAYMENT status
+      // 4. Synchronize deposit intent with WAITING_FOR_PAYMENT status
+      // Reuse active unsubmitted intent if one already exists for this user to avoid database spam
       const expiryMinutes = tonConfig?.depositExpiryMinutes || 1440;
       const requiredConfirmations = DepositVerificationService.getRequiredConfirmations(network);
-      const deposit = await prisma.deposit.create({
-        data: {
+      const depositData = {
+        amountUsdt,
+        amountPoops,
+        currency: quote.currency,
+        network,
+        depositAddress,
+        paymentReference,
+        expectedCryptoAmount: quote.cryptoAmount,
+        tokenContract: quote.tokenContract,
+        requiredConfirmations,
+        status: 'WAITING_FOR_PAYMENT' as const,
+        notes: notes ? notes.trim() : `Deposit intent for ${amountUsdt} USDT (${quote.cryptoAmount} ${quote.currency})`,
+        expiresAt: new Date(Date.now() + expiryMinutes * 60 * 1000),
+      };
+
+      const existingIntent = await prisma.deposit.findFirst({
+        where: {
           userId,
-          amountUsdt,
-          amountPoops,
-          currency: quote.currency,
-          network,
-          depositAddress,
-          paymentReference,
-          expectedCryptoAmount: quote.cryptoAmount,
-          tokenContract: quote.tokenContract,
-          requiredConfirmations,
           status: 'WAITING_FOR_PAYMENT',
-          notes: notes ? notes.trim() : `Deposit intent for ${amountUsdt} USDT (${quote.cryptoAmount} ${quote.currency})`,
-          expiresAt: new Date(Date.now() + expiryMinutes * 60 * 1000),
+          txHash: null,
         },
+        orderBy: { createdAt: 'desc' },
       });
+
+      const deposit = existingIntent
+        ? await prisma.deposit.update({
+            where: { id: existingIntent.id },
+            data: depositData,
+          })
+        : await prisma.deposit.create({
+            data: {
+              userId,
+              ...depositData,
+            },
+          });
 
       sendSuccess(res, {
         id: deposit.id,

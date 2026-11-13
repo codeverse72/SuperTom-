@@ -320,6 +320,21 @@ class AdminApiClient {
     });
   }
 
+  public async deleteDeposit(id: string) {
+    return this.request<{ message: string }>(`/deposits/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  public async clearDeposits(params: { all?: boolean; status?: string } = {}) {
+    const q = new URLSearchParams();
+    if (params.all) q.set('all', 'true');
+    if (params.status) q.set('status', params.status);
+    return this.request<{ deletedCount: number; message: string }>(`/deposits?${q.toString()}`, {
+      method: 'DELETE',
+    });
+  }
+
   public async manualCreditDeposit(data: {
     identifier: string;
     amountUsdt: number;

@@ -20,6 +20,7 @@ import {
   Clock,
   AlertTriangle,
   ShieldCheck,
+  Trash2,
 } from 'lucide-react';
 
 export const PayoutsPage: React.FC = () => {
@@ -290,6 +291,35 @@ export const PayoutsPage: React.FC = () => {
       fetchDeposits();
     } else {
       alert(res.error || 'Failed to decline deposit');
+    }
+  };
+
+  const handleDeleteDeposit = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this deposit record? This action cannot be undone.')) {
+      return;
+    }
+    const res = await adminApi.deleteDeposit(id);
+    if (res.success) {
+      alert(res.data?.message || 'Deposit deleted successfully');
+      fetchDeposits();
+    } else {
+      alert(res.error || 'Failed to delete deposit');
+    }
+  };
+
+  const handleClearAllDeposits = async () => {
+    const promptAns = window.prompt(
+      'Type "DELETE" to confirm deleting ALL deposit records from the database:'
+    );
+    if (promptAns !== 'DELETE') {
+      return;
+    }
+    const res = await adminApi.clearDeposits({ all: true });
+    if (res.success) {
+      alert(res.data?.message || 'Successfully cleared deposits.');
+      fetchDeposits();
+    } else {
+      alert(res.error || 'Failed to clear deposits');
     }
   };
 
@@ -640,6 +670,15 @@ export const PayoutsPage: React.FC = () => {
                 >
                   <span>+ Credit Manual Deposit</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={handleClearAllDeposits}
+                  className="px-3.5 py-1.5 rounded-xl bg-rose-950/80 border border-rose-500/40 hover:bg-rose-900 text-rose-300 font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                  title="Purge all deposit requests"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Clear All Deposits</span>
+                </button>
               </div>
             )}
           </div>
@@ -662,13 +701,14 @@ export const PayoutsPage: React.FC = () => {
 
             <div className="flex items-center gap-1.5 flex-wrap">
               {[
-                { label: 'ALL', value: '' },
-                { label: 'PENDING', value: 'PENDING' },
+                { label: 'ALL SUBMITTED', value: '' },
+                { label: 'PENDING REVIEW', value: 'PENDING' },
                 { label: 'CONFIRMING', value: 'CONFIRMING' },
                 { label: 'AWAITING CONFS', value: 'AWAITING_CONFIRMATIONS' },
                 { label: 'CREDITED', value: 'CREDITED' },
                 { label: 'UNIDENTIFIED', value: 'UNIDENTIFIED' },
                 { label: 'REJECTED', value: 'REJECTED' },
+                { label: 'UNSUBMITTED INTENTS', value: 'INTENTS' },
               ].map((filter) => (
                 <button
                   key={filter.label}
@@ -692,6 +732,17 @@ export const PayoutsPage: React.FC = () => {
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
               </button>
+              {hasRole(['SUPER_ADMIN', 'ADMIN']) && (
+                <button
+                  type="button"
+                  onClick={handleClearAllDeposits}
+                  title="Clear all deposits from database"
+                  className="px-2.5 py-1 rounded-lg bg-rose-950/50 border border-rose-500/40 text-rose-300 hover:bg-rose-900/80 text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Clear All</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -763,38 +814,51 @@ export const PayoutsPage: React.FC = () => {
                           {new Date(d.createdAt).toLocaleString()}
                         </td>
                         <td className="py-3 px-4 text-right">
-                          {['PENDING', 'WAITING_FOR_PAYMENT', 'PAYMENT_DETECTED', 'CONFIRMING', 'HASH_SUBMITTED', 'VERIFYING', 'AWAITING_CONFIRMATIONS', 'UNDER_REVIEW'].includes(d.status) && hasRole(['SUPER_ADMIN', 'ADMIN']) && (
-                            <div className="flex items-center justify-end gap-1.5">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {Boolean(d.txHash) &&
+                              ['PENDING', 'PAYMENT_DETECTED', 'CONFIRMING', 'HASH_SUBMITTED', 'VERIFYING', 'AWAITING_CONFIRMATIONS', 'UNDER_REVIEW'].includes(d.status) &&
+                              hasRole(['SUPER_ADMIN', 'ADMIN']) && (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      setConfirmDepositItem(d);
+                                      setDepositTxHash(d.txHash && d.txHash !== 'Pending on-chain verification' ? d.txHash : '');
+                                      let boost = '0';
+                                      if (d.notes?.includes('Diamond') || d.notes?.includes('1000') || d.notes?.includes('1,000')) boost = '1000';
+                                      else if (d.notes?.includes('Gold') || d.notes?.includes('200')) boost = '200';
+                                      else if (d.notes?.includes('Silver') || d.notes?.includes('50')) boost = '50';
+                                      else if (d.notes?.includes('Common') || d.notes?.includes('10')) boost = '10';
+                                      setConfirmDepositBoost(boost);
+                                    }}
+                                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] shadow-sm flex items-center gap-1 cursor-pointer transition-all"
+                                    title="Confirm & credit deposit"
+                                  >
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    <span>Confirm</span>
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setDeclineDepositItem(d);
+                                      setDeclineDepositReason('');
+                                    }}
+                                    className="px-2 py-1 rounded-lg bg-rose-950 border border-rose-500/40 text-rose-300 font-bold hover:bg-rose-900/60 text-[11px] flex items-center gap-1 cursor-pointer transition-all"
+                                    title="Decline deposit request"
+                                  >
+                                    <XCircle className="w-3 h-3" />
+                                    <span>Decline</span>
+                                  </button>
+                                </>
+                            )}
+                            {hasRole(['SUPER_ADMIN', 'ADMIN']) && (
                               <button
-                                onClick={() => {
-                                  setConfirmDepositItem(d);
-                                  setDepositTxHash(d.txHash && d.txHash !== 'Pending on-chain verification' ? d.txHash : '');
-                                  let boost = '0';
-                                  if (d.notes?.includes('Diamond') || d.notes?.includes('1000') || d.notes?.includes('1,000')) boost = '1000';
-                                  else if (d.notes?.includes('Gold') || d.notes?.includes('200')) boost = '200';
-                                  else if (d.notes?.includes('Silver') || d.notes?.includes('50')) boost = '50';
-                                  else if (d.notes?.includes('Common') || d.notes?.includes('10')) boost = '10';
-                                  setConfirmDepositBoost(boost);
-                                }}
-                                className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] shadow-sm flex items-center gap-1 cursor-pointer transition-all"
-                                title="Confirm & credit deposit"
+                                onClick={() => handleDeleteDeposit(d.id)}
+                                className="p-1.5 rounded-lg bg-purple-950/40 border border-purple-900/40 text-slate-400 hover:text-rose-400 hover:border-rose-500/40 cursor-pointer transition-all"
+                                title="Delete this deposit record"
                               >
-                                <CheckCircle2 className="w-3 h-3" />
-                                <span>Confirm</span>
+                                <Trash2 className="w-3 h-3" />
                               </button>
-                              <button
-                                onClick={() => {
-                                  setDeclineDepositItem(d);
-                                  setDeclineDepositReason('');
-                                }}
-                                className="px-2 py-1 rounded-lg bg-rose-950 border border-rose-500/40 text-rose-300 font-bold hover:bg-rose-900/60 text-[11px] flex items-center gap-1 cursor-pointer transition-all"
-                                title="Decline deposit request"
-                              >
-                                <XCircle className="w-3 h-3" />
-                                <span>Decline</span>
-                              </button>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))
