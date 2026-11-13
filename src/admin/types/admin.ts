@@ -219,13 +219,18 @@ export interface DepositItem {
   depositAddress?: string | null;
   paymentReference?: string | null;
   expectedCryptoAmount?: number | null;
+  receivedCryptoAmount?: number | null;
   fromAddress?: string | null;
   txHash?: string | null;
   status: string;
   confirmations?: number | null;
   requiredConfirmations?: number | null;
   blockNumber?: string | null;
+  explorerUrl?: string | null;
+  failureReason?: string | null;
   notes?: string | null;
+  verifiedAt?: string | null;
+  creditedAt?: string | null;
   createdAt: string;
 }
 

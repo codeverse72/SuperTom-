@@ -305,6 +305,8 @@ export const Payout: React.FC = () => {
   const [depositError, setDepositError] = useState<string | null>(null);
   const [activeDepositId, setActiveDepositId] = useState<string | null>(null);
   const [activeDepositQuote, setActiveDepositQuote] = useState<CreateDepositIntentResponseDto | null>(null);
+  const [depositConfirmations, setDepositConfirmations] = useState<{ current: number; required: number } | null>(null);
+  const [depositExplorerUrl, setDepositExplorerUrl] = useState<string | null>(null);
 
   // Status feedback states matching performance-first specification
   const [isInitiatingPayment, setIsInitiatingPayment] = useState<boolean>(false);
@@ -932,49 +934,62 @@ Payment Reference / Memo: ${memo}`;
       cleanTx = parts[parts.length - 1].replace(/^[#?]/, '').trim() || cleanTx;
     }
 
-    if (cleanTx.length < 6) {
+    if (cleanTx.length < 8) {
       setDepositError('Transaction hash is too short. Please paste a valid transaction hash.');
       return;
     }
 
     setIsVerifyingDeposit(true);
-    setDepositStatus('CONFIRMING');
+    setDepositStatus('VERIFYING');
 
-    if (activeDepositId) {
-      const res = await paymentService.verifyDeposit(activeDepositId, cleanTx, depositAmountUsd);
-      setIsVerifyingDeposit(false);
+    try {
+      if (activeDepositId) {
+        const res = await paymentService.verifyDeposit(activeDepositId, cleanTx);
+        setIsVerifyingDeposit(false);
 
-      if (res.success) {
-        setDepositStatus('PAYMENT_DETECTED');
-        showToast('Proof Submitted!', res.data?.message || 'Transaction submitted for Admin verification. Your balance will be credited once confirmed on-chain.', 'info');
-        refreshDeposits();
-        if (selectedPlanForDeposit) {
-          setSelectedPlanForDeposit(null);
-        }
-      } else {
-        // Fallback to manual submit if needed
-        submitDeposit(depositAmountUsd, activeDepositCurrency?.name || 'USDT', cleanTx).then((subRes) => {
-          if (subRes.success) {
-            setDepositStatus('PAYMENT_DETECTED');
-            showToast('Deposit Proof Submitted', 'Pending on-chain admin confirmation', 'info');
+        if (res.success && res.data) {
+          const data = res.data as any;
+          if (data.explorerUrl) setDepositExplorerUrl(data.explorerUrl);
+          if (data.confirmations !== undefined && data.requiredConfirmations !== undefined) {
+            setDepositConfirmations({ current: data.confirmations, required: data.requiredConfirmations });
+          }
+
+          if (data.isCompleted || data.status === 'CREDITED' || data.status === 'COMPLETED') {
+            setDepositStatus('COMPLETED');
+            showToast('Deposit Verified!', data.message || 'Transaction verified on-chain and credited to your balance!', 'success');
+            refreshDeposits();
+            if (selectedPlanForDeposit) {
+              setSelectedPlanForDeposit(null);
+            }
+          } else if (data.status === 'AWAITING_CONFIRMATIONS') {
+            setDepositStatus('AWAITING_CONFIRMATIONS');
+            showToast('Confirming on Blockchain', data.message || `Confirmations: ${data.confirmations}/${data.requiredConfirmations}`, 'info');
             refreshDeposits();
           } else {
-            setDepositStatus('WAITING_FOR_PAYMENT');
-            setDepositError(res.error?.message || subRes.error || 'Verification failed');
+            setDepositStatus(data.status || 'HASH_SUBMITTED');
+            showToast('Proof Submitted', data.message || 'Transaction received and verifying on-chain.', 'info');
+            refreshDeposits();
           }
-        });
-      }
-    } else {
-      const res = await submitDeposit(depositAmountUsd, activeDepositCurrency?.name || 'USDT', cleanTx);
-      setIsVerifyingDeposit(false);
-      if (res.success) {
-        setDepositStatus('PAYMENT_DETECTED');
-        showToast('Deposit Submitted', 'Deposit received and queued for Admin approval!', 'info');
-        refreshDeposits();
+        } else {
+          setDepositStatus('WAITING_FOR_PAYMENT');
+          setDepositError(res.error?.message || 'Verification failed. Please check the transaction hash.');
+        }
       } else {
-        setDepositStatus('WAITING_FOR_PAYMENT');
-        setDepositError(res.error || 'Failed to submit deposit');
+        const res = await submitDeposit(depositAmountUsd, activeDepositCurrency?.name || 'USDT', cleanTx);
+        setIsVerifyingDeposit(false);
+        if (res.success) {
+          setDepositStatus('HASH_SUBMITTED');
+          showToast('Deposit Submitted', 'Deposit received and queued for blockchain confirmation!', 'info');
+          refreshDeposits();
+        } else {
+          setDepositStatus('WAITING_FOR_PAYMENT');
+          setDepositError(res.error || 'Deposit submission failed');
+        }
       }
+    } catch (err: any) {
+      setIsVerifyingDeposit(false);
+      setDepositStatus('WAITING_FOR_PAYMENT');
+      setDepositError(err?.message || 'Verification failed due to a network error');
     }
   };
 
@@ -2097,15 +2112,21 @@ Payment Reference / Memo: ${memo}`;
               <span>Verify Blockchain Payment</span>
             </h4>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono border ${
-              depositStatus === 'COMPLETED'
+              depositStatus === 'COMPLETED' || depositStatus === 'CREDITED'
                 ? 'bg-emerald-950 text-emerald-400 border-emerald-500/40'
-                : depositStatus === 'PAYMENT_DETECTED'
-                ? 'bg-indigo-950 text-indigo-300 border-indigo-500/40 animate-pulse'
-                : depositStatus === 'CONFIRMING'
+                : depositStatus === 'AWAITING_CONFIRMATIONS' || depositStatus === 'CONFIRMING'
                 ? 'bg-blue-950 text-blue-300 border-blue-500/40 animate-pulse'
+                : depositStatus === 'HASH_SUBMITTED' || depositStatus === 'VERIFYING' || depositStatus === 'PAYMENT_DETECTED'
+                ? 'bg-indigo-950 text-indigo-300 border-indigo-500/40 animate-pulse'
                 : 'bg-amber-950/70 text-amber-300 border-amber-500/40'
             }`}>
-              {depositStatus === 'PAYMENT_DETECTED' ? 'AWAITING ADMIN REVIEW' : depositStatus}
+              {depositStatus === 'COMPLETED' || depositStatus === 'CREDITED'
+                ? 'VERIFIED & CREDITED'
+                : depositStatus === 'AWAITING_CONFIRMATIONS'
+                ? 'CONFIRMING ON-CHAIN'
+                : depositStatus === 'HASH_SUBMITTED' || depositStatus === 'VERIFYING' || depositStatus === 'PAYMENT_DETECTED'
+                ? 'VERIFYING ON-CHAIN'
+                : depositStatus}
             </span>
           </div>
 
@@ -2116,7 +2137,7 @@ Payment Reference / Memo: ${memo}`;
             <input
               type="text"
               required
-              disabled={depositStatus === 'PAYMENT_DETECTED'}
+              disabled={depositStatus === 'COMPLETED' || depositStatus === 'CREDITED'}
               value={depositTxHash}
               onChange={(e) => {
                 setDepositTxHash(e.target.value);
@@ -2134,30 +2155,74 @@ Payment Reference / Memo: ${memo}`;
             </div>
           )}
 
-          {depositStatus === 'PAYMENT_DETECTED' ? (
-            <div className="p-3.5 rounded-xl bg-indigo-950/70 border border-indigo-500/40 text-center space-y-2">
-              <div className="text-xs font-bold text-indigo-300 flex items-center justify-center gap-1.5">
-                <Clock className="w-4 h-4 text-indigo-400 animate-spin" />
-                <span>Payment Proof Under Review</span>
+          {depositStatus === 'COMPLETED' || depositStatus === 'CREDITED' ? (
+            <div className="p-3.5 rounded-xl bg-emerald-950/70 border border-emerald-500/40 text-center space-y-2">
+              <div className="text-xs font-bold text-emerald-300 flex items-center justify-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>Deposit Verified & Balance Credited!</span>
               </div>
               <p className="text-[11px] text-slate-300 leading-relaxed">
-                Your transaction hash has been sent to the Admin Panel. Your TomCoins will be credited as soon as an Admin approves the on-chain transfer!
+                Your transaction has been verified directly on the blockchain. Your TomCoins balance and entitlements have been updated automatically!
               </p>
-              <a
-                href="https://t.me/SuperTomCare"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => {
-                  if (window.Telegram?.WebApp?.openTelegramLink) {
-                    e.preventDefault();
-                    window.Telegram.WebApp.openTelegramLink('https://t.me/SuperTomCare');
-                  }
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 hover:text-emerald-200 text-[11px] font-bold transition-all cursor-pointer"
-              >
-                <Headphones className="w-3.5 h-3.5" />
-                <span>Need fast-track verification? Contact @SuperTomCare</span>
-              </a>
+              {depositExplorerUrl && (
+                <a
+                  href={depositExplorerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 hover:text-emerald-200 text-[11px] font-bold transition-all cursor-pointer"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>View on Blockchain Explorer</span>
+                </a>
+              )}
+            </div>
+          ) : depositStatus === 'AWAITING_CONFIRMATIONS' ? (
+            <div className="p-3.5 rounded-xl bg-blue-950/70 border border-blue-500/40 text-center space-y-2">
+              <div className="text-xs font-bold text-blue-300 flex items-center justify-center gap-1.5">
+                <Clock className="w-4 h-4 text-blue-400 animate-spin" />
+                <span>Confirming on Blockchain ({depositConfirmations?.current || 0} / {depositConfirmations?.required || 1})</span>
+              </div>
+              <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-gradient-to-r from-blue-500 to-cyan-400 h-2 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, Math.round(((depositConfirmations?.current || 0) / (depositConfirmations?.required || 1)) * 100))}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                Transaction detected on-chain! Waiting for confirmations. Balance will be credited automatically with ZERO admin approval needed.
+              </p>
+              {depositExplorerUrl && (
+                <a
+                  href={depositExplorerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/20 border border-blue-500/40 text-blue-300 hover:text-blue-200 text-[11px] font-bold transition-all cursor-pointer"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>View on Explorer</span>
+                </a>
+              )}
+            </div>
+          ) : depositStatus === 'HASH_SUBMITTED' || depositStatus === 'VERIFYING' || depositStatus === 'PAYMENT_DETECTED' ? (
+            <div className="p-3.5 rounded-xl bg-indigo-950/70 border border-indigo-500/40 text-center space-y-2">
+              <div className="text-xs font-bold text-indigo-300 flex items-center justify-center gap-1.5">
+                <RefreshCw className="w-4 h-4 text-indigo-400 animate-spin" />
+                <span>Verifying on Blockchain...</span>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                Querying node RPCs for transaction inclusion. Balance will credit automatically upon confirmation.
+              </p>
+              {depositExplorerUrl && (
+                <a
+                  href={depositExplorerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 hover:text-indigo-200 text-[11px] font-bold transition-all cursor-pointer"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>View on Explorer</span>
+                </a>
+              )}
             </div>
           ) : (
             <button
@@ -2168,12 +2233,12 @@ Payment Reference / Memo: ${memo}`;
               {isVerifyingDeposit ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin text-cyan-300" />
-                  <span>Submitting Proof to Admin...</span>
+                  <span>Verifying on Blockchain...</span>
                 </>
               ) : (
                 <>
-                  <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                  <span>I HAVE SENT PAYMENT / SUBMIT PROOF</span>
+                  <ShieldCheck className="w-4 h-4 text-emerald-300" />
+                  <span>VERIFY & CREDIT DEPOSIT AUTOMATICALLY</span>
                 </>
               )}
             </button>

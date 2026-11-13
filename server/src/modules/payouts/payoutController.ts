@@ -520,6 +520,7 @@ export class PayoutController {
 
       // 4. Create deposit record with WAITING_FOR_PAYMENT status
       const expiryMinutes = tonConfig?.depositExpiryMinutes || 1440;
+      const requiredConfirmations = DepositVerificationService.getRequiredConfirmations(network);
       const deposit = await prisma.deposit.create({
         data: {
           userId,
@@ -530,6 +531,8 @@ export class PayoutController {
           depositAddress,
           paymentReference,
           expectedCryptoAmount: quote.cryptoAmount,
+          tokenContract: quote.tokenContract,
+          requiredConfirmations,
           status: 'WAITING_FOR_PAYMENT',
           notes: notes ? notes.trim() : `Deposit intent for ${amountUsdt} USDT (${quote.cryptoAmount} ${quote.currency})`,
           expiresAt: new Date(Date.now() + expiryMinutes * 60 * 1000),
@@ -631,8 +634,15 @@ export class PayoutController {
         depositAddress: deposit.depositAddress,
         paymentReference: deposit.paymentReference,
         txHash: deposit.txHash || undefined,
+        confirmations: deposit.confirmations,
+        requiredConfirmations: deposit.requiredConfirmations,
+        explorerUrl: deposit.explorerUrl || (deposit.txHash ? DepositVerificationService.getExplorerUrl(deposit.network, deposit.txHash) : undefined),
+        receivedCryptoAmount: deposit.receivedCryptoAmount ? Number(deposit.receivedCryptoAmount) : undefined,
+        failureReason: deposit.failureReason || undefined,
+        verifiedAt: deposit.verifiedAt?.getTime() || undefined,
+        creditedAt: deposit.creditedAt?.getTime() || undefined,
         confirmedAt: deposit.confirmedAt?.getTime() || undefined,
-        isCompleted: deposit.status === 'COMPLETED' || deposit.status === 'CONFIRMED',
+        isCompleted: ['COMPLETED', 'CONFIRMED', 'CREDITED', 'SUCCESS'].includes(deposit.status),
       });
     } catch {
       sendError(res, 'Failed to fetch deposit status', 500, 'SERVER_ERROR');
@@ -641,8 +651,9 @@ export class PayoutController {
 
   /**
    * POST /api/v1/payouts/deposits/:id/verify
-   * Submit transaction hash for on-chain Admin review and verification.
-   * SECURITY ENFORCEMENT: No user can ever self-credit funds. Balance is ONLY credited upon explicit Admin approval.
+   * Secure, fully automated on-chain blockchain transaction verification endpoint.
+   * NO USER MANIPULATION: Client-submitted amounts/currencies are strictly ignored.
+   * Funds and rewards are ONLY credited upon authentic on-chain proof.
    */
   public static async verifyDeposit(req: AuthenticatedRequest, res: Response): Promise<void> {
     const userId = req.user?.userId;
@@ -658,11 +669,16 @@ export class PayoutController {
       return;
     }
 
-    const { txHash, amountUsdt } = parse.data;
+    const { txHash } = parse.data;
     let cleanTx = txHash.trim();
     if (cleanTx.includes('/')) {
       const parts = cleanTx.split('/');
       cleanTx = parts[parts.length - 1].replace(/^[#?]/, '').trim() || cleanTx;
+    }
+
+    if (cleanTx.length < 8) {
+      sendError(res, 'Invalid transaction hash format.', 422, 'INVALID_TX_HASH');
+      return;
     }
 
     try {
@@ -675,63 +691,45 @@ export class PayoutController {
         return;
       }
 
-      if (deposit.status === 'COMPLETED' || deposit.status === 'CONFIRMED') {
-        sendError(res, 'This deposit has already been confirmed and credited.', 400, 'ALREADY_COMPLETED');
+      if (['COMPLETED', 'CONFIRMED', 'CREDITED', 'SUCCESS'].includes(deposit.status)) {
+        sendError(res, 'This deposit has already been verified and credited.', 400, 'ALREADY_COMPLETED');
         return;
       }
 
-      // Check transaction hash uniqueness across all other completed/confirmed deposits
+      // Check transaction hash uniqueness across all other completed deposits
       const existingHash = await prisma.deposit.findFirst({
         where: {
           txHash: cleanTx,
           id: { not: id },
-          status: { in: ['CONFIRMED', 'COMPLETED', 'PAYMENT_DETECTED'] },
+          status: { in: ['CONFIRMED', 'COMPLETED', 'CREDITED', 'SUCCESS'] },
         },
       });
 
       if (existingHash) {
-        sendError(res, 'This transaction hash has already been submitted for verification.', 400, 'DUPLICATE_TX_HASH');
+        sendError(res, 'This transaction hash has already been credited to another deposit.', 400, 'DUPLICATE_TX_HASH');
         return;
       }
 
-      const finalAmountUsdt = amountUsdt ? amountUsdt : Number(deposit.amountUsdt);
-      const finalAmountPoops = BigInt(Math.round(finalAmountUsdt * env.POOPS_PER_USDT));
+      // Execute on-chain blockchain verification and automatic crediting engine
+      const verifyResult = await DepositVerificationService.verifyAndProcessDeposit(id, cleanTx);
 
-      // Update deposit with submitted txHash and set status to PAYMENT_DETECTED
-      const updated = await prisma.deposit.update({
-        where: { id },
-        data: {
-          txHash: cleanTx,
-          amountUsdt: finalAmountUsdt,
-          amountPoops: finalAmountPoops,
-          status: 'PAYMENT_DETECTED',
-          notes: deposit.notes ? `${deposit.notes} | TX submitted by user for verification` : 'TX submitted for verification',
-        },
-      });
-
-      // Attempt immediate on-chain blockchain verification
-      try {
-        const onChainRes = await DepositVerificationService.checkOnChainDeposit(id, userId);
-        if (onChainRes.success && onChainRes.isCompleted) {
-          sendSuccess(res, {
-            success: true,
-            isCompleted: true,
-            status: 'COMPLETED',
-            txHash: cleanTx,
-            newBalance: onChainRes.newBalance,
-            message: 'Transaction confirmed on blockchain! Balance credited successfully.',
-          });
-          return;
-        }
-      } catch {
-        // Fallback to PAYMENT_DETECTED state
+      if (verifyResult.status === 'REJECTED') {
+        sendError(res, verifyResult.message || 'Transaction verification failed on blockchain.', 400, 'VERIFICATION_REJECTED', {
+          explorerUrl: verifyResult.explorerUrl,
+        });
+        return;
       }
 
       sendSuccess(res, {
-        success: true,
-        isCompleted: false,
-        status: updated.status,
-        message: 'Transaction proof submitted successfully! Your deposit is currently pending verification and will be credited once confirmed on-chain.',
+        success: verifyResult.success,
+        isCompleted: verifyResult.isCompleted,
+        status: verifyResult.status,
+        txHash: cleanTx,
+        explorerUrl: verifyResult.explorerUrl,
+        confirmations: verifyResult.confirmations,
+        requiredConfirmations: verifyResult.requiredConfirmations,
+        newBalance: verifyResult.newBalance,
+        message: verifyResult.message,
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Verification failed';

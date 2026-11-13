@@ -665,7 +665,8 @@ export const PayoutsPage: React.FC = () => {
                 { label: 'ALL', value: '' },
                 { label: 'PENDING', value: 'PENDING' },
                 { label: 'CONFIRMING', value: 'CONFIRMING' },
-                { label: 'SUCCESS', value: 'SUCCESS' },
+                { label: 'AWAITING CONFS', value: 'AWAITING_CONFIRMATIONS' },
+                { label: 'CREDITED', value: 'CREDITED' },
                 { label: 'UNIDENTIFIED', value: 'UNIDENTIFIED' },
                 { label: 'REJECTED', value: 'REJECTED' },
               ].map((filter) => (
@@ -729,14 +730,32 @@ export const PayoutsPage: React.FC = () => {
                             <div className="text-[10px] text-amber-400">Memo: {d.paymentReference}</div>
                           )}
                         </td>
-                        <td className="py-3 px-4 font-mono text-slate-400 text-[11px] truncate max-w-[150px]">
-                          {d.txHash || 'Pending on-chain verification'}
+                        <td className="py-3 px-4 font-mono text-slate-400 text-[11px] max-w-[150px]">
+                          {d.txHash ? (
+                            <a
+                              href={d.explorerUrl || `https://bscscan.com/tx/${d.txHash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sky-400 hover:text-sky-300 hover:underline flex items-center gap-1 font-mono text-[11px]"
+                              title={d.txHash}
+                            >
+                              <span className="truncate">{d.txHash.length > 16 ? `${d.txHash.slice(0, 8)}...${d.txHash.slice(-6)}` : d.txHash}</span>
+                              <ExternalLink className="w-3 h-3 shrink-0" />
+                            </a>
+                          ) : (
+                            <span className="text-slate-500">Pending TXID</span>
+                          )}
                         </td>
                         <td className="py-3 px-4">
                           <Badge status={d.status} />
-                          {d.requiredConfirmations && d.requiredConfirmations > 1 && ['CONFIRMING', 'PENDING_CONFIRMATION'].includes(d.status) && (
+                          {d.requiredConfirmations && d.requiredConfirmations > 1 && ['CONFIRMING', 'PENDING_CONFIRMATION', 'AWAITING_CONFIRMATIONS', 'VERIFYING'].includes(d.status) && (
                             <div className="text-[10px] text-sky-400 font-mono mt-0.5">
                               {d.confirmations || 0}/{d.requiredConfirmations} confs
+                            </div>
+                          )}
+                          {d.failureReason && (
+                            <div className="text-[10px] text-rose-400 font-mono mt-0.5 truncate max-w-[120px]" title={d.failureReason}>
+                              {d.failureReason}
                             </div>
                           )}
                         </td>
@@ -744,7 +763,7 @@ export const PayoutsPage: React.FC = () => {
                           {new Date(d.createdAt).toLocaleString()}
                         </td>
                         <td className="py-3 px-4 text-right">
-                          {['PENDING', 'WAITING_FOR_PAYMENT', 'PAYMENT_DETECTED', 'CONFIRMING'].includes(d.status) && hasRole(['SUPER_ADMIN', 'ADMIN']) && (
+                          {['PENDING', 'WAITING_FOR_PAYMENT', 'PAYMENT_DETECTED', 'CONFIRMING', 'HASH_SUBMITTED', 'VERIFYING', 'AWAITING_CONFIRMATIONS', 'UNDER_REVIEW'].includes(d.status) && hasRole(['SUPER_ADMIN', 'ADMIN']) && (
                             <div className="flex items-center justify-end gap-1.5">
                               <button
                                 onClick={() => {

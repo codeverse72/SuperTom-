@@ -202,9 +202,12 @@ export class AutoDepositMonitor {
       where: {
         status: {
           in: [
+            'HASH_SUBMITTED' as DepositStatus,
+            'VERIFYING' as DepositStatus,
+            'AWAITING_CONFIRMATIONS' as DepositStatus,
+            'CONFIRMING' as DepositStatus,
             'DETECTING' as DepositStatus,
             'PENDING_CONFIRMATION' as DepositStatus,
-            'CONFIRMING' as DepositStatus,
             'PAYMENT_DETECTED' as DepositStatus,
             'WAITING_FOR_PAYMENT' as DepositStatus,
             'PENDING' as DepositStatus,
@@ -220,7 +223,7 @@ export class AutoDepositMonitor {
     for (const deposit of pendingDeposits) {
       if (!deposit.txHash) continue;
       try {
-        await this.verifySingleDeposit(deposit);
+        await DepositVerificationService.verifyAndProcessDeposit(deposit.id, deposit.txHash);
       } catch (err) {
         logger.warn(`[AutoDepositMonitor] Error verifying deposit ${deposit.id}:`, err);
       }
@@ -394,7 +397,7 @@ export class AutoDepositMonitor {
     const existing = await prisma.deposit.findFirst({
       where: {
         txHash: cleanHash,
-        status: { in: ['SUCCESS' as DepositStatus, 'COMPLETED' as DepositStatus, 'CONFIRMED' as DepositStatus] },
+        status: { in: ['SUCCESS' as DepositStatus, 'COMPLETED' as DepositStatus, 'CONFIRMED' as DepositStatus, 'CREDITED' as DepositStatus] },
       },
     });
 

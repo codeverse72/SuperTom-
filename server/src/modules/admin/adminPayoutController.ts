@@ -382,13 +382,25 @@ export class AdminPayoutController {
         const upper = status.toUpperCase();
         if (upper === 'PENDING') {
           where.status = {
-            in: ['PENDING', 'WAITING_FOR_PAYMENT', 'PAYMENT_DETECTED', 'CONFIRMING'],
+            in: [
+              'PENDING',
+              'WAITING_FOR_PAYMENT',
+              'PAYMENT_DETECTED',
+              'CONFIRMING',
+              'HASH_SUBMITTED',
+              'VERIFYING',
+              'AWAITING_CONFIRMATIONS',
+              'DETECTING',
+              'PENDING_CONFIRMATION',
+              'PENDING_PAYMENT',
+              'INITIATED',
+            ],
           };
-        } else if (upper === 'CONFIRMED') {
+        } else if (upper === 'CONFIRMED' || upper === 'SUCCESS' || upper === 'COMPLETED' || upper === 'CREDITED') {
           where.status = {
-            in: ['CONFIRMED', 'COMPLETED'],
+            in: ['CONFIRMED', 'COMPLETED', 'CREDITED', 'SUCCESS', 'VERIFIED'],
           };
-        } else if (['REJECTED', 'FAILED', 'EXPIRED', 'CREATED'].includes(upper)) {
+        } else {
           where.status = upper;
         }
       }
@@ -421,13 +433,26 @@ export class AdminPayoutController {
           },
         }),
         prisma.deposit.aggregate({
-          where: { status: { in: ['CONFIRMED', 'COMPLETED'] } },
+          where: { status: { in: ['CONFIRMED', 'COMPLETED', 'CREDITED', 'SUCCESS'] } },
           _sum: { amountUsdt: true, amountPoops: true },
         }),
         prisma.deposit.count({
           where: {
             status: {
-              in: ['PENDING', 'WAITING_FOR_PAYMENT', 'PAYMENT_DETECTED', 'CONFIRMING'],
+              in: [
+                'PENDING',
+                'WAITING_FOR_PAYMENT',
+                'PAYMENT_DETECTED',
+                'CONFIRMING',
+                'HASH_SUBMITTED',
+                'VERIFYING',
+                'AWAITING_CONFIRMATIONS',
+                'DETECTING',
+                'PENDING_CONFIRMATION',
+                'PENDING_PAYMENT',
+                'INITIATED',
+                'UNDER_REVIEW',
+              ],
             },
           },
         }),
@@ -455,9 +480,16 @@ export class AdminPayoutController {
           depositAddress: d.depositAddress,
           paymentReference: d.paymentReference,
           expectedCryptoAmount: d.expectedCryptoAmount ? Number(d.expectedCryptoAmount) : null,
+          receivedCryptoAmount: d.receivedCryptoAmount ? Number(d.receivedCryptoAmount) : null,
           txHash: d.txHash,
+          confirmations: d.confirmations,
+          requiredConfirmations: d.requiredConfirmations,
+          explorerUrl: d.explorerUrl || (d.txHash ? DepositVerificationService.getExplorerUrl(d.network, d.txHash) : undefined),
+          failureReason: d.failureReason,
           status: d.status,
           notes: d.notes,
+          verifiedAt: d.verifiedAt,
+          creditedAt: d.creditedAt,
           createdAt: d.createdAt,
         })),
       });
@@ -556,8 +588,8 @@ export class AdminPayoutController {
           throw new Error('Deposit not found');
         }
 
-        if (!['PENDING', 'WAITING_FOR_PAYMENT', 'PAYMENT_DETECTED', 'CONFIRMING'].includes(deposit.status)) {
-          throw new Error(`Cannot confirm deposit with status: ${deposit.status}`);
+        if (['CONFIRMED', 'COMPLETED', 'CREDITED', 'SUCCESS'].includes(deposit.status)) {
+          throw new Error(`Deposit is already confirmed and credited`);
         }
 
         // Auto-detect mining plan boost from deposit notes if not explicitly passed

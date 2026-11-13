@@ -50,8 +50,18 @@ export const paymentService = {
     return apiClient.post<import('./types').CheckOnChainResponseDto>(`/payouts/deposits/${depositId}/check-onchain`);
   },
 
-  verifyDeposit: async (depositId: string, txHash: string, amountUsdt?: number): Promise<ApiResponse<{ success: boolean; message: string; newBalance?: number }>> => {
-    return apiClient.post<{ success: boolean; message: string; newBalance?: number }>(`/payouts/deposits/${depositId}/verify`, { txHash, amountUsdt });
+  verifyDeposit: async (depositId: string, txHash: string): Promise<ApiResponse<{
+    success: boolean;
+    isCompleted?: boolean;
+    status: string;
+    txHash?: string;
+    explorerUrl?: string;
+    confirmations?: number;
+    requiredConfirmations?: number;
+    newBalance?: number;
+    message: string;
+  }>> => {
+    return apiClient.post(`/payouts/deposits/${depositId}/verify`, { txHash });
   },
 
   getWithdrawalEntitlement: async (): Promise<ApiResponse<import('./types').WithdrawalEntitlementDto>> => {

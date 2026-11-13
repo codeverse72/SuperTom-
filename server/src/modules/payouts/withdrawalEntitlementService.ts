@@ -41,7 +41,7 @@ export class WithdrawalEntitlementService {
     const confirmedDeposits = await prisma.deposit.findMany({
       where: {
         userId,
-        status: { in: ['CONFIRMED', 'COMPLETED'] },
+        status: { in: ['CONFIRMED', 'COMPLETED', 'CREDITED', 'SUCCESS'] },
       },
       select: {
         amountUsdt: true,
@@ -159,7 +159,7 @@ export class WithdrawalEntitlementService {
       const deposits = await tx.deposit.findMany({
         where: {
           userId,
-          status: { in: ['CONFIRMED', 'COMPLETED'] },
+          status: { in: ['CONFIRMED', 'COMPLETED', 'CREDITED', 'SUCCESS'] },
         },
         select: { amountUsdt: true },
       });

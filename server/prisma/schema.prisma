@@ -40,6 +40,14 @@ enum DepositStatus {
   UNDERPAID
   OVERPAID
   UNIDENTIFIED
+  INITIATED
+  PENDING_PAYMENT
+  HASH_SUBMITTED
+  VERIFYING
+  AWAITING_CONFIRMATIONS
+  VERIFIED
+  CREDITED
+  UNDER_REVIEW
 }
 
 enum CurrencyType {
@@ -410,6 +418,12 @@ model Deposit {
   requiredConfirmations Int           @default(1)
   blockNumber           BigInt?
   fromAddress           String?
+  tokenContract         String?
+  verifiedAt            DateTime?
+  creditedAt            DateTime?
+  failureReason         String?
+  rewardAmount          Decimal?      @db.Decimal(18, 4)
+  explorerUrl           String?
   notes                 String?
   confirmedAt           DateTime?
   expiresAt             DateTime?
