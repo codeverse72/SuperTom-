@@ -102,7 +102,7 @@ export const Profile: React.FC = () => {
         {/* Highlight Stats Row */}
         <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-purple-500/20 text-center">
           <div className="p-2 rounded-2xl bg-purple-950/40 border border-purple-500/20">
-            <span className="text-[10px] uppercase font-bold text-purple-300/80 block">Poops</span>
+            <span className="text-[10px] uppercase font-bold text-amber-300/80 block">TomCoins</span>
             <span className="text-sm font-black text-amber-400 font-mono tabular-nums">
               {formatNumber(balance)}
             </span>
@@ -161,7 +161,7 @@ export const Profile: React.FC = () => {
             </div>
             <div>
               <span className="text-sm font-bold text-white font-display">Referral Program</span>
-              <p className="text-[11px] text-purple-300/70">{user?.friendsInvited ?? 0} friends invited · +{user?.referralEarnings ?? 0} Poops earned</p>
+              <p className="text-[11px] text-purple-300/70">{user?.friendsInvited ?? 0} friends invited · +{user?.referralEarnings ?? 0} TomCoins earned</p>
             </div>
           </div>
           <ChevronRight className="w-4 h-4 text-purple-400" />
@@ -283,7 +283,7 @@ export const Profile: React.FC = () => {
               </div>
               <div className="p-3 rounded-2xl bg-purple-950/60 border border-purple-500/20 flex justify-between">
                 <span className="text-purple-300">Current Production:</span>
-                <span className="font-bold text-emerald-400">{productionRate !== null ? `+${productionRate} Poops / hr` : '0 Poops / hr'}</span>
+                <span className="font-bold text-emerald-400">{productionRate !== null ? `+${productionRate} TomCoins / hr` : '0 TomCoins / hr'}</span>
               </div>
               <div className="p-3 rounded-2xl bg-purple-950/60 border border-purple-500/20 flex justify-between">
                 <span className="text-purple-300">Account Rank:</span>
@@ -312,7 +312,7 @@ export const Profile: React.FC = () => {
             </div>
             <div className="py-4 space-y-3">
               <p className="text-xs text-purple-200/90 leading-relaxed">
-                Earn <strong className="text-amber-300">450 Poops</strong> for every friend who joins SuperTom via your referral link, plus 10% of their biscuit production!
+                Earn <strong className="text-amber-300">450 TomCoins</strong> for every friend who joins SuperTom via your referral link, plus 10% of their biscuit production!
               </p>
 
               <div className="p-3 rounded-2xl bg-purple-950/80 border border-purple-500/30 flex items-center justify-between gap-2">
@@ -402,15 +402,15 @@ export const Profile: React.FC = () => {
               </div>
 
               <div className="p-3 rounded-2xl bg-purple-950/60 border border-purple-500/20">
-                <h4 className="font-bold text-amber-300">How do I mine Poops?</h4>
+                <h4 className="font-bold text-amber-300">How do I mine TomCoins?</h4>
                 <p className="text-purple-200/80 mt-1">
-                  King Tom automatically generates Poops every hour. Feed him biscuits in the Store to increase his production rate permanently!
+                  King Tom automatically generates TomCoins every hour. Feed him biscuits in the Store to increase his production rate permanently!
                 </p>
               </div>
               <div className="p-3 rounded-2xl bg-purple-950/60 border border-purple-500/20">
                 <h4 className="font-bold text-amber-300">What is the USDT conversion?</h4>
                 <p className="text-purple-200/80 mt-1">
-                  2,000 Poops = 1 USDT. You can request withdrawals in the Withdraw tab starting from $1.00 USD (2,000 Poops).
+                  2,000 TomCoins = 1 USDT. You can request withdrawals in the Withdraw tab starting from $1.00 USD (2,000 TomCoins).
                 </p>
               </div>
               <div className="p-3 rounded-2xl bg-purple-950/60 border border-purple-500/20">
@@ -442,7 +442,7 @@ export const Profile: React.FC = () => {
             </div>
             <div className="py-4 space-y-2.5 text-xs text-purple-200/90 leading-relaxed">
               <p>
-                <strong>SuperTom</strong> is the royal feline sovereign of the blockchain bakery. Wearing cool sunglasses and a 24k crown, he turns delicious biscuits into valuable Poop currency.
+                <strong>SuperTom</strong> is the royal feline sovereign of the blockchain bakery. Wearing cool sunglasses and a 24k crown, he turns delicious biscuits into valuable TomCoin ($TOM) currency.
               </p>
               <div className="p-3 rounded-2xl bg-purple-950/60 border border-purple-500/20 font-mono text-[10px]">
                 <div>Version: 1.0.0 (Production Frontend)</div>

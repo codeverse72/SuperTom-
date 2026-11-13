@@ -32,7 +32,7 @@ async function bootstrap() {
     try {
       const res = await CampaignService.processScheduledDailyRewards();
       if (res.processedCount > 0) {
-        logger.info(`[CampaignScheduler] Auto-credited ${res.processedCount} daily rewards (+${res.totalPoopsAwarded.toLocaleString()} Poops).`);
+        logger.info(`[CampaignScheduler] Auto-credited ${res.processedCount} daily rewards (+${res.totalPoopsAwarded.toLocaleString()} TomCoins).`);
       }
     } catch (schedErr) {
       logger.error('[CampaignScheduler] Error in daily reward job:', schedErr);
@@ -58,7 +58,7 @@ async function bootstrap() {
     try {
       const res = await MiningService.processScheduledHourlySettlements();
       if (res.processedCount > 0) {
-        logger.info(`[MiningScheduler] Auto-credited ${res.processedCount} players (+${res.totalPoopsAwarded.toLocaleString()} Poops hourly additions).`);
+        logger.info(`[MiningScheduler] Auto-credited ${res.processedCount} players (+${res.totalPoopsAwarded.toLocaleString()} TomCoins hourly additions).`);
       }
     } catch (miningErr) {
       logger.error('[MiningScheduler] Error in hourly mining job:', miningErr);

@@ -356,7 +356,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
               if (init.mining.settledAmount && init.mining.settledAmount > 0) {
                 showToast(
                   'Hourly Mining Added!',
-                  `+${init.mining.settledAmount.toLocaleString()} Poops added to main balance (${init.mining.completedHoursSettled || 1} hr${(init.mining.completedHoursSettled || 1) > 1 ? 's' : ''})!`,
+                  `+${init.mining.settledAmount.toLocaleString()} TomCoins added to main balance (${init.mining.completedHoursSettled || 1} hr${(init.mining.completedHoursSettled || 1) > 1 ? 's' : ''})!`,
                   'reward'
                 );
               }
@@ -499,7 +499,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (res.success && res.data) {
           if (res.data.claimedAmount > 0) {
             setBalance(res.data.newBalance);
-            showToast('Hourly Mining Added!', `+${res.data.claimedAmount.toLocaleString()} Poops added to main balance!`, 'reward');
+            showToast('Hourly Mining Added!', `+${res.data.claimedAmount.toLocaleString()} TomCoins added to main balance!`, 'reward');
           }
           const nextMs = (res.data as any).msUntilNextHour ?? 3600 * 1000;
           setNextMiningAdditionTimestamp(Date.now() + nextMs);
@@ -718,7 +718,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (missionId === 'm7_watch_30_ads') {
         if (res.data.verified) {
-          showToast('Quest Complete!', 'All 30 ads watched today! Claim your 500 Poops reward.', 'reward');
+          showToast('Quest Complete!', 'All 30 ads watched today! Claim your 500 TomCoins reward.', 'reward');
         } else {
           showToast(
             'Ad Watched!',
@@ -760,7 +760,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setMissions((prev) =>
           prev.map((m) => (m.id === missionId ? { ...m, status: 'claimed' } : m))
         );
-        showToast('Bounty Claimed!', `+${res.data.rewardPoops.toLocaleString()} Poops credited!`, 'reward');
+        showToast('Bounty Claimed!', `+${res.data.rewardPoops.toLocaleString()} TomCoins credited!`, 'reward');
       }
     });
 

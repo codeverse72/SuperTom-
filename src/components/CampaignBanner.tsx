@@ -158,7 +158,7 @@ export const CampaignBanner: React.FC<CampaignBannerProps> = ({ onApplyDeposit }
           <div className="p-2.5 rounded-2xl bg-purple-950/60 border border-purple-500/30 text-center shadow-md">
             <span className="text-[9px] uppercase font-bold text-purple-300/80 block">Cashback</span>
             <span className="text-xs font-black text-amber-400 font-mono">
-              +{participation.cashbackPoops.toLocaleString()} 💩
+              +{participation.cashbackPoops.toLocaleString()} 👑
             </span>
           </div>
 
@@ -172,7 +172,7 @@ export const CampaignBanner: React.FC<CampaignBannerProps> = ({ onApplyDeposit }
           <div className="p-2.5 rounded-2xl bg-purple-950/60 border border-purple-500/30 text-center shadow-md">
             <span className="text-[9px] uppercase font-bold text-purple-300/80 block">Earned Total</span>
             <span className="text-xs font-black text-emerald-400 font-mono">
-              +{participation.totalDailyPoopsCredited.toLocaleString()} 💩
+              +{participation.totalDailyPoopsCredited.toLocaleString()} 👑
             </span>
           </div>
         </div>
@@ -215,7 +215,7 @@ export const CampaignBanner: React.FC<CampaignBannerProps> = ({ onApplyDeposit }
                       <span className="text-[10px] text-purple-300/70 font-mono">{r.rewardDate}</span>
                     </div>
                     <span className="font-mono font-bold text-amber-300">
-                      +{r.rewardPoops.toLocaleString()} 💩
+                      +{r.rewardPoops.toLocaleString()} 👑
                     </span>
                   </div>
                 ))}
@@ -258,7 +258,7 @@ export const CampaignBanner: React.FC<CampaignBannerProps> = ({ onApplyDeposit }
             💰 30% INSTANT CASHBACK + 🎁 $1 USDT DAILY
           </h4>
           <p className="text-[11px] text-purple-200/90 mt-1 leading-relaxed">
-            Deposit <strong className="text-amber-300 font-mono">$5–$10 USDT</strong> to unlock 30% cashback in Poops plus up to <strong className="text-cyan-300 font-bold">13 days</strong> of 2,000 Poops/day automated rewards!
+            Deposit <strong className="text-amber-300 font-mono">$5–$10 USDT</strong> to unlock 30% cashback in TomCoins plus up to <strong className="text-cyan-300 font-bold">13 days</strong> of 2,000 TomCoins/day automated rewards!
           </p>
         </div>
       </div>

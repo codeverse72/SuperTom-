@@ -33,7 +33,7 @@ export const ProductionCard: React.FC<ProductionCardProps> = ({ onOpenFeeding })
 
             <div>
               <p className="text-[11px] sm:text-xs font-semibold text-purple-200/90 leading-tight">
-                Poop Rate
+                TomCoin Rate
               </p>
               <p className="text-sm sm:text-base font-black text-white leading-tight mt-0.5">
                 {displayRate}

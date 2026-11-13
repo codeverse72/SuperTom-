@@ -272,7 +272,7 @@ export const MissionsPage: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-bold text-slate-300 uppercase mb-1">Reward (Poops)</label>
+              <label className="block font-bold text-slate-300 uppercase mb-1">Reward (TomCoins)</label>
               <input
                 type="number"
                 min={1}

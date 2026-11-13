@@ -160,7 +160,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab = 'home' }) => {
               </a>
 
               <div className="p-3 rounded-2xl bg-purple-900/30 border border-purple-500/20 text-xs text-purple-200/80 leading-relaxed">
-                <span className="font-bold text-amber-300">Conversion Rule:</span> 2,000 Poops = 1 USDT. Feed King Tom biscuits to increase production per hour!
+                <span className="font-bold text-amber-300">Conversion Rule:</span> 2,000 TomCoins = 1 USDT. Feed King Tom biscuits to increase production per hour!
               </div>
             </div>
 
@@ -180,7 +180,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab = 'home' }) => {
           <div className="glass-panel w-full max-w-sm rounded-3xl p-5 border border-purple-500/30 shadow-2xl">
             <h3 className="text-base font-bold text-white font-display text-center">Close SuperTom Mini App?</h3>
             <p className="text-xs text-purple-200/80 text-center mt-2 leading-relaxed">
-              Your cat is actively mining poops! All game calculations continue server-side.
+              Your cat is actively mining TomCoins! All game calculations continue server-side.
             </p>
 
             <div className="mt-5 grid grid-cols-2 gap-3">

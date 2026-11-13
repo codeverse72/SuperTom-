@@ -33,7 +33,7 @@ export const BROADCAST_TEMPLATES: BroadcastTemplate[] = [
     message: [
       '🐱 <b>Hey {firstName}, King Tom misses you!</b>',
       '',
-      '⏰ Your mining vault has been waiting — jump back in to settle your 💩 Poops and keep your hourly rate flowing!',
+      '⏰ Your mining vault has been waiting — jump back in to claim your 👑 TomCoins and keep your hourly rate flowing!',
       '',
       '🍪 Feed Tom a biscuit, collect your earnings, and claim your daily streak before the day resets.',
       '',
@@ -51,14 +51,14 @@ export const BROADCAST_TEMPLATES: BroadcastTemplate[] = [
     message: [
       '🎡 <b>Your Lucky Wheel Awaits, {firstName}!</b>',
       '',
-      '💎 Players are winning bonus Poops and biscuits across the 2h / 4h / 8h milestone cycles.',
+      '💎 Players are winning bonus TomCoins and biscuits across the 2h / 4h / 8h milestone cycles.',
       '',
-      '🔥 Your current balance is <b>{balance} Poops</b> — come spin the wheel and climb toward your next payout!',
+      '🔥 Your current balance is <b>{balance} TomCoins</b> — come spin the wheel and climb toward your next payout!',
     ].join('\n'),
   },
   {
     id: 'wakeup_daily_quests',
-    name: 'Daily Quests & Watch Ads (+500 Poops)',
+    name: 'Daily Quests & Watch Ads (+500 TomCoins)',
     category: 'quests',
     badge: 'Daily Bounty',
     defaultAudience: 'all_active',
@@ -67,25 +67,25 @@ export const BROADCAST_TEMPLATES: BroadcastTemplate[] = [
     message: [
       '🏆 <b>Daily Missions Reset at 00:00 UTC, {firstName}!</b>',
       '',
-      '📺 Watch sponsored ads and complete daily quests to grab extra <b>Poops</b> today.',
+      '📺 Watch sponsored ads and complete daily quests to grab extra <b>TomCoins</b> today.',
       '',
-      '💰 Every Poop brings you closer to USDT &amp; TON withdrawals!',
+      '💰 Every TomCoin brings you closer to USDT &amp; TON withdrawals!',
     ].join('\n'),
   },
   {
     id: 'wakeup_referral_push',
-    name: 'Invite Friends (+450 Poops / Invite)',
+    name: 'Invite Friends (+450 TomCoins / Invite)',
     category: 'growth',
     badge: 'Referrals',
     defaultAudience: 'all_active',
     ctaText: '👥 Invite & Earn +450',
     includeSecondaryButtons: false,
     message: [
-      '👑 <b>Earn +450 Poops Per Friend, {firstName}!</b>',
+      '👑 <b>Earn +450 TomCoins Per Friend, {firstName}!</b>',
       '',
       '🔗 Share your personal invite code <code>{referralCode}</code> with friends on Telegram.',
       '',
-      '🎁 Every friend who opens SuperTom unlocks <b>+450 Poops</b> for you plus ongoing biscuit commissions!',
+      '🎁 Every friend who opens SuperTom unlocks <b>+450 TomCoins</b> for you plus ongoing biscuit commissions!',
     ].join('\n'),
   },
   {
@@ -101,7 +101,7 @@ export const BROADCAST_TEMPLATES: BroadcastTemplate[] = [
       '',
       '✨ SuperTom has fresh daily missions, Lucky Wheel prizes, and live USDT / TON payout options waiting for you.',
       '',
-      '🍪 Pop in for 10 seconds to wake up King Tom and stack more Poops today!',
+      '🍪 Pop in for 10 seconds to wake up King Tom and stack more TomCoins today!',
     ].join('\n'),
   },
   {
@@ -115,9 +115,9 @@ export const BROADCAST_TEMPLATES: BroadcastTemplate[] = [
     message: [
       '💎 <b>SuperTom Updates Are Live!</b>',
       '',
-      '🚀 Miners across the kingdom are feeding Tom, clearing quests, and cashing out Poops into USDT / TON rewards.',
+      '🚀 Miners across the kingdom are feeding Tom, clearing quests, and cashing out TomCoins into USDT / TON rewards.',
       '',
-      '🐱 Jump back in now and grow your stack beyond <b>{balance} Poops</b>!',
+      '🐱 Jump back in now and grow your stack beyond <b>{balance} TomCoins</b>!',
     ].join('\n'),
   },
 ];

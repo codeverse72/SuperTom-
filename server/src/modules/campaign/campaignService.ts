@@ -203,7 +203,7 @@ export class CampaignService {
       qualified: true,
       cashbackPoops,
       rewardDays,
-      message: `Enrolled in 5K Celebration! Credited ${cashbackPoops.toLocaleString()} Poops (30% cashback) + unlocked ${rewardDays} days of daily rewards!`,
+      message: `Enrolled in 5K Celebration! Credited ${cashbackPoops.toLocaleString()} TomCoins (30% cashback) + unlocked ${rewardDays} days of daily rewards!`,
     };
   }
 
@@ -288,13 +288,13 @@ export class CampaignService {
 
           const nextDayIndex = current.daysClaimed + 1;
 
-          // 1. Double-entry ledger balance transaction for 2,000 Poops
+          // 1. Double-entry ledger balance transaction for 2,000 TomCoins
           const { balanceAfter } = await LedgerService.executeBalanceTransaction(tx, {
             userId: current.userId,
             type: 'DAILY_CAMPAIGN_REWARD',
             amount: BigInt(dailyPoops),
             referenceId: current.id,
-            description: `5K Members Celebration: Day ${nextDayIndex} of ${current.totalRewardDays} Daily Reward (2,000 Poops)`,
+            description: `5K Members Celebration: Day ${nextDayIndex} of ${current.totalRewardDays} Daily Reward (2,000 TomCoins)`,
             idempotencyKey: `daily_reward_${current.id}_${nextDayIndex}_${todayDateStr}`,
           });
 

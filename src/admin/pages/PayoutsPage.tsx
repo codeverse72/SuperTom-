@@ -407,7 +407,7 @@ export const PayoutsPage: React.FC = () => {
                   <tr>
                     <th className="py-3 px-4">Player</th>
                     <th className="py-3 px-4">Requested USDT</th>
-                    <th className="py-3 px-4">Poops Deducted</th>
+                    <th className="py-3 px-4">TomCoins Deducted</th>
                     <th className="py-3 px-4">Network & Wallet Address</th>
                     <th className="py-3 px-4">Status</th>
                     <th className="py-3 px-4">Date</th>
@@ -426,7 +426,7 @@ export const PayoutsPage: React.FC = () => {
                           ${w.amountUsdt.toFixed(2)} USDT
                         </td>
                         <td className="py-3 px-4 font-mono text-amber-400">
-                          {w.amountPoops.toLocaleString()} Poops
+                          {w.amountPoops.toLocaleString()} TomCoins
                         </td>
                         <td className="py-3 px-4 font-mono text-slate-300 max-w-[220px]">
                           <div className="flex items-center gap-1.5 mb-0.5">
@@ -596,7 +596,7 @@ export const PayoutsPage: React.FC = () => {
               variant="emerald"
             />
             <StatCard
-              title="Total Poops Credited"
+              title="Total TomCoins Credited"
               value={depositStats ? `+${depositStats.totalConfirmedPoops.toLocaleString()}` : '0'}
               subtitle="Credited to player balances"
               icon={Coins}
@@ -705,7 +705,7 @@ export const PayoutsPage: React.FC = () => {
                   <tr>
                     <th className="py-3 px-4">Player</th>
                     <th className="py-3 px-4">Deposit Amount</th>
-                    <th className="py-3 px-4">Poops Credited</th>
+                    <th className="py-3 px-4">TomCoins Credited</th>
                     <th className="py-3 px-4">Network</th>
                     <th className="py-3 px-4">Transaction Hash</th>
                     <th className="py-3 px-4">Status</th>
@@ -725,7 +725,7 @@ export const PayoutsPage: React.FC = () => {
                           ${d.amountUsdt.toFixed(2)} USDT
                         </td>
                         <td className="py-3 px-4 font-mono text-amber-400">
-                          +{d.amountPoops.toLocaleString()} Poops
+                          +{d.amountPoops.toLocaleString()} TomCoins
                         </td>
                         <td className="py-3 px-4 font-mono text-slate-300">
                           <div>{d.currency ? `${d.currency} (${d.network})` : d.network}</div>
@@ -874,7 +874,7 @@ export const PayoutsPage: React.FC = () => {
         isOpen={Boolean(rejectModalItem)}
         onClose={() => setRejectModalItem(null)}
         title="Reject Withdrawal Request"
-        subtitle={`Will immediately refund ${rejectModalItem?.amountPoops} Poops to @${rejectModalItem?.username}`}
+        subtitle={`Will immediately refund ${rejectModalItem?.amountPoops} TomCoins to @${rejectModalItem?.username}`}
         maxWidth="md"
       >
         <form onSubmit={handleRejectSubmit} className="space-y-4 text-xs">
@@ -943,11 +943,11 @@ export const PayoutsPage: React.FC = () => {
               onChange={(e) => setConfirmDepositBoost(e.target.value)}
               className="w-full px-3 py-2 rounded-xl bg-[#090415] border border-purple-900/60 text-white focus:outline-hidden"
             >
-              <option value="0">None / Standard Poops Only</option>
-              <option value="10">Common Plan (+10 Poops / hour)</option>
-              <option value="50">Silver Plan (+50 Poops / hour)</option>
-              <option value="200">Gold Plan (+200 Poops / hour)</option>
-              <option value="1000">Diamond Plan (+1,000 Poops / hour)</option>
+              <option value="0">None / Standard TomCoins Only</option>
+              <option value="10">Common Plan (+10 TomCoins / hour)</option>
+              <option value="50">Silver Plan (+50 TomCoins / hour)</option>
+              <option value="200">Gold Plan (+200 TomCoins / hour)</option>
+              <option value="1000">Diamond Plan (+1,000 TomCoins / hour)</option>
             </select>
             <p className="text-[10px] text-slate-400 mt-1">
               Automatically adjusts and increments the player's mining speed upon confirmation.
@@ -967,7 +967,7 @@ export const PayoutsPage: React.FC = () => {
               disabled={isConfirmingDeposit || !depositTxHash}
               className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all disabled:opacity-50"
             >
-              {isConfirmingDeposit ? 'Processing...' : 'Confirm & Credit Poops'}
+              {isConfirmingDeposit ? 'Processing...' : 'Confirm & Credit TomCoins'}
             </button>
           </div>
         </form>
@@ -988,7 +988,7 @@ export const PayoutsPage: React.FC = () => {
               <span>Are you sure you want to decline this deposit?</span>
             </p>
             <p className="text-[11px] text-slate-400 mt-1">
-              Declining this deposit will mark its status as <strong className="text-rose-400 font-mono">REJECTED</strong>. No Poops or mining boosts will be credited to the player.
+              Declining this deposit will mark its status as <strong className="text-rose-400 font-mono">REJECTED</strong>. No TomCoins or mining boosts will be credited to the player.
             </p>
           </div>
 
@@ -1030,7 +1030,7 @@ export const PayoutsPage: React.FC = () => {
         isOpen={showManualDepositModal}
         onClose={() => setShowManualDepositModal(false)}
         title="Credit Player Deposit Balance"
-        subtitle="Credits USDT/Poops directly to player account with mandatory audit record"
+        subtitle="Credits USDT/TomCoins directly to player account with mandatory audit record"
         maxWidth="md"
       >
         <form onSubmit={handleManualDepositSubmit} className="space-y-4 text-xs">
@@ -1065,7 +1065,7 @@ export const PayoutsPage: React.FC = () => {
               />
               {parseFloat(manualDepositAmount) > 0 && (
                 <p className="text-[10px] text-amber-400 mt-1 font-mono">
-                  ≈ +{(parseFloat(manualDepositAmount) * 2000).toLocaleString()} Poops credited
+                  ≈ +{(parseFloat(manualDepositAmount) * 2000).toLocaleString()} TomCoins credited
                 </p>
               )}
             </div>
@@ -1096,10 +1096,10 @@ export const PayoutsPage: React.FC = () => {
               className="w-full px-3 py-2 rounded-xl bg-[#090415] border border-purple-900/60 text-white focus:outline-hidden"
             >
               <option value="0">None (Balance Only)</option>
-              <option value="10">Common Plan (+10 Poops / hour)</option>
-              <option value="50">Silver Plan (+50 Poops / hour)</option>
-              <option value="200">Gold Plan (+200 Poops / hour)</option>
-              <option value="1000">Diamond Plan (+1,000 Poops / hour)</option>
+              <option value="10">Common Plan (+10 TomCoins / hour)</option>
+              <option value="50">Silver Plan (+50 TomCoins / hour)</option>
+              <option value="200">Gold Plan (+200 TomCoins / hour)</option>
+              <option value="1000">Diamond Plan (+1,000 TomCoins / hour)</option>
             </select>
             <p className="text-[10px] text-slate-400 mt-1">
               Adds bonus mining speed directly to the player's mining settlement.

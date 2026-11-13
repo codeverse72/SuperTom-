@@ -188,7 +188,7 @@ export class ReferralService {
       ``,
       `🌟 <b>${friendName}</b> just opened SuperTom using your invite link!`,
       ``,
-      `💰 <b>+${rewardPoops.toLocaleString('en-US')} Poops</b> has been credited directly to your balance!`,
+      `💰 <b>+${rewardPoops.toLocaleString('en-US')} TomCoins 👑</b> has been credited directly to your balance!`,
       `👥 Total friends invited: <b>${totalReferees}</b>`,
       `👑 You earn <b>+10%</b> lifetime mining commission on everything they mine!`,
     ].join('\n');

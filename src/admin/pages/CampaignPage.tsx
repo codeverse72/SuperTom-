@@ -103,7 +103,7 @@ export const CampaignPage: React.FC = () => {
   };
 
   const handleTriggerProcessor = async () => {
-    if (!confirm('Execute scheduled daily reward processor now? Eligible participants will receive their daily 2,000 Poops.')) {
+    if (!confirm('Execute scheduled daily reward processor now? Eligible participants will receive their daily 2,000 TomCoins.')) {
       return;
     }
 
@@ -174,7 +174,7 @@ export const CampaignPage: React.FC = () => {
               <Badge status={isActive ? 'ACTIVE' : 'DISABLED'} />
             </div>
             <p className="text-xs text-slate-400">
-              30% Instant Cashback + $1 USDT (2,000 Poops/day) tiered daily reward engine.
+              30% Instant Cashback + $1 USDT (2,000 TomCoins/day) tiered daily reward engine.
             </p>
           </div>
         </div>
@@ -241,7 +241,7 @@ export const CampaignPage: React.FC = () => {
         <div className="p-4 rounded-2xl bg-[#0c061a] border border-purple-900/40 shadow-lg">
           <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">30% Cashback Paid</span>
           <div className="text-2xl font-black text-emerald-400 font-mono">
-            {(stats.totalCashbackPoopsAwarded ?? 0).toLocaleString()} 💩
+            {(stats.totalCashbackPoopsAwarded ?? 0).toLocaleString()} 👑
           </div>
           <span className="text-[10px] text-slate-500 block mt-1">
             ≈ ${((stats.totalCashbackPoopsAwarded ?? 0) / 2000).toFixed(2)} USDT value
@@ -251,7 +251,7 @@ export const CampaignPage: React.FC = () => {
         <div className="p-4 rounded-2xl bg-[#0c061a] border border-purple-900/40 shadow-lg">
           <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Daily Rewards Disbursed</span>
           <div className="text-2xl font-black text-cyan-400 font-mono">
-            {(stats.totalDailyRewardsPoopsAwarded ?? 0).toLocaleString()} 💩
+            {(stats.totalDailyRewardsPoopsAwarded ?? 0).toLocaleString()} 👑
           </div>
           <span className="text-[10px] text-slate-500 block mt-1">
             Across {stats.totalDailyRewardsCount ?? 0} daily rewards
@@ -342,7 +342,7 @@ export const CampaignPage: React.FC = () => {
 
               <div>
                 <label className="block text-slate-300 font-semibold mb-1">
-                  Daily Reward Rate (Poops/day)
+                  Daily Reward Rate (TomCoins/day)
                 </label>
                 <input
                   type="number"
@@ -527,13 +527,13 @@ export const CampaignPage: React.FC = () => {
                       ${p.qualifyingDepositAmount.toFixed(2)} USDT
                     </td>
                     <td className="p-3 text-emerald-400 font-bold">
-                      +{p.cashbackPoops.toLocaleString()} 💩
+                      +{p.cashbackPoops.toLocaleString()} 👑
                     </td>
                     <td className="p-3 text-cyan-300 font-bold">
                       {p.daysClaimed} / {p.totalRewardDays} Days
                     </td>
                     <td className="p-3 text-purple-300">
-                      +{p.totalDailyPoopsCredited.toLocaleString()} 💩
+                      +{p.totalDailyPoopsCredited.toLocaleString()} 👑
                     </td>
                     <td className="p-3 font-sans">
                       <Badge status={p.status} />

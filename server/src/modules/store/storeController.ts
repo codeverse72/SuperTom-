@@ -121,7 +121,7 @@ export class StoreController {
 
     sendError(
       res,
-      'Direct purchase with Poops balance is disabled. Biscuits must be purchased via verified USDT deposit.',
+      'Direct purchase with TomCoins balance is disabled. Biscuits must be purchased via verified USDT deposit.',
       403,
       'POOPS_PURCHASE_DISABLED'
     );

@@ -387,7 +387,7 @@ export const SpinPage: React.FC = () => {
                           {r.rewardType}
                         </td>
                         <td className="py-2.5 px-3 font-mono text-amber-400">
-                          {r.amount !== undefined ? `${r.amount} Poops` : r.biscuitId || '-'}
+                          {r.amount !== undefined ? `${r.amount} TomCoins` : r.biscuitId || '-'}
                         </td>
                         <td className="py-2.5 px-3 text-right">
                           <div className="flex items-center justify-end gap-1">

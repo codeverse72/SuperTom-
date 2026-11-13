@@ -50,7 +50,7 @@ export const ReferralsPage: React.FC = () => {
         <StatCard
           title="Referral Bonuses Paid"
           value={data?.overview.totalRewardsDistributed ?? 0}
-          subtitle="450 Poops signup bounty"
+          subtitle="450 TomCoins signup bounty"
           icon={Trophy}
           variant="gold"
         />

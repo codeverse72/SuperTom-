@@ -543,7 +543,7 @@ export class AutoDepositMonitor {
     // User is identified!
     if (isSufficientlyConfirmed) {
       // AUTOMATIC BALANCE CREDITING (Zero Admin Approval)
-      logger.info(`✨ [AutoDepositMonitor] Auto-crediting confirmed deposit ${depositRecord.id} for user ${matchedUserId} (${tx.amountUsdt} USDT / +${tx.amountPoops.toLocaleString()} Poops)...`);
+      logger.info(`✨ [AutoDepositMonitor] Auto-crediting confirmed deposit ${depositRecord.id} for user ${matchedUserId} (${tx.amountUsdt} USDT / +${tx.amountPoops.toLocaleString()} TomCoins)...`);
       await DepositVerificationService.finalizeVerifiedDeposit(
         depositRecord.id,
         cleanHash,

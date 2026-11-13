@@ -62,14 +62,14 @@ export function validateWithdrawalAmount(
   }
 
   if (!Number.isInteger(num)) {
-    return { isValid: false, amount: num, error: 'Poop amounts must be whole integers.' };
+    return { isValid: false, amount: num, error: 'TomCoin amounts must be whole integers.' };
   }
 
   if (num < MIN_WITHDRAWAL_POOPS) {
     return { 
       isValid: false, 
       amount: num, 
-      error: `Minimum withdrawal is ${MIN_WITHDRAWAL_POOPS.toLocaleString()} Poops (1.00 USDT).` 
+      error: `Minimum withdrawal is ${MIN_WITHDRAWAL_POOPS.toLocaleString()} TomCoins (1.00 USDT).` 
     };
   }
 
@@ -81,7 +81,7 @@ export function validateWithdrawalAmount(
     return { 
       isValid: false, 
       amount: num, 
-      error: `Insufficient balance. Available: ${currentBalance.toLocaleString()} Poops.` 
+      error: `Insufficient balance. Available: ${currentBalance.toLocaleString()} TomCoins.` 
     };
   }
 

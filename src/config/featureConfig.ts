@@ -23,7 +23,7 @@ export const FEATURE_REGISTRY: Record<FeatureId, FeatureDefinition> = {
   },
   mining: {
     id: 'mining',
-    name: 'Poop Mining Services',
+    name: 'TomCoin Mining Services',
     status: (IS_BACKEND_CONFIGURED && import.meta.env.VITE_FEATURE_MINING !== 'false') ? 'AVAILABLE' : 'UNAVAILABLE',
     unavailableMessage: 'Mining services are temporarily unavailable.',
     requiresAuth: true,

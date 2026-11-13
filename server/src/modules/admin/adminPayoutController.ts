@@ -588,7 +588,7 @@ export class AdminPayoutController {
           type: 'DEPOSIT_CREDIT',
           amount: deposit.amountPoops,
           referenceId: deposit.id,
-          description: `Confirmed deposit of ${deposit.amountUsdt} USDT (${deposit.amountPoops} Poops)`,
+          description: `Confirmed deposit of ${deposit.amountUsdt} USDT (${deposit.amountPoops} TomCoins)`,
           idempotencyKey: `dep_conf_${deposit.id}`,
         });
 
@@ -652,8 +652,8 @@ export class AdminPayoutController {
 
       sendSuccess(res, {
         message: appliedBoost > 0 
-          ? `Deposit confirmed! Poops credited and mining speed boosted by +${appliedBoost}/hr.`
-          : 'Deposit confirmed and Poops credited to player',
+          ? `Deposit confirmed! TomCoins credited and mining speed boosted by +${appliedBoost}/hr.`
+          : 'Deposit confirmed and TomCoins credited to player',
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Deposit confirmation failed';
@@ -721,7 +721,7 @@ export class AdminPayoutController {
           type: 'ADMIN_ADJUSTMENT',
           amount: amountPoops,
           referenceId: deposit.id,
-          description: `Admin deposit credit of $${amountUsdt} USDT (${amountPoops} Poops). Reason: ${notes}`,
+          description: `Admin deposit credit of $${amountUsdt} USDT (${amountPoops} TomCoins). Reason: ${notes}`,
           idempotencyKey: `dep_manual_${deposit.id}`,
         });
 
@@ -795,7 +795,7 @@ export class AdminPayoutController {
           newBalance: Number(result.updatedUser?.poopsBalance),
           productionRate: result.rate,
         },
-        message: `Successfully credited $${amountUsdt} USDT (${amountPoops} Poops) to @${result.updatedUser?.username || cleanId}${boostPerHour > 0 ? ` with +${boostPerHour}/hr mining speed boost!` : '!'}`
+        message: `Successfully credited $${amountUsdt} USDT (${amountPoops} TomCoins) to @${result.updatedUser?.username || cleanId}${boostPerHour > 0 ? ` with +${boostPerHour}/hr mining speed boost!` : '!'}`
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Manual credit deposit failed';

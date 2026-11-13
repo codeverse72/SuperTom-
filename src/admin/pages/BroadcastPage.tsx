@@ -73,7 +73,7 @@ const AUDIENCE_META: Array<{
   {
     id: 'low_balance',
     label: 'Starters (< 1k 💩)',
-    description: 'Active users under 1,000 Poops balance',
+    description: 'Active users under 1,000 TomCoins balance',
     accent: 'border-cyan-500/40 bg-cyan-950/20 text-cyan-300',
   },
   {

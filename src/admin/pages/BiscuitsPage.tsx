@@ -229,13 +229,13 @@ export const BiscuitsPage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400">Store Cost:</span>
                   <span className="font-mono font-bold text-amber-400">
-                    {b.costPoops.toLocaleString()} Poops
+                    {b.costPoops.toLocaleString()} TomCoins
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400">Production Boost:</span>
                   <span className="font-mono font-bold text-emerald-400">
-                    +{b.productionBoostPerHour.toLocaleString()} Poops/hr
+                    +{b.productionBoostPerHour.toLocaleString()} TomCoins/hr
                   </span>
                 </div>
                 <div className="flex items-center justify-between pt-1 border-t border-purple-900/20 text-[11px]">
@@ -317,7 +317,7 @@ export const BiscuitsPage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block font-bold text-slate-300 uppercase mb-1">
-                Store Cost (Poops)
+                Store Cost (TomCoins)
               </label>
               <input
                 type="number"
@@ -331,7 +331,7 @@ export const BiscuitsPage: React.FC = () => {
 
             <div>
               <label className="block font-bold text-slate-300 uppercase mb-1">
-                Hourly Boost (+Poops/hr)
+                Hourly Boost (+TomCoins/hr)
               </label>
               <input
                 type="number"
@@ -433,13 +433,13 @@ export const BiscuitsPage: React.FC = () => {
                   </span>
                 </div>
                 <span className="text-[11px] text-emerald-400 font-mono font-bold">
-                  +{newBoostPerHour.toLocaleString()} Poops/hr
+                  +{newBoostPerHour.toLocaleString()} TomCoins/hr
                 </span>
               </div>
             </div>
             <div className="text-right">
               <span className="font-mono font-black text-amber-400 text-sm">
-                {newCostPoops.toLocaleString()} 💩
+                {newCostPoops.toLocaleString()} 👑
               </span>
             </div>
           </div>
@@ -487,7 +487,7 @@ export const BiscuitsPage: React.FC = () => {
         <form onSubmit={handleSave} className="space-y-4 text-xs">
           <div>
             <label className="block font-bold text-slate-300 uppercase mb-1">
-              Store Price (Poops)
+              Store Price (TomCoins)
             </label>
             <input
               type="number"
@@ -501,7 +501,7 @@ export const BiscuitsPage: React.FC = () => {
 
           <div>
             <label className="block font-bold text-slate-300 uppercase mb-1">
-              Production Boost (+Poops/hour)
+              Production Boost (+TomCoins/hour)
             </label>
             <input
               type="number"

@@ -406,7 +406,7 @@ export class DepositVerificationService {
 ⚡ *Status:* Completed
 🔗 *TXID:* \`${txHash.slice(0, 10)}...${txHash.slice(-8)}\`
 
-🪙 *Balance Credited:* +${amountPoops.toLocaleString()} Poops 💩
+🪙 *Balance Credited:* +${amountPoops.toLocaleString()} TomCoins 👑
 
 Your account balance has been updated immediately!`;
 

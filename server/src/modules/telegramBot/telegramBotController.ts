@@ -239,7 +239,7 @@ export class TelegramBotController {
       welcomeHtmlLines.push(`💎 <b>Feed Tom with biscuits</b>, increase your mining rate, complete missions and collect rewards.`);
     } else {
       welcomeHtmlLines.push(`👋 Welcome, <b>${firstName}</b>!`);
-      welcomeHtmlLines.push(`🎉 <i>Your journey to earning Poops starts here!</i>`);
+      welcomeHtmlLines.push(`🎉 <i>Your journey to earning TomCoins ($TOM) starts here!</i>`);
       if (validReferralCode && referrerName) {
         welcomeHtmlLines.push(``);
         welcomeHtmlLines.push(`👑 <i>Invited by ${this.escapeHtml(referrerName)}! Your starter bonus is ready to claim.</i>`);
@@ -251,9 +251,9 @@ export class TelegramBotController {
     welcomeHtmlLines.push(``);
     welcomeHtmlLines.push(`<b>🚀 WHAT YOU CAN DO:</b>`);
     welcomeHtmlLines.push(``);
-    welcomeHtmlLines.push(`🍪 <b>Feed Tom</b> — Increase your Poop production.`);
+    welcomeHtmlLines.push(`🍪 <b>Feed Tom</b> — Increase your TomCoin production.`);
     welcomeHtmlLines.push(`🎡 <b>Spin &amp; Earn</b> — Unlock exciting spin rewards.`);
-    welcomeHtmlLines.push(`🏆 <b>Missions</b> — Complete tasks and earn Poops.`);
+    welcomeHtmlLines.push(`🏆 <b>Missions</b> — Complete tasks and earn TomCoins.`);
     welcomeHtmlLines.push(`💰 <b>Payouts</b> — Request withdrawals according to the platform's rules.`);
     welcomeHtmlLines.push(`👥 <b>Referrals</b> — Invite friends and grow your rewards.`);
     welcomeHtmlLines.push(``);

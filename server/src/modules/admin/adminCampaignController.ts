@@ -132,7 +132,7 @@ export class AdminCampaignController {
       });
 
       sendSuccess(res, {
-        message: `Processed ${result.processedCount} daily rewards (${result.totalPoopsAwarded.toLocaleString()} Poops credited).`,
+        message: `Processed ${result.processedCount} daily rewards (${result.totalPoopsAwarded.toLocaleString()} TomCoins credited).`,
         result,
       });
     } catch (err: unknown) {

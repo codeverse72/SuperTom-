@@ -2,30 +2,35 @@
  * Centralized Currency & Numerical Conversion Utilities
  * 
  * Strict single-source-of-truth for game economy calculations:
- * 2,000 Poops = 1 USDT
+ * 2,000 TomCoins = 1 USDT
  */
 
-export const POOPS_PER_USDT = 2000;
+export const TOM_PER_USDT = 2000;
+export const POOPS_PER_USDT = TOM_PER_USDT;
 
 /**
- * Converts a Poop amount into its USDT equivalent.
+ * Converts a TomCoin amount into its USDT equivalent.
  * Returns '--' if the balance is null or undefined.
  */
-export function poopsToUsdt(poops: number | null | undefined, decimals: number = 4): string {
-  if (poops === null || poops === undefined || isNaN(poops)) {
+export function tomToUsdt(tom: number | null | undefined, decimals: number = 4): string {
+  if (tom === null || tom === undefined || isNaN(tom)) {
     return '--';
   }
-  const val = poops / POOPS_PER_USDT;
+  const val = tom / TOM_PER_USDT;
   return val.toFixed(decimals);
 }
 
+export const poopsToUsdt = tomToUsdt;
+
 /**
- * Converts a USDT amount into its whole Poop equivalent.
+ * Converts a USDT amount into its whole TomCoin equivalent.
  */
-export function usdtToPoops(usdt: number): number {
+export function usdtToTom(usdt: number): number {
   if (isNaN(usdt) || usdt <= 0) return 0;
-  return Math.floor(usdt * POOPS_PER_USDT);
+  return Math.floor(usdt * TOM_PER_USDT);
 }
+
+export const usdtToPoops = usdtToTom;
 
 /**
  * Formats numbers with international comma separators.

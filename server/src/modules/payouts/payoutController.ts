@@ -13,7 +13,7 @@ import { AutoDepositMonitor } from './autoDepositMonitor.js';
 
 const withdrawalRequestSchema = z.object({
   walletAddress: z.string().min(10, 'Wallet address is required'),
-  amountPoops: z.number().int().min(env.MIN_WITHDRAWAL_POOPS, `Minimum withdrawal is ${env.MIN_WITHDRAWAL_POOPS} Poops (1.00 USDT)`),
+  amountPoops: z.number().int().min(env.MIN_WITHDRAWAL_POOPS, `Minimum withdrawal is ${env.MIN_WITHDRAWAL_POOPS} TomCoins (1.00 USDT)`),
   network: z.string().min(2).default('TRC20'),
 });
 
@@ -151,7 +151,7 @@ export class PayoutController {
         }
 
         if (user.poopsBalance < amountBig) {
-          throw new Error(`Insufficient balance. Available: ${user.poopsBalance} Poops, Requested: ${amountBig} Poops`);
+          throw new Error(`Insufficient balance. Available: ${user.poopsBalance} TomCoins, Requested: ${amountBig} TomCoins`);
         }
 
         // 1.5 Strictly enforce deposit requirement for withdrawals:
@@ -163,7 +163,7 @@ export class PayoutController {
           userId,
           type: 'WITHDRAWAL_RESERVATION',
           amount: -amountBig,
-          description: `Withdrawal reservation of ${amountPoops} Poops (${amountUsdt} USDT) on ${network} to ${cleanAddress}`,
+          description: `Withdrawal reservation of ${amountPoops} TomCoins (${amountUsdt} USDT) on ${network} to ${cleanAddress}`,
           idempotencyKey: `wd_${userId}_${Date.now()}`,
         });
 

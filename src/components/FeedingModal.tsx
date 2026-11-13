@@ -62,7 +62,7 @@ export const FeedingModal: React.FC<FeedingModalProps> = ({ isOpen, onClose, onN
                 Feed King Tom
               </h3>
               <p className="text-[11px] text-purple-300/80">
-                Give crunchy biscuits to boost hourly Poop production
+                Give crunchy biscuits to boost hourly TomCoin production
               </p>
             </div>
           </div>
@@ -142,7 +142,7 @@ export const FeedingModal: React.FC<FeedingModalProps> = ({ isOpen, onClose, onN
           <div className="flex items-center justify-between pt-2 border-t border-purple-500/20 text-xs">
             <span className="text-purple-300">Boost per biscuit:</span>
             <span className="font-extrabold text-emerald-400 font-mono">
-              +{currentConfig.productionBoost} Poops / hr
+              +{currentConfig.productionBoost} TomCoins / hr
             </span>
           </div>
         </div>

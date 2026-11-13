@@ -86,7 +86,7 @@ export interface SpinRewardConfig {
 export const SPIN_REWARDS: SpinRewardConfig[] = [
   {
     id: 'poop-100',
-    label: '100 Poops',
+    label: '100 TomCoins',
     rewardType: 'poops',
     amount: 100,
     probability: 25.0,
@@ -95,7 +95,7 @@ export const SPIN_REWARDS: SpinRewardConfig[] = [
   },
   {
     id: 'poop-300',
-    label: '300 Poops',
+    label: '300 TomCoins',
     rewardType: 'poops',
     amount: 300,
     probability: 6.0,
@@ -104,7 +104,7 @@ export const SPIN_REWARDS: SpinRewardConfig[] = [
   },
   {
     id: 'poop-250',
-    label: '250 Poops',
+    label: '250 TomCoins',
     rewardType: 'poops',
     amount: 250,
     probability: 15.0,
@@ -113,7 +113,7 @@ export const SPIN_REWARDS: SpinRewardConfig[] = [
   },
   {
     id: 'poop-750',
-    label: '750 Poops',
+    label: '750 TomCoins',
     rewardType: 'poops',
     amount: 750,
     probability: 3.0,
@@ -122,7 +122,7 @@ export const SPIN_REWARDS: SpinRewardConfig[] = [
   },
   {
     id: 'poop-0',
-    label: '0 Poops',
+    label: '0 TomCoins',
     rewardType: 'poops',
     amount: 0,
     probability: 30.0,
@@ -131,7 +131,7 @@ export const SPIN_REWARDS: SpinRewardConfig[] = [
   },
   {
     id: 'poop-525',
-    label: '525 Poops',
+    label: '525 TomCoins',
     rewardType: 'poops',
     amount: 525,
     probability: 20.0,
@@ -140,7 +140,7 @@ export const SPIN_REWARDS: SpinRewardConfig[] = [
   },
   {
     id: 'poop-1000',
-    label: '1,000 Poops',
+    label: '1,000 TomCoins',
     rewardType: 'poops',
     amount: 1000,
     probability: 1.0,
@@ -149,8 +149,10 @@ export const SPIN_REWARDS: SpinRewardConfig[] = [
   }
 ];
 
-export const POOPS_PER_USDT = 2000;
-export const MIN_WITHDRAWAL_POOPS = 2000;
+export const TOM_PER_USDT = 2000;
+export const POOPS_PER_USDT = TOM_PER_USDT;
+export const MIN_WITHDRAWAL_TOM = 2000;
+export const MIN_WITHDRAWAL_POOPS = MIN_WITHDRAWAL_TOM;
 
 export interface MilestoneTimerConfig {
   stage: 1 | 2 | 3;
@@ -261,7 +263,7 @@ export const INITIAL_MISSIONS: Mission[] = [
   {
     id: 'm7',
     title: 'Feed Tom 10 Times',
-    description: 'Provide crunchy biscuits to King Tom to accelerate continuous poop generation',
+    description: 'Provide crunchy biscuits to King Tom to accelerate continuous TomCoin generation',
     reward: 500,
     category: 'daily',
     icon: 'Cookie',
@@ -273,7 +275,7 @@ export const INITIAL_MISSIONS: Mission[] = [
   {
     id: 'm7_watch_30_ads',
     title: 'Watch 30 Ads Daily',
-    description: 'Watch 30 sponsored ads per day to earn 500 Poops (resets daily at 00:00 UTC)',
+    description: 'Watch 30 sponsored ads per day to earn 500 TomCoins (resets daily at 00:00 UTC)',
     reward: 500,
     category: 'daily',
     icon: 'Tv',
@@ -322,8 +324,8 @@ export const INITIAL_MISSIONS: Mission[] = [
   },
   {
     id: 'm11',
-    title: 'Royal Treasury: 20,000 Poops',
-    description: 'Accumulate a royal treasure hoard of at least 20,000 total Poops',
+    title: 'Royal Treasury: 20,000 TomCoins',
+    description: 'Accumulate a royal treasure hoard of at least 20,000 total TomCoins',
     reward: 3000,
     category: 'special',
     icon: 'Trophy',
@@ -338,8 +340,8 @@ export const CAT_SPEECH_BUBBLES = [
   "Feed me more biscuits!",
   "I'm getting hungry!",
   "More biscuits, human!",
-  "Let's make some Poops!",
+  "Let's mine some TomCoins!",
   "My royal throne demands treats!",
   "Purr... that biscuit was 10/10!",
-  "Mining poops at royal capacity!"
+  "Mining TomCoins at royal capacity!"
 ];

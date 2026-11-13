@@ -105,7 +105,7 @@ export const MiningPage: React.FC = () => {
         <form onSubmit={handleSave} className="space-y-5">
           <div>
             <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-              Default Base Rate (Poops per Hour)
+              Default Base Rate (TomCoins per Hour)
             </label>
             <input
               type="number"
@@ -117,7 +117,7 @@ export const MiningPage: React.FC = () => {
               className="w-full px-4 py-2.5 rounded-xl bg-[#080413] border border-purple-900/60 text-white font-mono text-sm focus:outline-hidden focus:border-purple-500"
             />
             <span className="text-[11px] text-slate-500 block mt-1">
-              Standard base rate is 10 Poops/hour (equivalent to 1 USDT every 200 hours at base rate).
+              Standard base rate is 10 TomCoins/hour (equivalent to 1 USDT every 200 hours at base rate).
             </span>
           </div>
 

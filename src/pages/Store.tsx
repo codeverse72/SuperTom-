@@ -77,14 +77,14 @@ export const Store: React.FC<StoreProps> = ({ onNavigateToDeposit }) => {
               Mining Speed Plans
             </h2>
             <p className="text-xs text-purple-200/80 mt-1">
-              Buy a plan to boost King Tom's continuous hourly Poop mining speed!
+              Buy a plan to boost King Tom's continuous hourly TomCoin mining speed!
             </p>
           </div>
 
           <div className="text-right shrink-0">
             <span className="text-[10px] uppercase font-bold text-purple-300">Your Balance</span>
             <div className="text-lg font-black text-amber-400 font-mono">
-              {formatNumber(balance)} 💩
+              {formatNumber(balance)} 👑
             </div>
             <span className="text-[10px] text-emerald-400 font-bold font-mono">
               {productionRate !== null ? `+${productionRate} / hr` : '-- / hr'}

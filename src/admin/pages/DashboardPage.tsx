@@ -61,14 +61,14 @@ export const DashboardPage: React.FC = () => {
           variant="purple"
         />
         <StatCard
-          title="Poops In Circulation"
+          title="TomCoins In Circulation"
           value={stats?.economy.poopsInCirculation ?? 0}
           subtitle={`≈ $${((stats?.economy.poopsInCirculation ?? 0) / 2000).toFixed(2)} USDT`}
           icon={Coins}
           variant="gold"
         />
         <StatCard
-          title="Total Poops Mined"
+          title="Total TomCoins Mined"
           value={stats?.economy.totalPoopsMined ?? 0}
           subtitle="Accrued from royal cat mining"
           icon={Pickaxe}
@@ -102,7 +102,7 @@ export const DashboardPage: React.FC = () => {
         <StatCard
           title="Referral Network"
           value={stats?.referrals.totalReferrals ?? 0}
-          subtitle={`${(stats?.referrals.totalBonusesDistributed ?? 0).toLocaleString()} Poops awarded`}
+          subtitle={`${(stats?.referrals.totalBonusesDistributed ?? 0).toLocaleString()} TomCoins awarded`}
           icon={Share2}
           variant="purple"
         />

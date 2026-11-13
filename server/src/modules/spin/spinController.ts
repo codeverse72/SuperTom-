@@ -19,13 +19,13 @@ interface SpinRewardDefinition {
  * Default fallback reward distribution (sums to 1000 / 100%)
  */
 const SPIN_REWARDS_CUMULATIVE: SpinRewardDefinition[] = [
-  { id: 'poop-100', label: '100 Poops', rewardType: 'poops', amount: 100, cumulativeWeight: 250 },
-  { id: 'poop-300', label: '300 Poops', rewardType: 'poops', amount: 300, cumulativeWeight: 310 },
-  { id: 'poop-250', label: '250 Poops', rewardType: 'poops', amount: 250, cumulativeWeight: 460 },
-  { id: 'poop-750', label: '750 Poops', rewardType: 'poops', amount: 750, cumulativeWeight: 490 },
-  { id: 'poop-0', label: '0 Poops', rewardType: 'poops', amount: 0, cumulativeWeight: 790 },
-  { id: 'poop-525', label: '525 Poops', rewardType: 'poops', amount: 525, cumulativeWeight: 990 },
-  { id: 'poop-1000', label: '1,000 Poops', rewardType: 'poops', amount: 1000, cumulativeWeight: 1000 },
+  { id: 'poop-100', label: '100 TomCoins', rewardType: 'poops', amount: 100, cumulativeWeight: 250 },
+  { id: 'poop-300', label: '300 TomCoins', rewardType: 'poops', amount: 300, cumulativeWeight: 310 },
+  { id: 'poop-250', label: '250 TomCoins', rewardType: 'poops', amount: 250, cumulativeWeight: 460 },
+  { id: 'poop-750', label: '750 TomCoins', rewardType: 'poops', amount: 750, cumulativeWeight: 490 },
+  { id: 'poop-0', label: '0 TomCoins', rewardType: 'poops', amount: 0, cumulativeWeight: 790 },
+  { id: 'poop-525', label: '525 TomCoins', rewardType: 'poops', amount: 525, cumulativeWeight: 990 },
+  { id: 'poop-1000', label: '1,000 TomCoins', rewardType: 'poops', amount: 1000, cumulativeWeight: 1000 },
 ];
 
 const MILESTONE_COOLDOWNS: Record<number, number> = {
@@ -111,13 +111,13 @@ export class SpinController {
     }
 
     const fallback = [
-      { id: 'poop-100', label: '100 Poops', rewardType: 'poops' as const, amount: 100, percentage: 25.0 },
-      { id: 'poop-300', label: '300 Poops', rewardType: 'poops' as const, amount: 300, percentage: 6.0 },
-      { id: 'poop-250', label: '250 Poops', rewardType: 'poops' as const, amount: 250, percentage: 15.0 },
-      { id: 'poop-750', label: '750 Poops', rewardType: 'poops' as const, amount: 750, percentage: 3.0 },
-      { id: 'poop-0', label: '0 Poops', rewardType: 'poops' as const, amount: 0, percentage: 30.0 },
-      { id: 'poop-525', label: '525 Poops', rewardType: 'poops' as const, amount: 525, percentage: 20.0 },
-      { id: 'poop-1000', label: '1,000 Poops', rewardType: 'poops' as const, amount: 1000, percentage: 1.0 },
+      { id: 'poop-100', label: '100 TomCoins', rewardType: 'poops' as const, amount: 100, percentage: 25.0 },
+      { id: 'poop-300', label: '300 TomCoins', rewardType: 'poops' as const, amount: 300, percentage: 6.0 },
+      { id: 'poop-250', label: '250 TomCoins', rewardType: 'poops' as const, amount: 250, percentage: 15.0 },
+      { id: 'poop-750', label: '750 TomCoins', rewardType: 'poops' as const, amount: 750, percentage: 3.0 },
+      { id: 'poop-0', label: '0 TomCoins', rewardType: 'poops' as const, amount: 0, percentage: 30.0 },
+      { id: 'poop-525', label: '525 TomCoins', rewardType: 'poops' as const, amount: 525, percentage: 20.0 },
+      { id: 'poop-1000', label: '1,000 TomCoins', rewardType: 'poops' as const, amount: 1000, percentage: 1.0 },
     ];
     SpinController.setRewardsCache(fallback);
     return fallback;

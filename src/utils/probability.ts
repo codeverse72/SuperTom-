@@ -58,19 +58,24 @@ export function isValidTronAddress(address: string): { isValid: boolean; error?:
 }
 
 /**
- * Formats Poops to USDT with accurate dynamic precision (2,000 Poops = 1 USDT)
+ * Formats TomCoins to USDT with accurate dynamic precision (2,000 TomCoins = 1 USDT)
  * Returns '--' if unauthenticated or balance is null.
  */
-export function poopsToUsdt(poops: number | null | undefined): string {
-  if (poops === null || poops === undefined) {
+export function tomToUsdt(tom: number | null | undefined): string {
+  if (tom === null || tom === undefined) {
     return '--';
   }
-  const usdt = poops / 2000;
+  const usdt = tom / 2000;
   return usdt.toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 4
   });
 }
+
+/**
+ * Backward-compatible alias for tomToUsdt
+ */
+export const poopsToUsdt = tomToUsdt;
 
 /**
  * Formats numbers with comma separators, or '--' if null/undefined.

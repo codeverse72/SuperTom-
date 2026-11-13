@@ -148,7 +148,7 @@ export const SpinWheelModal: React.FC = () => {
             Spin King Tom’s Wheel
           </h2>
           <p className="text-[11px] text-purple-300/80">
-            Win up to 1,000 Poops!
+            Win up to 1,000 TomCoins!
           </p>
         </div>
 
@@ -300,7 +300,7 @@ export const SpinWheelModal: React.FC = () => {
 
               <p className="text-xs text-purple-200/90 mt-1.5 leading-relaxed">
                 {wonClaimData.amount === 0
-                  ? 'No poops won this round. Don’t worry, your next free spin will be ready soon!'
+                  ? 'No TomCoins won this round. Don’t worry, your next free spin will be ready soon!'
                   : `Wheel landed on ${wonClaimData.label}! The reward has been directly credited to your live balance.`}
               </p>
 
@@ -308,7 +308,7 @@ export const SpinWheelModal: React.FC = () => {
               <div className="w-full mt-3.5 p-2.5 rounded-xl bg-purple-950/90 border border-emerald-500/50 text-[11px] text-emerald-300 font-bold flex items-center justify-center gap-1.5 shadow-md">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>
-                  New Balance: <strong className="font-mono text-amber-300 text-xs">{wonClaimData.newBalancePoops.toLocaleString()} Poops</strong> 💩
+                  New Balance: <strong className="font-mono text-amber-300 text-xs">{wonClaimData.newBalancePoops.toLocaleString()} TomCoins</strong> 👑
                 </span>
               </div>
 

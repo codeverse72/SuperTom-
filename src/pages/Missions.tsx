@@ -145,7 +145,7 @@ export const Missions: React.FC = () => {
     setCopiedMissionId(mission.id);
     shareViaTelegram(
       url,
-      '🐱 Join me on SuperTom and start mining with King Tom! 👑 Boost your mining rate and claim free Poops!'
+      '🐱 Join me on SuperTom and start mining with King Tom! 👑 Boost your mining rate and claim free TomCoins!'
     );
     showToast('Telegram Share', 'Referral link copied & Telegram share opened!', 'success');
     setTimeout(() => setCopiedMissionId(null), 2500);
@@ -257,11 +257,11 @@ export const Missions: React.FC = () => {
               Complete Missions!
             </h2>
             <h3 className="text-base sm:text-lg font-black text-white font-display leading-tight">
-              Earn Free Poops!
+              Earn Free TomCoins!
             </h3>
 
             <p className="text-xs text-purple-200/80 mt-1 leading-snug">
-              Complete tasks to unlock instant Poops rewards and boost King Tom!
+              Complete tasks to unlock instant TomCoin rewards and boost King Tom!
             </p>
 
             {/* Total Rewards Available in Catalogue */}
@@ -269,7 +269,7 @@ export const Missions: React.FC = () => {
               <div>
                 <span className="text-[10px] text-purple-300/70 block uppercase font-bold">Total Rewards Pool</span>
                 <span className="text-sm font-black text-amber-400 font-mono">
-                  +{totalRewardsAvailable.toLocaleString()} 💩
+                  +{totalRewardsAvailable.toLocaleString()} 👑
                 </span>
               </div>
               <div className="w-[1px] h-6 bg-purple-500/30" />
@@ -404,13 +404,13 @@ export const Missions: React.FC = () => {
                 {/* Reward Amount */}
                 <div className="shrink-0 text-right">
                   <div className="flex items-center gap-1 justify-end">
-                    <span className="text-xs">💩</span>
+                    <span className="text-xs">👑</span>
                     <span className="text-sm font-black text-amber-400 font-mono">
                       +{formatNumber(mission.reward)}
                     </span>
                   </div>
-                  <span className="text-[9px] uppercase font-bold text-purple-300/70">
-                    POOPS
+                  <span className="text-[9px] uppercase font-bold text-amber-300/80">
+                    TOM
                   </span>
                 </div>
               </div>

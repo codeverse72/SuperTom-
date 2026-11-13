@@ -62,7 +62,7 @@ export class MiningController {
         msUntilNextHour: result.msUntilNextHour,
         nextAdditionAt: result.nextAdditionAt.toISOString(),
         message: result.settled
-          ? `Added +${result.amountSettled} Poops to your main balance (${result.completedHours} hr${result.completedHours > 1 ? 's' : ''})!`
+          ? `Added +${result.amountSettled} TomCoins to your main balance (${result.completedHours} hr${result.completedHours > 1 ? 's' : ''})!`
           : 'Hourly mining in progress. Next addition will occur when the hour completes.',
       });
     } catch (err: unknown) {

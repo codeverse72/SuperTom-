@@ -1006,7 +1006,7 @@ Payment Reference / Memo: ${memo}`;
     }
 
     if (amountUsdNum < currency.minWithdrawUsd) {
-      setWithdrawError(`Minimum withdrawal is $${currency.minWithdrawUsd.toFixed(2)} USD (2,000 Poops).`);
+      setWithdrawError(`Minimum withdrawal is $${currency.minWithdrawUsd.toFixed(2)} USD (2,000 TomCoins).`);
       return;
     }
 
@@ -1016,7 +1016,7 @@ Payment Reference / Memo: ${memo}`;
       return;
     }
 
-    // Convert USD to integer Poops
+    // Convert USD to integer TomCoins
     const poopsToDeduct = Math.round(amountUsdNum * 2000);
     if (balance === null || poopsToDeduct > balance) {
       setWithdrawError('Insufficient balance.');
@@ -1994,10 +1994,10 @@ Payment Reference / Memo: ${memo}`;
                   {activeDepositQuote.cryptoPriceUsd && activeDepositQuote.cryptoPriceUsd !== 1 && (
                     <span className="text-[10px] text-slate-400 ml-1">(@ ${activeDepositQuote.cryptoPriceUsd.toFixed(2)})</span>
                   )}
-                  <span className="text-slate-400 text-[10px] ml-1">({(depositAmountUsd * 2000).toLocaleString()} Poops 💩)</span>
+                  <span className="text-slate-400 text-[10px] ml-1">({(depositAmountUsd * 2000).toLocaleString()} TomCoins 👑)</span>
                 </span>
               ) : (
-                <span>≈ {(depositAmountUsd * 2000).toLocaleString()} Poops 💩</span>
+                <span>≈ {(depositAmountUsd * 2000).toLocaleString()} TomCoins 👑</span>
               )}
             </div>
           </div>
@@ -2141,7 +2141,7 @@ Payment Reference / Memo: ${memo}`;
                 <span>Payment Proof Under Review</span>
               </div>
               <p className="text-[11px] text-slate-300 leading-relaxed">
-                Your transaction hash has been sent to the Admin Panel. Your Poops will be credited as soon as an Admin approves the on-chain transfer!
+                Your transaction hash has been sent to the Admin Panel. Your TomCoins will be credited as soon as an Admin approves the on-chain transfer!
               </p>
               <a
                 href="https://t.me/SuperTomCare"
@@ -2482,9 +2482,9 @@ Payment Reference / Memo: ${memo}`;
                       </div>
 
                       <p className="text-[10px] text-cyan-400 font-mono mt-1 font-semibold flex items-center justify-between">
-                        <span>Minimum withdrawal is $1.00 USD (2,000 Poops)</span>
+                        <span>Minimum withdrawal is $1.00 USD (2,000 TomCoins)</span>
                         {parseFloat(withdrawAmountUsd) > 0 && (
-                          <span className="text-amber-300">≈ {Math.round(parseFloat(withdrawAmountUsd) * 2000).toLocaleString()} Poops 💩</span>
+                          <span className="text-amber-300">≈ {Math.round(parseFloat(withdrawAmountUsd) * 2000).toLocaleString()} TomCoins 👑</span>
                         )}
                       </p>
                     </div>
@@ -2694,7 +2694,7 @@ Payment Reference / Memo: ${memo}`;
                   </div>
                   <div className="flex items-center gap-1.5 text-slate-300">
                     <Check className="w-3 h-3 text-cyan-400 shrink-0" />
-                    <span>Full $3.00 (6,000 Poops) credited to balance</span>
+                    <span>Full $3.00 (6,000 TomCoins) credited to balance</span>
                   </div>
                 </div>
 
@@ -2737,7 +2737,7 @@ Payment Reference / Memo: ${memo}`;
                   </div>
                   <div className="flex items-center gap-1.5 text-slate-300">
                     <Check className="w-3 h-3 text-emerald-400 shrink-0" />
-                    <span>Full $5.00 (10,000 Poops) credited to balance</span>
+                    <span>Full $5.00 (10,000 TomCoins) credited to balance</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-slate-300">
                     <Check className="w-3 h-3 text-emerald-400 shrink-0" />
@@ -2758,7 +2758,7 @@ Payment Reference / Memo: ${memo}`;
 
             {/* Note */}
             <p className="text-[10px] text-slate-400 text-center leading-tight">
-              ✨ 100% of your deposit is credited to your Poops balance and can be mined or withdrawn!
+              ✨ 100% of your deposit is credited to your TomCoin balance and can be mined or withdrawn!
             </p>
 
             {/* Dismiss */}

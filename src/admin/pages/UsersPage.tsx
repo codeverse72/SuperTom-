@@ -158,7 +158,7 @@ export const UsersPage: React.FC = () => {
               <tr>
                 <th className="py-3 px-4">Player</th>
                 <th className="py-3 px-4">Telegram ID</th>
-                <th className="py-3 px-4">Poops Balance</th>
+                <th className="py-3 px-4">TomCoins Balance</th>
                 <th className="py-3 px-4">Level</th>
                 <th className="py-3 px-4">Mining Rate</th>
                 <th className="py-3 px-4">Referrals</th>
@@ -282,7 +282,7 @@ export const UsersPage: React.FC = () => {
           <div className="space-y-5 text-xs">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="p-3 rounded-xl bg-purple-950/30 border border-purple-900/40">
-                <span className="text-slate-400 block mb-1">Poops Balance</span>
+                <span className="text-slate-400 block mb-1">TomCoins Balance</span>
                 <span className="text-base font-bold text-amber-400 font-mono">
                   {selectedUserDetail.poopsBalance.toLocaleString()}
                 </span>
