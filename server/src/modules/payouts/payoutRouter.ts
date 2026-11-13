@@ -10,6 +10,7 @@ const depositLimiter = createRateLimiter(60000, 5); // Max 5 deposit submissions
 
 payoutRouter.get('/history', requireAuth, PayoutController.getHistory);
 payoutRouter.get('/entitlement', requireAuth, PayoutController.getEntitlement);
+payoutRouter.post('/claim-ad-unlock', requireAuth, PayoutController.claimAdUnlock);
 payoutRouter.post('/request', requireAuth, withdrawalLimiter, PayoutController.requestWithdrawal);
 payoutRouter.get('/wallets', requireAuth, PayoutController.getWallets);
 payoutRouter.post('/wallets', requireAuth, PayoutController.saveWallet);

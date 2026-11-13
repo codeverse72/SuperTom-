@@ -215,7 +215,7 @@ export class PayoutController {
       if ((err as any)?.code === 'WITHDRAWAL_DEPOSIT_REQUIRED') {
         sendError(
           res,
-          'A deposit of $3.00 (for 3 withdrawals) or $5.00 (for unlimited withdrawals) is required to unlock payouts.',
+          'A deposit of $3.00 (for 3 withdrawals), $5.00 (for unlimited withdrawals), or watching 30 ads/day for 5 days is required to unlock payouts.',
           403,
           'WITHDRAWAL_DEPOSIT_REQUIRED',
           { requiresDeposit: true }
@@ -224,6 +224,26 @@ export class PayoutController {
       }
       const msg = err instanceof Error ? err.message : 'Withdrawal submission failed';
       sendError(res, msg, 400, 'WITHDRAWAL_FAILED');
+    }
+  }
+
+  /**
+   * POST /api/v1/payouts/claim-ad-unlock
+   * Claims a withdrawal request unlocked via the "Watch 30 Ads/Day for 5 Days" quest.
+   */
+  public static async claimAdUnlock(req: AuthenticatedRequest, res: Response): Promise<void> {
+    const userId = req.user?.userId;
+    if (!userId) {
+      sendError(res, 'Unauthorized', 401, 'UNAUTHORIZED');
+      return;
+    }
+
+    try {
+      const result = await WithdrawalEntitlementService.claimAdWithdrawalUnlock(userId);
+      sendSuccess(res, result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to claim ad withdrawal unlock';
+      sendError(res, msg, 400, 'CLAIM_FAILED');
     }
   }
 

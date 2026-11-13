@@ -128,6 +128,7 @@ model User {
   referredById    String?
   remainingWithdrawals Int      @default(0)
   hasUnlimitedWithdrawals Boolean @default(false)
+  adWithdrawalsClaimed Int      @default(0)
   accountStatus   AccountStatus  @default(ACTIVE)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt

@@ -110,7 +110,9 @@ export default function App() {
               {activeTab === 'store' && (
                 <Store onNavigateToDeposit={() => handleTabChange('payout')} />
               )}
-              {activeTab === 'payout' && <Payout />}
+              {activeTab === 'payout' && (
+                <Payout onNavigateToMissions={() => handleTabChange('missions')} />
+              )}
               {activeTab === 'profile' && <Profile />}
             </ErrorBoundary>
           </main>

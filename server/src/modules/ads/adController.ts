@@ -10,6 +10,7 @@ import {
   WATCH_ADS_DAILY_TARGET,
   getUtcDayStart,
 } from '../missions/missionController.js';
+import { WithdrawalEntitlementService } from '../payouts/withdrawalEntitlementService.js';
 
 export const ADEXIUM_PLACEMENT_ID = 'b073a77c-3963-43dc-a846-99b5382cd341';
 export const DEFAULT_ADSGRAM_BLOCK_ID = process.env.ADSGRAM_BLOCK_ID || '59392';
@@ -284,14 +285,29 @@ export class AdController {
         return;
       }
 
+      let adWithdrawalUnlocked = false;
+      if (result.isQuestCompleted) {
+        try {
+          const entitlement = await WithdrawalEntitlementService.getUserEntitlement(userId);
+          if (entitlement.remainingWithdrawals > 0) {
+            adWithdrawalUnlocked = true;
+          }
+        } catch (e) {
+          console.error('[AdController] Entitlement check error:', e);
+        }
+      }
+
       sendSuccess(res, {
         completed: true,
         sessionId,
         progress: result.missionProgress,
         total: result.total,
         isQuestCompleted: result.isQuestCompleted,
-        message: result.isQuestCompleted
-          ? 'Congratulations! You reached 30/30 daily ads. Claim your 500 Poops reward!'
+        adWithdrawalUnlocked,
+        message: adWithdrawalUnlocked
+          ? '🎉 Congratulations! You completed 30 ads today and unlocked a FREE withdrawal request (5/5 Days completed)!'
+          : result.isQuestCompleted
+          ? 'Congratulations! You reached 30/30 daily ads. Claim your 500 TomCoins reward!'
           : `Advertisement recorded successfully (${result.missionProgress}/${result.total})!`,
       });
     } catch (err) {

@@ -344,6 +344,17 @@ export interface CampaignStatusResponseDto {
   participation: UserCampaignParticipationDto | null;
 }
 
+export interface AdWatchWithdrawalProgressDto {
+  daysCompleted: number; // 0 to 5
+  targetDays: number; // 5
+  todayAdsWatched: number; // 0 to 30
+  todayAdsTarget: number; // 30
+  isTodayCompleted: boolean; // true if today >= 30
+  canClaimReward: boolean; // true if daysCompleted >= 5
+  totalQualifyingDays: number;
+  claimedCycles: number;
+}
+
 export interface WithdrawalEntitlementDto {
   canWithdraw: boolean;
   hasUnlimitedWithdrawals: boolean;
@@ -351,4 +362,5 @@ export interface WithdrawalEntitlementDto {
   totalDepositedUsd: number;
   requiredDepositTier1: number; // $3.00 for 3 withdrawals
   requiredDepositTier2: number; // $5.00 for unlimited withdrawals
+  adWatchProgress?: AdWatchWithdrawalProgressDto;
 }

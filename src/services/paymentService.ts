@@ -67,4 +67,12 @@ export const paymentService = {
   getWithdrawalEntitlement: async (): Promise<ApiResponse<import('./types').WithdrawalEntitlementDto>> => {
     return apiClient.get<import('./types').WithdrawalEntitlementDto>('/payouts/entitlement');
   },
+
+  claimAdWithdrawalUnlock: async (): Promise<ApiResponse<{
+    success: boolean;
+    remainingWithdrawals: number;
+    message: string;
+  }>> => {
+    return apiClient.post('/payouts/claim-ad-unlock');
+  },
 };

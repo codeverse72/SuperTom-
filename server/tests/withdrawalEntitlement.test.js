@@ -160,4 +160,65 @@ describe('Withdrawal Entitlement & Deposit Requirement Suite', () => {
       assert.equal(canWithdraw, true);
     });
   });
+
+  describe('4. "Watch 30 Ads/Day for 5 Days" Withdrawal Unlock Suite', () => {
+    test('User with < 5 qualifying days cannot claim withdrawal unlock', () => {
+      const TARGET_DAYS = 5;
+      const DAILY_TARGET = 30;
+      const qualifyingDays = 4; // 4 days with >= 30 ads
+      const claimedCycles = 0;
+
+      const effectiveDays = Math.max(0, qualifyingDays - claimedCycles * TARGET_DAYS);
+      const daysCompleted = Math.min(TARGET_DAYS, effectiveDays);
+      const canClaimReward = daysCompleted >= TARGET_DAYS;
+
+      assert.equal(daysCompleted, 4);
+      assert.equal(canClaimReward, false);
+    });
+
+    test('User with 5 qualifying days achieves canClaimReward = true', () => {
+      const TARGET_DAYS = 5;
+      const qualifyingDays = 5;
+      const claimedCycles = 0;
+
+      const effectiveDays = Math.max(0, qualifyingDays - claimedCycles * TARGET_DAYS);
+      const daysCompleted = Math.min(TARGET_DAYS, effectiveDays);
+      const canClaimReward = daysCompleted >= TARGET_DAYS;
+
+      assert.equal(daysCompleted, 5);
+      assert.equal(canClaimReward, true);
+    });
+
+    test('Claiming reward grants exactly +1 withdrawal request and starts next cycle', () => {
+      const TARGET_DAYS = 5;
+      let qualifyingDays = 5;
+      let claimedCycles = 0;
+      let remainingWithdrawals = 0;
+
+      // Claim reward
+      let effectiveDays = Math.max(0, qualifyingDays - claimedCycles * TARGET_DAYS);
+      assert.equal(effectiveDays >= TARGET_DAYS, true);
+
+      remainingWithdrawals += 1;
+      claimedCycles += 1;
+
+      // Next cycle calculation
+      effectiveDays = Math.max(0, qualifyingDays - claimedCycles * TARGET_DAYS);
+      const nextDaysCompleted = Math.min(TARGET_DAYS, effectiveDays);
+      const nextCanClaim = nextDaysCompleted >= TARGET_DAYS;
+
+      assert.equal(remainingWithdrawals, 1);
+      assert.equal(claimedCycles, 1);
+      assert.equal(nextDaysCompleted, 0);
+      assert.equal(nextCanClaim, false);
+
+      // Now user can send a withdrawal request!
+      const canWithdraw = remainingWithdrawals > 0;
+      assert.equal(canWithdraw, true);
+
+      // Sending withdrawal request consumes the quota
+      remainingWithdrawals -= 1;
+      assert.equal(remainingWithdrawals, 0);
+    });
+  });
 });
