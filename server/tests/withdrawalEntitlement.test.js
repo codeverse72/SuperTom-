@@ -13,14 +13,14 @@ describe('Withdrawal Entitlement & Deposit Requirement Suite', () => {
       assert.equal(hasUnlimitedWithdrawals, false);
     });
 
-    test('$3.00 deposit unlocks exactly 3 withdrawal requests', () => {
-      const depositAmountUsdt = 3.0;
+    test('$1.00 deposit unlocks exactly 3 withdrawal requests', () => {
+      const depositAmountUsdt = 1.0;
       let remainingWithdrawals = 0;
       let hasUnlimitedWithdrawals = false;
 
-      if (depositAmountUsdt >= 5.0) {
+      if (depositAmountUsdt >= 3.0) {
         hasUnlimitedWithdrawals = true;
-      } else if (depositAmountUsdt >= 3.0) {
+      } else if (depositAmountUsdt >= 1.0) {
         remainingWithdrawals += 3;
       }
 
@@ -29,14 +29,14 @@ describe('Withdrawal Entitlement & Deposit Requirement Suite', () => {
       assert.equal(remainingWithdrawals > 0, true);
     });
 
-    test('$5.00 deposit unlocks UNLIMITED lifetime withdrawals', () => {
-      const depositAmountUsdt = 5.0;
+    test('$3.00 deposit unlocks UNLIMITED lifetime withdrawals', () => {
+      const depositAmountUsdt = 3.0;
       let remainingWithdrawals = 0;
       let hasUnlimitedWithdrawals = false;
 
-      if (depositAmountUsdt >= 5.0) {
+      if (depositAmountUsdt >= 3.0) {
         hasUnlimitedWithdrawals = true;
-      } else if (depositAmountUsdt >= 3.0) {
+      } else if (depositAmountUsdt >= 1.0) {
         remainingWithdrawals += 3;
       }
 
@@ -44,24 +44,24 @@ describe('Withdrawal Entitlement & Deposit Requirement Suite', () => {
       assert.equal(hasUnlimitedWithdrawals || remainingWithdrawals > 0, true);
     });
 
-    test('Higher deposits ($10, $50) unlock UNLIMITED lifetime withdrawals', () => {
-      for (const amount of [10.0, 15.0, 50.0]) {
+    test('Higher deposits ($5, $10, $50) unlock UNLIMITED lifetime withdrawals', () => {
+      for (const amount of [5.0, 10.0, 15.0, 50.0]) {
         let hasUnlimitedWithdrawals = false;
-        if (amount >= 5.0) {
+        if (amount >= 3.0) {
           hasUnlimitedWithdrawals = true;
         }
         assert.equal(hasUnlimitedWithdrawals, true);
       }
     });
 
-    test('Deposits below $3.00 do NOT unlock withdrawal quota', () => {
-      const depositAmountUsdt = 1.0;
+    test('Deposits below $1.00 do NOT unlock withdrawal quota', () => {
+      const depositAmountUsdt = 0.5;
       let remainingWithdrawals = 0;
       let hasUnlimitedWithdrawals = false;
 
-      if (depositAmountUsdt >= 5.0) {
+      if (depositAmountUsdt >= 3.0) {
         hasUnlimitedWithdrawals = true;
-      } else if (depositAmountUsdt >= 3.0) {
+      } else if (depositAmountUsdt >= 1.0) {
         remainingWithdrawals += 3;
       }
 
@@ -134,24 +134,24 @@ describe('Withdrawal Entitlement & Deposit Requirement Suite', () => {
   });
 
   describe('3. Multiple Deposits Stacking Logic', () => {
-    test('Two separate $3 deposits grant 6 total withdrawals', () => {
+    test('Two separate $1 deposits grant 6 total withdrawals', () => {
       let remainingWithdrawals = 0;
-      const deposit1 = 3.0;
-      const deposit2 = 3.0;
+      const deposit1 = 1.0;
+      const deposit2 = 1.0;
 
-      remainingWithdrawals += Math.floor(deposit1 / 3.0) * 3;
-      remainingWithdrawals += Math.floor(deposit2 / 3.0) * 3;
+      remainingWithdrawals += Math.floor(deposit1 / 1.0) * 3;
+      remainingWithdrawals += Math.floor(deposit2 / 1.0) * 3;
 
       assert.equal(remainingWithdrawals, 6);
     });
 
-    test('$3 deposit followed by $5 deposit upgrades user to UNLIMITED', () => {
+    test('$1 deposit followed by $3 deposit upgrades user to UNLIMITED', () => {
       let remainingWithdrawals = 3;
       let hasUnlimitedWithdrawals = false;
 
-      // Later user deposits $5
-      const newDeposit = 5.0;
-      if (newDeposit >= 5.0) {
+      // Later user deposits $3
+      const newDeposit = 3.0;
+      if (newDeposit >= 3.0) {
         hasUnlimitedWithdrawals = true;
       }
 

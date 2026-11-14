@@ -13,9 +13,10 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ activeTab = 'home' }) => {
   const { soundEnabled, toggleSound, balance, showToast } = useGame();
-  const { language, setLanguage, supportedLanguages, t } = useI18n();
+  const { language, setLanguage, supportedLanguages, currentLanguageOption, t } = useI18n();
   const { close: closeTelegram, isTelegram } = useTelegram();
   const [showMenu, setShowMenu] = useState(false);
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
 
   return (
@@ -55,6 +56,23 @@ export const Header: React.FC<HeaderProps> = ({ activeTab = 'home' }) => {
 
           {/* Right Action Icons: Telegram-style circular buttons */}
           <div className="flex items-center gap-2">
+            {/* Language Switcher Button (Left side of Customer Support) */}
+            <button
+              onClick={() => {
+                sound.playTap();
+                setShowLanguageModal(true);
+              }}
+              className="relative w-9 h-9 rounded-full bg-[#180a33]/80 hover:bg-[#281353] border border-indigo-500/40 hover:border-indigo-400 flex items-center justify-center text-indigo-300 hover:text-white transition-all active:scale-95 shadow-md shadow-black/40 cursor-pointer group"
+              title={t('profile.language')}
+              aria-label={t('profile.language')}
+            >
+              <Globe className="w-4 h-4 text-indigo-300 group-hover:scale-110 transition-transform" />
+              {/* Flag Badge at bottom right */}
+              <span className="absolute -bottom-1 -right-1 text-[10px] leading-none pointer-events-none drop-shadow-sm select-none">
+                {currentLanguageOption?.flag}
+              </span>
+            </button>
+
             {/* Customer Support SVG Button (Left side to "...") */}
             <button
               onClick={() => {
@@ -200,6 +218,79 @@ export const Header: React.FC<HeaderProps> = ({ activeTab = 'home' }) => {
             <button
               onClick={() => setShowMenu(false)}
               className="w-full py-2.5 rounded-xl bg-purple-600/50 hover:bg-purple-600 text-white font-semibold text-sm transition-colors border border-purple-400/40 cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Language Switcher Modal */}
+      {showLanguageModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-150">
+          <div className="glass-panel w-full max-w-sm rounded-3xl p-5 border border-indigo-500/40 shadow-2xl bg-[#140628] animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-indigo-500/20">
+              <div className="flex items-center gap-2">
+                <Globe className="w-5 h-5 text-indigo-400" />
+                <h3 className="text-base font-bold text-white font-display">
+                  {t('profile.language')}
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowLanguageModal(false)}
+                className="text-purple-300/70 hover:text-white p-1 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-purple-200/80 my-3 leading-relaxed">
+              {t('profile.languageSub')}
+            </p>
+
+            <div className="space-y-2 py-1">
+              {supportedLanguages.map((l) => {
+                const isSelected = language === l.code;
+                return (
+                  <button
+                    key={l.code}
+                    type="button"
+                    onClick={() => {
+                      sound.playTap();
+                      setLanguage(l.code);
+                      showToast(t('profile.langSaved'), `${l.flag} ${l.nativeName}`, 'success');
+                      setShowLanguageModal(false);
+                    }}
+                    className={`w-full p-3 rounded-2xl flex items-center justify-between transition-all border cursor-pointer ${
+                      isSelected
+                        ? 'bg-purple-600/40 border-amber-400 text-white shadow-lg ring-1 ring-amber-400/50'
+                        : 'bg-purple-950/40 border-purple-500/20 text-purple-200 hover:bg-purple-900/40 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{l.flag}</span>
+                      <div className="text-left">
+                        <span className="text-sm font-bold text-white block">
+                          {l.nativeName}
+                        </span>
+                        <span className="text-[11px] text-purple-300/70 block">
+                          {l.name}
+                        </span>
+                      </div>
+                    </div>
+                    {isSelected && (
+                      <span className="w-6 h-6 rounded-full bg-amber-400 text-purple-950 flex items-center justify-center text-xs font-black">
+                        ✓
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => setShowLanguageModal(false)}
+              className="mt-4 w-full py-2.5 rounded-xl bg-purple-600/50 hover:bg-purple-600 text-white font-semibold text-sm transition-colors border border-purple-400/40 cursor-pointer"
             >
               Close
             </button>

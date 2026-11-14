@@ -18,8 +18,8 @@ export interface WithdrawalEntitlement {
   hasUnlimitedWithdrawals: boolean;
   remainingWithdrawals: number;
   totalDepositedUsd: number;
-  requiredDepositTier1: number; // $3.00 for 3 withdrawals
-  requiredDepositTier2: number; // $5.00 for unlimited withdrawals
+  requiredDepositTier1: number; // $1.00 for 3 withdrawals
+  requiredDepositTier2: number; // $3.00 for unlimited withdrawals
   adWatchProgress: AdWatchWithdrawalProgress;
 }
 
@@ -150,8 +150,8 @@ export class WithdrawalEntitlementService {
         hasUnlimitedWithdrawals: false,
         remainingWithdrawals: 0,
         totalDepositedUsd: 0,
-        requiredDepositTier1: 3.0,
-        requiredDepositTier2: 5.0,
+        requiredDepositTier1: 1.0,
+        requiredDepositTier2: 3.0,
         adWatchProgress: {
           daysCompleted: 0,
           targetDays: 5,
@@ -177,22 +177,22 @@ export class WithdrawalEntitlementService {
     });
 
     let totalDepositedUsd = 0;
-    let hasFiveDollarDeposit = false;
     let hasThreeDollarDeposit = false;
+    let hasOneDollarDeposit = false;
 
     for (const d of confirmedDeposits) {
       const amt = Number(d.amountUsdt);
       totalDepositedUsd += amt;
-      if (amt >= 5.0) hasFiveDollarDeposit = true;
       if (amt >= 3.0) hasThreeDollarDeposit = true;
+      if (amt >= 1.0) hasOneDollarDeposit = true;
     }
 
     let hasUnlimited = user.hasUnlimitedWithdrawals;
     let remaining = user.remainingWithdrawals;
     let claimedCycles = user.adWithdrawalsClaimed || 0;
 
-    // Auto-grant unlimited if user has deposited >= $5.00
-    if (!hasUnlimited && (hasFiveDollarDeposit || totalDepositedUsd >= 5.0)) {
+    // Auto-grant unlimited if user has deposited >= $3.00
+    if (!hasUnlimited && (hasThreeDollarDeposit || totalDepositedUsd >= 3.0)) {
       hasUnlimited = true;
       await prisma.user.update({
         where: { id: userId },
@@ -200,12 +200,12 @@ export class WithdrawalEntitlementService {
       }).catch((e) => logger.warn('[WithdrawalEntitlement] Auto-update unlimited failed:', e));
     }
 
-    // Auto-grant 3 withdrawals if user has deposited >= $3.00 and has 0 remaining
-    if (!hasUnlimited && remaining === 0 && (hasThreeDollarDeposit || totalDepositedUsd >= 3.0)) {
+    // Auto-grant 3 withdrawals if user has deposited >= $1.00 and has 0 remaining
+    if (!hasUnlimited && remaining === 0 && (hasOneDollarDeposit || totalDepositedUsd >= 1.0)) {
       const pastWithdrawals = await prisma.withdrawal.count({
         where: { userId, status: { not: 'REJECTED' } },
       });
-      const earnedSlots = Math.floor(totalDepositedUsd / 3.0) * 3;
+      const earnedSlots = Math.floor(totalDepositedUsd / 1.0) * 3;
       const calculatedRemaining = Math.max(0, earnedSlots - pastWithdrawals);
       if (calculatedRemaining > 0) {
         remaining = calculatedRemaining;
@@ -245,15 +245,15 @@ export class WithdrawalEntitlementService {
       hasUnlimitedWithdrawals: hasUnlimited,
       remainingWithdrawals: hasUnlimited ? 999999 : remaining,
       totalDepositedUsd,
-      requiredDepositTier1: 3.0,
-      requiredDepositTier2: 5.0,
+      requiredDepositTier1: 1.0,
+      requiredDepositTier2: 3.0,
       adWatchProgress,
     };
   }
 
   /**
    * Called whenever a deposit is verified and marked CONFIRMED / COMPLETED.
-   * Immediately unlocks 3 withdrawals for $3+ or UNLIMITED for $5+.
+   * Immediately unlocks 3 withdrawals for $1+ or UNLIMITED for $3+.
    */
   public static async processDepositConfirmed(
     tx: Prisma.TransactionClient,
@@ -261,8 +261,8 @@ export class WithdrawalEntitlementService {
   ): Promise<void> {
     const { userId, amountUsdt } = params;
 
-    if (amountUsdt >= 5.0) {
-      // $5+ deposit unlocks UNLIMITED lifetime withdrawals
+    if (amountUsdt >= 3.0) {
+      // $3+ deposit unlocks UNLIMITED lifetime withdrawals
       await tx.user.update({
         where: { id: userId },
         data: {
@@ -270,8 +270,8 @@ export class WithdrawalEntitlementService {
         },
       });
       logger.info(`[WithdrawalEntitlement] User ${userId} granted UNLIMITED withdrawals for $${amountUsdt.toFixed(2)} deposit!`);
-    } else if (amountUsdt >= 3.0) {
-      // $3+ deposit unlocks 3 free withdrawals
+    } else if (amountUsdt >= 1.0) {
+      // $1+ deposit unlocks 3 free withdrawals
       await tx.user.update({
         where: { id: userId },
         data: {
@@ -318,26 +318,26 @@ export class WithdrawalEntitlementService {
       });
 
       let total = 0;
-      let hasFive = false;
       let hasThree = false;
+      let hasOne = false;
       for (const d of deposits) {
         const a = Number(d.amountUsdt);
         total += a;
-        if (a >= 5.0) hasFive = true;
         if (a >= 3.0) hasThree = true;
+        if (a >= 1.0) hasOne = true;
       }
 
-      if (hasFive || total >= 5.0) {
+      if (hasThree || total >= 3.0) {
         hasUnlimited = true;
         await tx.user.update({
           where: { id: userId },
           data: { hasUnlimitedWithdrawals: true },
         });
-      } else if (hasThree || total >= 3.0) {
+      } else if (hasOne || total >= 1.0) {
         const pastWithdrawals = await tx.withdrawal.count({
           where: { userId, status: { not: 'REJECTED' } },
         });
-        const earned = Math.floor(total / 3.0) * 3;
+        const earned = Math.floor(total / 1.0) * 3;
         const available = Math.max(0, earned - pastWithdrawals);
         if (available > 0) {
           remaining = available;
@@ -373,7 +373,7 @@ export class WithdrawalEntitlementService {
 
     if (!hasUnlimited && remaining <= 0) {
       const err = new Error(
-        'A qualifying deposit ($3.00 for 3 payouts, $5.00 for unlimited) or watching 30 ads/day for 5 days is required to unlock payouts.'
+        'A qualifying deposit ($1.00 for 3 payouts, $3.00 for unlimited) or watching 30 ads/day for 5 days is required to unlock payouts.'
       );
       (err as any).code = 'WITHDRAWAL_DEPOSIT_REQUIRED';
       (err as any).requiresDeposit = true;
