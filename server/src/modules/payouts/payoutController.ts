@@ -934,6 +934,32 @@ export class PayoutController {
         },
       });
 
+      // Automatically complete m8_connect_wallet mission if not already completed/claimed
+      try {
+        const userMission = await prisma.userMission.findUnique({
+          where: { userId_missionId: { userId, missionId: 'm8_connect_wallet' } },
+        });
+        if (!userMission || userMission.status === 'START' || userMission.status === 'IN_PROGRESS') {
+          await prisma.userMission.upsert({
+            where: { userId_missionId: { userId, missionId: 'm8_connect_wallet' } },
+            create: {
+              userId,
+              missionId: 'm8_connect_wallet',
+              status: 'COMPLETED',
+              progress: 1,
+              total: 1,
+            },
+            update: {
+              status: 'COMPLETED',
+              progress: 1,
+              total: 1,
+            },
+          });
+        }
+      } catch (missionErr) {
+        logger.warn('Failed to auto-progress wallet mission:', missionErr);
+      }
+
       sendSuccess(res, wallet);
     } catch {
       sendError(res, 'Failed to save wallet', 500, 'WALLET_SAVE_ERROR');

@@ -26,6 +26,7 @@ import { generateReferralLink } from '../utils/telegram';
 import { formatNumber, poopsToUsdt } from '../utils/probability';
 import { sound } from '../utils/sound';
 import { adManager } from '../services/adManager';
+import { LanguageFlag } from '../components/LanguageFlag';
 
 export const Profile: React.FC = () => {
   const { 
@@ -230,8 +231,9 @@ export const Profile: React.FC = () => {
                 <span className="text-sm font-bold text-white font-display">
                   {t('profile.language')}
                 </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 shrink-0">
-                  {currentLanguageOption.flag} {currentLanguageOption.nativeName}
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 shrink-0">
+                  <LanguageFlag code={currentLanguageOption.code} className="w-3.5 h-2.5" />
+                  <span>{currentLanguageOption.nativeName}</span>
                 </span>
               </div>
               <p className="text-[11px] text-purple-300/70">
@@ -565,7 +567,7 @@ export const Profile: React.FC = () => {
                     key={langOpt.code}
                     onClick={() => {
                       setLanguage(langOpt.code);
-                      showToast(t('profile.langSaved'), `${langOpt.flag} ${langOpt.nativeName}`, 'success');
+                      showToast(t('profile.langSaved'), langOpt.nativeName, 'success');
                       setActiveModal(null);
                     }}
                     className={`w-full p-3.5 rounded-2xl border flex items-center justify-between transition-all cursor-pointer ${
@@ -575,7 +577,7 @@ export const Profile: React.FC = () => {
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">{langOpt.flag}</span>
+                      <LanguageFlag code={langOpt.code} className="w-8 h-5.5 rounded-md shadow-sm" />
                       <div className="text-left">
                         <span className="text-sm font-bold text-white block">
                           {langOpt.nativeName}

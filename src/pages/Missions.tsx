@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import chestPurpleImg from '../assets/dashboard/chest_purple.png';
 import { 
   Send, 
@@ -20,7 +20,10 @@ import {
   Copy,
   Tv,
   AlertCircle,
-  Zap
+  Zap,
+  Wallet,
+  X,
+  ChevronRight
 } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { Mission, MissionCategory } from '../config/gameConfig';
@@ -28,6 +31,9 @@ import { formatNumber } from '../utils/probability';
 import { sound } from '../utils/sound';
 import { shareViaTelegram, generateReferralLink } from '../utils/telegram';
 import { runServerVerifiedAdSession, AdLifecycleState } from '../utils/adexiumRewarded';
+import { useTonConnect } from '../hooks/useTonConnect';
+import { paymentService } from '../services/paymentService';
+import { validateNetworkAddress } from '../utils/validation';
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Send,
@@ -41,7 +47,8 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Disc,
   Sparkles,
   Trophy,
-  Tv
+  Tv,
+  Wallet
 };
 
 interface MissionsProps {
@@ -56,6 +63,82 @@ export const Missions: React.FC<MissionsProps> = ({ onNavigateToDeposit }) => {
   const [copiedMissionId, setCopiedMissionId] = useState<string | null>(null);
   const [adButtonState, setAdButtonState] = useState<AdLifecycleState>('READY');
   const [adStatusMessage, setAdStatusMessage] = useState<string | null>(null);
+
+  // Wallet Quest State
+  const [showWalletQuestModal, setShowWalletQuestModal] = useState(false);
+  const [walletNetwork, setWalletNetwork] = useState<'TON' | 'USDT (TRC20)' | 'USDT (BEP20)'>('TON');
+  const [walletAddressInput, setWalletAddressInput] = useState('');
+  const [isSavingWallet, setIsSavingWallet] = useState(false);
+  const [walletError, setWalletError] = useState<string | null>(null);
+
+  const {
+    isConnected: isTonConnected,
+    walletAddress: tonWalletAddress,
+    isLoading: isTonLoading,
+    connectWallet: connectTonWallet,
+  } = useTonConnect(showWalletQuestModal);
+
+  const handleConnectTon = async () => {
+    setWalletError(null);
+    try {
+      await connectTonWallet();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'TON Connect failed';
+      setWalletError(msg);
+    }
+  };
+
+  const handleSaveManualWallet = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setWalletError(null);
+    const addr = walletAddressInput.trim();
+    if (!addr) {
+      setWalletError('Please enter your wallet address');
+      return;
+    }
+    const val = validateNetworkAddress(walletNetwork, addr);
+    if (!val.isValid) {
+      setWalletError(val.error || 'Invalid wallet address format');
+      return;
+    }
+
+    setIsSavingWallet(true);
+    try {
+      const res = await paymentService.saveWallet({ walletAddress: addr, network: walletNetwork });
+      if (res.success) {
+        sound.playReward();
+        showToast('Wallet Connected!', '500 TomCoins quest ready to claim!', 'reward');
+        setShowWalletQuestModal(false);
+        setWalletAddressInput('');
+        await verifyMission('m8_connect_wallet');
+        await refreshMissions();
+      } else {
+        setWalletError(res.error?.message || 'Failed to save wallet address');
+      }
+    } catch {
+      setWalletError('Network error while saving wallet');
+    } finally {
+      setIsSavingWallet(false);
+    }
+  };
+
+  // If TON connected successfully, automatically save wallet and complete quest!
+  useEffect(() => {
+    if (showWalletQuestModal && isTonConnected && tonWalletAddress) {
+      paymentService.saveWallet({ walletAddress: tonWalletAddress, network: 'TON' }).then(() => {
+        sound.playReward();
+        showToast('Wallet Connected!', '500 TomCoins quest ready to claim!', 'reward');
+        setShowWalletQuestModal(false);
+        verifyMission('m8_connect_wallet');
+        refreshMissions();
+      });
+    }
+  }, [showWalletQuestModal, isTonConnected, tonWalletAddress]);
+
+  const isWalletMission = (m: Mission) =>
+    m.id === 'm8_connect_wallet' ||
+    m.id.includes('wallet') ||
+    m.title.toLowerCase().includes('wallet');
 
   const isInviteMission = (m: Mission) =>
     m.id === 'm4_invite_3' || 
@@ -184,13 +267,15 @@ export const Missions: React.FC<MissionsProps> = ({ onNavigateToDeposit }) => {
     if (isWatchAdsMission(m)) return 1;
     // 2. Share friends mission
     if (isInviteMission(m)) return 2;
-    // 3. Social & In-Game quests in logical progression
-    if (m.id === 'm1_join_channel' || m.id === 'm1' || m.title.toLowerCase().includes('channel')) return 3;
-    if (m.id === 'm2_join_group' || m.id === 'm2' || m.title.toLowerCase().includes('group') || m.title.toLowerCase().includes('chat') || m.title.toLowerCase().includes('community')) return 4;
-    if (m.id === 'm3_follow_x' || m.id === 'm3' || m.title.toLowerCase().includes('x') || m.title.toLowerCase().includes('twitter') || m.title.toLowerCase().includes('social')) return 5;
-    if (m.id === 'm5_feed_5_biscuits' || m.id === 'm7' || m.title.toLowerCase().includes('feed') || m.title.toLowerCase().includes('biscuit')) return 6;
-    if (m.id === 'm6_reach_level_5' || m.id === 'm6' || m.title.toLowerCase().includes('level') || m.title.toLowerCase().includes('check-in')) return 7;
-    return 8;
+    // 3. Connect Wallet Quest
+    if (isWalletMission(m)) return 3;
+    // 4. Social & In-Game quests in logical progression
+    if (m.id === 'm1_join_channel' || m.id === 'm1' || m.title.toLowerCase().includes('channel')) return 4;
+    if (m.id === 'm2_join_group' || m.id === 'm2' || m.title.toLowerCase().includes('group') || m.title.toLowerCase().includes('chat') || m.title.toLowerCase().includes('community')) return 5;
+    if (m.id === 'm3_follow_x' || m.id === 'm3' || m.title.toLowerCase().includes('x') || m.title.toLowerCase().includes('twitter') || m.title.toLowerCase().includes('social')) return 6;
+    if (m.id === 'm5_feed_5_biscuits' || m.id === 'm7' || m.title.toLowerCase().includes('feed') || m.title.toLowerCase().includes('biscuit')) return 7;
+    if (m.id === 'm6_reach_level_5' || m.id === 'm6' || m.title.toLowerCase().includes('level') || m.title.toLowerCase().includes('check-in')) return 8;
+    return 9;
   };
 
   const filteredMissions = missions
@@ -217,6 +302,12 @@ export const Missions: React.FC<MissionsProps> = ({ onNavigateToDeposit }) => {
 
     if (isWatchAdsMission(mission)) {
       await handleWatchAdQuest(mission);
+      return;
+    }
+
+    // Connect Crypto Wallet Quest
+    if (isWalletMission(mission)) {
+      setShowWalletQuestModal(true);
       return;
     }
 
@@ -734,9 +825,15 @@ export const Missions: React.FC<MissionsProps> = ({ onNavigateToDeposit }) => {
                   ) : (
                     <button
                       onClick={() => handleMissionInteraction(mission)}
-                      className="px-3.5 py-1.5 rounded-xl bg-purple-900/60 hover:bg-purple-800/70 text-white border border-purple-400/30 text-xs font-bold flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                      className={`px-3.5 py-1.5 rounded-xl text-white text-xs font-bold flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-md transition-all ${
+                        isWalletMission(mission)
+                          ? 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:brightness-110 border border-cyan-400/50'
+                          : 'bg-purple-900/60 hover:bg-purple-800/70 border border-purple-400/30'
+                      }`}
                     >
-                      <span>{mission.actionUrl ? 'Open Link' : 'Start Quest'}</span>
+                      <span>
+                        {isWalletMission(mission) ? 'Connect Wallet' : mission.actionUrl ? 'Open Link' : 'Start Quest'}
+                      </span>
                       <ArrowRight className="w-3 h-3 text-amber-300" />
                     </button>
                   )}
@@ -746,6 +843,126 @@ export const Missions: React.FC<MissionsProps> = ({ onNavigateToDeposit }) => {
           );
         })}
       </div>
+
+      {/* Wallet Connect Quest Modal */}
+      {showWalletQuestModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-3xl bg-[#09041a] border border-cyan-500/40 p-5 space-y-4 shadow-2xl relative">
+            <button
+              onClick={() => {
+                setShowWalletQuestModal(false);
+                setWalletError(null);
+              }}
+              className="absolute top-4 right-4 p-1.5 rounded-xl bg-purple-900/40 text-purple-300 hover:text-white cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-cyan-600/20 border border-cyan-400/40 flex items-center justify-center text-cyan-400">
+                <Wallet className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-white font-display">
+                  Connect Crypto Wallet
+                </h3>
+                <p className="text-xs text-amber-300 font-bold">
+                  +500 TomCoins Royal Reward
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-purple-200/80 leading-relaxed">
+              Connect your TON wallet or submit your payout address to complete the quest and earn 500 TomCoins!
+            </p>
+
+            {/* Quick 1-Click TON Connect */}
+            <button
+              type="button"
+              disabled={isTonLoading}
+              onClick={handleConnectTon}
+              className="w-full p-3 rounded-2xl bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-lg transition-all cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-base">💎</span>
+                <div className="text-left">
+                  <div>Connect TON Wallet</div>
+                  <div className="text-[10px] font-normal text-cyan-200">Tonkeeper, Telegram @wallet, MyTonWallet</div>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+
+            <div className="relative flex py-1 items-center">
+              <div className="flex-grow border-t border-purple-500/20"></div>
+              <span className="flex-shrink mx-3 text-[10px] font-bold text-purple-400 uppercase">Or Paste Address</span>
+              <div className="flex-grow border-t border-purple-500/20"></div>
+            </div>
+
+            {/* Manual Form */}
+            <form onSubmit={handleSaveManualWallet} className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                  Select Blockchain Network
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(['TON', 'USDT (TRC20)', 'USDT (BEP20)'] as const).map((net) => (
+                    <button
+                      key={net}
+                      type="button"
+                      onClick={() => setWalletNetwork(net)}
+                      className={`py-1.5 px-1 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${
+                        walletNetwork === net
+                          ? 'bg-cyan-600/40 border-cyan-400 text-cyan-200 shadow-sm'
+                          : 'bg-purple-950/40 border-purple-900/50 text-slate-400'
+                      }`}
+                    >
+                      {net}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                  Your Receiving Wallet Address
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={walletAddressInput}
+                  onChange={(e) => {
+                    setWalletAddressInput(e.target.value);
+                    setWalletError(null);
+                  }}
+                  placeholder={
+                    walletNetwork === 'TON'
+                      ? 'UQ... or EQ...'
+                      : walletNetwork.includes('TRC20')
+                      ? 'T...'
+                      : '0x...'
+                  }
+                  className="w-full px-3 py-2 rounded-xl bg-[#0e0722] border border-purple-500/30 text-white font-mono text-xs focus:outline-hidden focus:border-cyan-400"
+                />
+              </div>
+
+              {walletError && (
+                <p className="text-[11px] font-bold text-rose-400">
+                  {walletError}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={isSavingWallet || !walletAddressInput.trim()}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:brightness-110 active:scale-95 disabled:opacity-50 text-slate-950 font-black text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer"
+              >
+                {isSavingWallet ? 'Saving & Verifying...' : 'Save & Claim 500 TomCoins'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

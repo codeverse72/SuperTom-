@@ -303,6 +303,18 @@ export const INITIAL_MISSIONS: Mission[] = [
 
   // SPECIAL MISSIONS
   {
+    id: 'm8_connect_wallet',
+    title: 'Connect Crypto Wallet',
+    description: 'Connect your TON or crypto wallet to receive instant payouts & rewards',
+    reward: 500,
+    category: 'special',
+    icon: 'Wallet',
+    status: 'start',
+    progress: 0,
+    total: 1,
+    badge: 'Wallet'
+  },
+  {
     id: 'm9',
     title: 'Spin Lucky Wheel 3 Times',
     description: 'Try your fortune on the lucky prize wheel across any milestone cycles',

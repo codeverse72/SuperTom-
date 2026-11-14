@@ -13,6 +13,9 @@ import {
   ChevronRight,
   RefreshCw,
   UserCheck,
+  Wallet,
+  Copy,
+  Check,
 } from 'lucide-react';
 
 export const UsersPage: React.FC = () => {
@@ -23,6 +26,8 @@ export const UsersPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [walletFilter, setWalletFilter] = useState<'all' | 'has_wallet' | 'no_wallet'>('all');
+  const [copiedWalletId, setCopiedWalletId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   // Selected User for Details Modal
@@ -49,6 +54,7 @@ export const UsersPage: React.FC = () => {
       limit: 15,
       search: search || undefined,
       status: statusFilter || undefined,
+      hasWallet: walletFilter === 'has_wallet' ? 'true' : walletFilter === 'no_wallet' ? 'false' : undefined,
     });
     if (res.success && res.data) {
       setUsers(res.data.users);
@@ -56,7 +62,7 @@ export const UsersPage: React.FC = () => {
       setTotalPages(res.data.totalPages);
     }
     setIsLoading(false);
-  }, [page, search, statusFilter]);
+  }, [page, search, statusFilter, walletFilter]);
 
   useEffect(() => {
     fetchUsers();
@@ -108,7 +114,7 @@ export const UsersPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Search & Filter Header */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-gradient-to-r from-[#120A25] to-[#0A0517] p-4 rounded-2xl border border-purple-900/30">
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 bg-gradient-to-r from-[#120A25] to-[#0A0517] p-4 rounded-2xl border border-purple-900/30">
         <div className="relative flex-1 max-w-md">
           <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
@@ -118,12 +124,57 @@ export const UsersPage: React.FC = () => {
               setSearch(e.target.value);
               setPage(1);
             }}
-            placeholder="Search by Telegram ID, username, or referral code..."
+            placeholder="Search by Telegram ID, username, referral code, or wallet address..."
             className="w-full pl-10 pr-4 py-2 rounded-xl bg-[#090414] border border-purple-900/60 text-white text-xs focus:outline-hidden focus:border-purple-500 placeholder:text-slate-600"
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Wallet Connection Filter */}
+          <div className="flex items-center gap-1 bg-[#090414] p-1 rounded-xl border border-purple-900/60">
+            <button
+              onClick={() => {
+                setWalletFilter('all');
+                setPage(1);
+              }}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                walletFilter === 'all'
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              All Wallets
+            </button>
+            <button
+              onClick={() => {
+                setWalletFilter('has_wallet');
+                setPage(1);
+              }}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                walletFilter === 'has_wallet'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-emerald-300'
+              }`}
+            >
+              <Wallet className="w-3 h-3" />
+              <span>Wallet Connected</span>
+            </button>
+            <button
+              onClick={() => {
+                setWalletFilter('no_wallet');
+                setPage(1);
+              }}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                walletFilter === 'no_wallet'
+                  ? 'bg-slate-700 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              No Wallet
+            </button>
+          </div>
+
+          {/* Account Status Filter */}
           {['', 'ACTIVE', 'SUSPENDED', 'BANNED'].map((st) => (
             <button
               key={st}
@@ -131,19 +182,20 @@ export const UsersPage: React.FC = () => {
                 setStatusFilter(st);
                 setPage(1);
               }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 statusFilter === st
                   ? 'bg-purple-600 text-white shadow-md shadow-purple-900/40'
                   : 'bg-purple-950/40 text-slate-400 hover:text-white border border-purple-900/40'
               }`}
             >
-              {st || 'ALL USERS'}
+              {st || 'ALL STATUS'}
             </button>
           ))}
           <button
             onClick={fetchUsers}
             disabled={isLoading}
-            className="p-2 rounded-xl bg-purple-950/40 hover:bg-purple-900/60 border border-purple-900/40 text-slate-300 transition-colors"
+            className="p-2 rounded-xl bg-purple-950/40 hover:bg-purple-900/60 border border-purple-900/40 text-slate-300 transition-colors cursor-pointer"
+            title="Refresh Users"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
@@ -158,6 +210,7 @@ export const UsersPage: React.FC = () => {
               <tr>
                 <th className="py-3 px-4">Player</th>
                 <th className="py-3 px-4">Telegram ID</th>
+                <th className="py-3 px-4">Connected Wallet</th>
                 <th className="py-3 px-4">TomCoins Balance</th>
                 <th className="py-3 px-4">Level</th>
                 <th className="py-3 px-4">Mining Rate</th>
@@ -180,6 +233,47 @@ export const UsersPage: React.FC = () => {
                       </span>
                     </td>
                     <td className="py-3 px-4 font-mono text-slate-300">{u.telegramId}</td>
+                    {/* Connected Wallet Column */}
+                    <td className="py-3 px-4">
+                      {u.primaryWallet ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono bg-blue-900/50 text-blue-300 border border-blue-500/30 shrink-0">
+                            {u.wallets?.[0]?.network || 'TON'}
+                          </span>
+                          <span
+                            className="font-mono text-slate-200 text-[11px] truncate max-w-[110px]"
+                            title={u.primaryWallet}
+                          >
+                            {u.primaryWallet.slice(0, 4)}...{u.primaryWallet.slice(-4)}
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard?.writeText(u.primaryWallet!);
+                              setCopiedWalletId(u.id);
+                              setTimeout(() => setCopiedWalletId(null), 2000);
+                            }}
+                            title="Copy wallet address"
+                            className="p-1 rounded hover:bg-purple-900/40 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                          >
+                            {copiedWalletId === u.id ? (
+                              <Check className="w-3 h-3 text-emerald-400" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </button>
+                          {(u.walletsCount ?? 1) > 1 && (
+                            <span className="text-[9px] font-bold px-1 rounded bg-purple-900/60 text-purple-300 shrink-0">
+                              +{u.walletsCount! - 1}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-slate-500 text-[11px] font-mono italic">
+                          None
+                        </span>
+                      )}
+                    </td>
                     <td className="py-3 px-4 font-mono font-bold text-amber-400">
                       {u.poopsBalance.toLocaleString()}
                     </td>
@@ -201,7 +295,7 @@ export const UsersPage: React.FC = () => {
                         <button
                           onClick={() => handleOpenDetail(u.id)}
                           title="View Full Profile"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-purple-900/40 transition-colors"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-purple-900/40 transition-colors cursor-pointer"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
@@ -212,7 +306,7 @@ export const UsersPage: React.FC = () => {
                               setNewStatus(u.accountStatus);
                             }}
                             title="Modify Status"
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-purple-900/40 transition-colors"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-purple-900/40 transition-colors cursor-pointer"
                           >
                             <ShieldAlert className="w-4 h-4" />
                           </button>
@@ -226,7 +320,7 @@ export const UsersPage: React.FC = () => {
                               setAdjustError(null);
                             }}
                             title="Audited Balance Adjustment"
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-purple-900/40 transition-colors"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-purple-900/40 transition-colors cursor-pointer"
                           >
                             <Coins className="w-4 h-4" />
                           </button>
@@ -237,7 +331,7 @@ export const UsersPage: React.FC = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-500 font-mono text-xs">
+                  <td colSpan={10} className="py-12 text-center text-slate-500 font-mono text-xs">
                     {isLoading ? 'Loading players...' : 'No users matching search criteria.'}
                   </td>
                 </tr>
@@ -305,6 +399,69 @@ export const UsersPage: React.FC = () => {
                   {selectedUserDetail.referralCode}
                 </span>
               </div>
+            </div>
+
+            {/* Connected Crypto Wallets */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h5 className="font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <Wallet className="w-4 h-4 text-cyan-400" />
+                  <span>Connected Crypto Wallets ({selectedUserDetail.wallets?.length ?? 0})</span>
+                </h5>
+              </div>
+              {selectedUserDetail.wallets && selectedUserDetail.wallets.length > 0 ? (
+                <div className="space-y-2">
+                  {selectedUserDetail.wallets.map((w) => (
+                    <div
+                      key={w.id}
+                      className="p-2.5 rounded-xl bg-purple-950/30 border border-purple-900/40 flex items-center justify-between gap-2"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-blue-900/60 text-blue-300 border border-blue-500/40 shrink-0">
+                          {w.network}
+                        </span>
+                        <span className="font-mono text-slate-200 text-xs truncate select-all">
+                          {w.walletAddress}
+                        </span>
+                        {w.isDefault && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                            DEFAULT
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">
+                          {new Date(w.createdAt).toLocaleDateString()}
+                        </span>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard?.writeText(w.walletAddress);
+                            setCopiedWalletId(w.id);
+                            setTimeout(() => setCopiedWalletId(null), 2000);
+                          }}
+                          className="px-2 py-1 rounded-lg bg-purple-900/40 hover:bg-purple-800/60 text-slate-300 hover:text-white flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                        >
+                          {copiedWalletId === w.id ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-400" />
+                              <span className="text-emerald-400">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3" />
+                              <span>Copy</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-purple-950/20 border border-purple-900/30 text-slate-500 italic text-center">
+                  No crypto wallet connected by this user yet.
+                </div>
+              )}
             </div>
 
             {/* Inventory & Feeding */}

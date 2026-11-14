@@ -6,6 +6,7 @@ import { useTelegram } from '../hooks/useTelegram';
 import { formatNumber } from '../utils/probability';
 import { NavTab } from './BottomNavigation';
 import { sound } from '../utils/sound';
+import { LanguageFlag } from './LanguageFlag';
 
 interface HeaderProps {
   activeTab?: NavTab;
@@ -62,15 +63,11 @@ export const Header: React.FC<HeaderProps> = ({ activeTab = 'home' }) => {
                 sound.playTap();
                 setShowLanguageModal(true);
               }}
-              className="relative w-9 h-9 rounded-full bg-[#180a33]/80 hover:bg-[#281353] border border-indigo-500/40 hover:border-indigo-400 flex items-center justify-center text-indigo-300 hover:text-white transition-all active:scale-95 shadow-md shadow-black/40 cursor-pointer group"
+              className="relative w-9 h-9 rounded-full bg-[#180a33]/90 hover:bg-[#281353] border border-indigo-400/50 hover:border-indigo-300 flex items-center justify-center transition-all active:scale-95 shadow-md shadow-black/40 cursor-pointer group overflow-hidden"
               title={t('profile.language')}
               aria-label={t('profile.language')}
             >
-              <Globe className="w-4 h-4 text-indigo-300 group-hover:scale-110 transition-transform" />
-              {/* Flag Badge at bottom right */}
-              <span className="absolute -bottom-1 -right-1 text-[10px] leading-none pointer-events-none drop-shadow-sm select-none">
-                {currentLanguageOption?.flag}
-              </span>
+              <LanguageFlag code={language} circle className="w-5.5 h-5.5 shadow-sm group-hover:scale-110 transition-transform" />
             </button>
 
             {/* Customer Support SVG Button (Left side to "...") */}
@@ -165,7 +162,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab = 'home' }) => {
                         type="button"
                         onClick={() => {
                           setLanguage(l.code);
-                          showToast(t('profile.langSaved'), `${l.flag} ${l.nativeName}`, 'success');
+                          showToast(t('profile.langSaved'), l.nativeName, 'success');
                         }}
                         className={`py-1.5 px-1 rounded-xl text-xs font-bold transition-all border flex flex-col items-center justify-center cursor-pointer ${
                           isSelected
@@ -173,7 +170,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab = 'home' }) => {
                             : 'bg-purple-900/40 border-purple-800/40 text-purple-200 hover:text-white'
                         }`}
                       >
-                        <span className="text-base">{l.flag}</span>
+                        <LanguageFlag code={l.code} className="w-5 h-3.5 mb-1" />
                         <span className="text-[10px] mt-0.5 truncate max-w-full">{l.nativeName}</span>
                       </button>
                     );
@@ -258,7 +255,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab = 'home' }) => {
                     onClick={() => {
                       sound.playTap();
                       setLanguage(l.code);
-                      showToast(t('profile.langSaved'), `${l.flag} ${l.nativeName}`, 'success');
+                      showToast(t('profile.langSaved'), l.nativeName, 'success');
                       setShowLanguageModal(false);
                     }}
                     className={`w-full p-3 rounded-2xl flex items-center justify-between transition-all border cursor-pointer ${
@@ -268,7 +265,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab = 'home' }) => {
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">{l.flag}</span>
+                      <LanguageFlag code={l.code} className="w-8 h-5.5 rounded-md shadow-sm" />
                       <div className="text-left">
                         <span className="text-sm font-bold text-white block">
                           {l.nativeName}

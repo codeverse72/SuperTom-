@@ -64,6 +64,10 @@ export const paymentService = {
     return apiClient.post(`/payouts/deposits/${depositId}/verify`, { txHash });
   },
 
+  saveWallet: async (data: { walletAddress: string; network: string }): Promise<ApiResponse<any>> => {
+    return apiClient.post('/payouts/wallets', data);
+  },
+
   getWithdrawalEntitlement: async (): Promise<ApiResponse<import('./types').WithdrawalEntitlementDto>> => {
     return apiClient.get<import('./types').WithdrawalEntitlementDto>('/payouts/entitlement');
   },

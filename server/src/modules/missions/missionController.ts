@@ -11,6 +11,9 @@ export const WATCH_ADS_DAILY_TARGET = 30;
 export const WATCH_ADS_REWARD_POOPS = 500n;
 export const WATCH_ADS_COOLDOWN_MS = 10_000;
 
+export const CONNECT_WALLET_MISSION_ID = 'm8_connect_wallet';
+export const CONNECT_WALLET_REWARD_POOPS = 500n;
+
 export function getUtcDayStart(date: Date = new Date()): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
@@ -96,6 +99,17 @@ export const SEED_MISSIONS = [
     icon: 'Crown',
     badge: 'Milestone',
   },
+  // 5. WALLET QUEST (Special category, 500 TomCoins)
+  {
+    id: CONNECT_WALLET_MISSION_ID,
+    title: 'Connect Crypto Wallet',
+    description: 'Connect your TON or crypto wallet to receive instant payouts & rewards',
+    rewardPoops: CONNECT_WALLET_REWARD_POOPS,
+    category: MissionCategory.SPECIAL,
+    verificationType: 'GAME_ACTION' as const,
+    icon: 'Wallet',
+    badge: 'Wallet',
+  },
 ];
 
 let coreMissionsEnsured = false;
@@ -106,26 +120,19 @@ let coreMissionsEnsured = false;
 export async function ensureCoreMissionsSeeded(): Promise<void> {
   if (coreMissionsEnsured) return;
 
-  const watchAdsSeed = SEED_MISSIONS.find((m) => m.id === WATCH_ADS_MISSION_ID);
   const existingIds = await prisma.mission.findMany({
     select: { id: true },
   });
   const present = new Set(existingIds.map((m) => m.id));
 
-  if (present.size === 0) {
-    for (const m of SEED_MISSIONS) {
+  for (const m of SEED_MISSIONS) {
+    if (!present.has(m.id)) {
       await prisma.mission.upsert({
         where: { id: m.id },
         create: m,
         update: {},
       });
     }
-  } else if (watchAdsSeed && !present.has(WATCH_ADS_MISSION_ID)) {
-    await prisma.mission.upsert({
-      where: { id: watchAdsSeed.id },
-      create: watchAdsSeed,
-      update: {},
-    });
   }
 
   coreMissionsEnsured = true;
@@ -143,6 +150,7 @@ export interface MissionMappingUserStats {
   level?: number | null;
   refereesCount?: number;
   feedingEventsCount?: number;
+  walletsCount?: number;
 }
 
 export function mapMissionToDto(
@@ -189,6 +197,10 @@ export function mapMissionToDto(
     } else if (m.id === 'm6_reach_level_5') {
       total = 5;
       progress = Math.min(5, userStats.level ?? 1);
+      if (progress >= total) status = 'completed';
+    } else if (m.id === CONNECT_WALLET_MISSION_ID) {
+      total = 1;
+      progress = (userStats.walletsCount ?? 0) >= 1 ? 1 : 0;
       if (progress >= total) status = 'completed';
     } else if (isWatchAds) {
       total = WATCH_ADS_DAILY_TARGET;
@@ -260,7 +272,7 @@ export class MissionController {
         where: { id: userId },
         include: {
           _count: {
-            select: { referees: true, feedingEvents: true },
+            select: { referees: true, feedingEvents: true, wallets: true },
           },
         },
       });
@@ -268,12 +280,13 @@ export class MissionController {
       const getPriority = (id: string, title?: string): number => {
         if (id === WATCH_ADS_MISSION_ID || id.includes('watch') || (title && title.toLowerCase().includes('watch'))) return 1;
         if (id === 'm4_invite_3' || id.includes('invite') || (title && title.toLowerCase().includes('invite')) || (title && title.toLowerCase().includes('friend'))) return 2;
-        if (id === 'm1_join_channel' || id.includes('channel') || (title && title.toLowerCase().includes('channel'))) return 3;
-        if (id === 'm2_join_group' || id.includes('group') || (title && title.toLowerCase().includes('group')) || (title && title.toLowerCase().includes('community'))) return 4;
-        if (id === 'm3_follow_x' || id.includes('follow') || id.includes('x') || (title && title.toLowerCase().includes('x')) || (title && title.toLowerCase().includes('twitter'))) return 5;
-        if (id === 'm5_feed_5_biscuits' || id.includes('feed') || (title && title.toLowerCase().includes('feed'))) return 6;
-        if (id === 'm6_reach_level_5' || id.includes('level') || (title && title.toLowerCase().includes('level'))) return 7;
-        return 8;
+        if (id === CONNECT_WALLET_MISSION_ID || id.includes('wallet') || (title && title.toLowerCase().includes('wallet'))) return 3;
+        if (id === 'm1_join_channel' || id.includes('channel') || (title && title.toLowerCase().includes('channel'))) return 4;
+        if (id === 'm2_join_group' || id.includes('group') || (title && title.toLowerCase().includes('group')) || (title && title.toLowerCase().includes('community'))) return 5;
+        if (id === 'm3_follow_x' || id.includes('follow') || id.includes('x') || (title && title.toLowerCase().includes('x')) || (title && title.toLowerCase().includes('twitter'))) return 6;
+        if (id === 'm5_feed_5_biscuits' || id.includes('feed') || (title && title.toLowerCase().includes('feed'))) return 7;
+        if (id === 'm6_reach_level_5' || id.includes('level') || (title && title.toLowerCase().includes('level'))) return 8;
+        return 9;
       };
 
       const sortedMissions = missions.sort((a, b) => getPriority(a.id, a.title) - getPriority(b.id, b.title));
@@ -286,6 +299,7 @@ export class MissionController {
             level: user?.level,
             refereesCount: user?._count.referees,
             feedingEventsCount: user?._count.feedingEvents,
+            walletsCount: user?._count.wallets,
           },
           now
         )
@@ -432,6 +446,13 @@ export class MissionController {
           missionProgress = Math.min(5, lvl);
           missionTotal = 5;
           verified = lvl >= 5;
+        } else if (mission.id === CONNECT_WALLET_MISSION_ID) {
+          const walletCount = await prisma.userWallet.count({
+            where: { userId },
+          });
+          missionProgress = walletCount >= 1 ? 1 : 0;
+          missionTotal = 1;
+          verified = walletCount >= 1;
         }
       }
 

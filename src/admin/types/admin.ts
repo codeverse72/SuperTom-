@@ -59,6 +59,14 @@ export interface DashboardStats {
   };
 }
 
+export interface ConnectedWalletItem {
+  id: string;
+  network: string;
+  walletAddress: string;
+  isDefault: boolean;
+  createdAt: string;
+}
+
 export interface UserListItem {
   id: string;
   telegramId: string;
@@ -73,6 +81,9 @@ export interface UserListItem {
   referralCode: string;
   refereesCount: number;
   feedingCount: number;
+  walletsCount?: number;
+  primaryWallet?: string | null;
+  wallets?: ConnectedWalletItem[];
   createdAt: string;
 }
 
@@ -81,6 +92,7 @@ export interface UserDetail extends UserListItem {
   languageCode?: string | null;
   referredById?: string | null;
   updatedAt: string;
+  wallets?: ConnectedWalletItem[];
   mining: {
     baseRate: number;
     boostRate: number;

@@ -114,12 +114,13 @@ class AdminApiClient {
   }
 
   // === Users ===
-  public async getUsers(params: { page?: number; limit?: number; search?: string; status?: string }) {
+  public async getUsers(params: { page?: number; limit?: number; search?: string; status?: string; hasWallet?: string }) {
     const q = new URLSearchParams();
     if (params.page) q.set('page', params.page.toString());
     if (params.limit) q.set('limit', params.limit.toString());
     if (params.search) q.set('search', params.search);
     if (params.status) q.set('status', params.status);
+    if (params.hasWallet) q.set('hasWallet', params.hasWallet);
     return this.request<{
       total: number;
       page: number;

@@ -28,10 +28,17 @@ export class AdminUserController {
 
       const search = (req.query.search as string)?.trim();
       const status = req.query.status as AccountStatus | undefined;
+      const hasWallet = req.query.hasWallet as string | undefined;
 
       const where: any = {};
       if (status && ['ACTIVE', 'SUSPENDED', 'BANNED'].includes(status)) {
         where.accountStatus = status;
+      }
+
+      if (hasWallet === 'true') {
+        where.wallets = { some: {} };
+      } else if (hasWallet === 'false') {
+        where.wallets = { none: {} };
       }
 
       if (search) {
@@ -40,6 +47,7 @@ export class AdminUserController {
           { username: { contains: search, mode: 'insensitive' } },
           { firstName: { contains: search, mode: 'insensitive' } },
           { referralCode: { contains: search, mode: 'insensitive' } },
+          { wallets: { some: { walletAddress: { contains: search, mode: 'insensitive' } } } },
           ...(isNumeric ? [{ telegramId: BigInt(search) }] : []),
         ];
       }
@@ -53,7 +61,17 @@ export class AdminUserController {
           orderBy: { createdAt: 'desc' },
           include: {
             miningSettlement: { select: { totalRatePerHour: true } },
-            _count: { select: { referees: true, feedingEvents: true } },
+            wallets: {
+              select: {
+                id: true,
+                network: true,
+                walletAddress: true,
+                isDefault: true,
+                createdAt: true,
+              },
+              orderBy: { createdAt: 'desc' },
+            },
+            _count: { select: { referees: true, feedingEvents: true, wallets: true } },
           },
         }),
       ]);
@@ -77,6 +95,15 @@ export class AdminUserController {
           referralCode: u.referralCode,
           refereesCount: u._count.referees,
           feedingCount: u._count.feedingEvents,
+          walletsCount: u._count.wallets,
+          primaryWallet: u.wallets[0]?.walletAddress ?? null,
+          wallets: u.wallets.map((w) => ({
+            id: w.id,
+            network: w.network,
+            walletAddress: w.walletAddress,
+            isDefault: w.isDefault,
+            createdAt: w.createdAt,
+          })),
           createdAt: u.createdAt,
         })),
       });
@@ -98,10 +125,11 @@ export class AdminUserController {
           miningSettlement: true,
           spinState: true,
           inventories: { include: { biscuit: true } },
+          wallets: { orderBy: { createdAt: 'desc' } },
           withdrawals: { orderBy: { createdAt: 'desc' }, take: 10 },
           deposits: { orderBy: { createdAt: 'desc' }, take: 10 },
           ledgerEntries: { orderBy: { createdAt: 'desc' }, take: 20 },
-          _count: { select: { referees: true, feedingEvents: true, userMissions: true } },
+          _count: { select: { referees: true, feedingEvents: true, userMissions: true, wallets: true } },
         },
       });
 
@@ -148,7 +176,15 @@ export class AdminUserController {
           referees: user._count.referees,
           feedingEvents: user._count.feedingEvents,
           missionsDone: user._count.userMissions,
+          wallets: user._count.wallets,
         },
+        wallets: user.wallets.map((w) => ({
+          id: w.id,
+          network: w.network,
+          walletAddress: w.walletAddress,
+          isDefault: w.isDefault,
+          createdAt: w.createdAt,
+        })),
         withdrawals: user.withdrawals.map((w) => ({
           id: w.id,
           amountPoops: Number(w.amountPoops),
