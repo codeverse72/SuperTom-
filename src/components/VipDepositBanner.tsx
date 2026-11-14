@@ -71,3 +71,4 @@ export const VipDepositBanner: React.FC<VipDepositBannerProps> = ({ onNavigateTo
     </div>
   );
 };
+

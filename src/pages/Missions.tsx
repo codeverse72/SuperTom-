@@ -19,7 +19,8 @@ import {
   RefreshCw,
   Copy,
   Tv,
-  AlertCircle
+  AlertCircle,
+  Zap
 } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { Mission, MissionCategory } from '../config/gameConfig';

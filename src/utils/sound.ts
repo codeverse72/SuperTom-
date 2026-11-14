@@ -217,8 +217,8 @@ class SoundController {
     this.playWin();
   }
 
-  public playClick() {
-    this.playTap();
+  public playCelebration() {
+    this.playWin();
   }
 }
 

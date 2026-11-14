@@ -784,7 +784,7 @@ Payment Reference / Memo: ${memo}`;
         setShowUnlockModal(false);
         fetchEntitlement();
       } else {
-        showToast('Claim Failed', res.error || 'Failed to claim withdrawal unlock', 'error');
+        showToast('Claim Failed', res.error?.message || 'Failed to claim withdrawal unlock', 'error');
       }
     } catch {
       setIsClaimingAdUnlock(false);
