@@ -491,9 +491,8 @@ export const UsersPage: React.FC = () => {
                       <p className="text-slate-400">{tx.description}</p>
                     </div>
                     <span
-                      className={`font-mono font-bold ${
-                        tx.amount >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                      }`}
+                      className={`font-mono font-bold ${tx.amount >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                        }`}
                     >
                       {tx.amount >= 0 ? `+${tx.amount}` : tx.amount}
                     </span>

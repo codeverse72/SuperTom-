@@ -248,6 +248,26 @@ export class PayoutController {
   }
 
   /**
+   * POST /api/v1/payouts/claim-referral-unlock
+   * Claims a withdrawal request unlocked via the "Invite 10 Friends" pass.
+   */
+  public static async claimReferralUnlock(req: AuthenticatedRequest, res: Response): Promise<void> {
+    const userId = req.user?.userId;
+    if (!userId) {
+      sendError(res, 'Unauthorized', 401, 'UNAUTHORIZED');
+      return;
+    }
+
+    try {
+      const result = await WithdrawalEntitlementService.claimReferralWithdrawalUnlock(userId);
+      sendSuccess(res, result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to claim referral withdrawal unlock';
+      sendError(res, msg, 400, 'CLAIM_FAILED');
+    }
+  }
+
+  /**
    * GET /api/v1/payouts/treasury-wallets
    * Returns official deposit receiving addresses for all supported currencies.
    * Priority: Dynamic Trust Wallet DB setting -> Process Env -> Default Fallback.

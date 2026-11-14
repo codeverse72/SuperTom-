@@ -13,6 +13,14 @@ export interface AdWatchWithdrawalProgress {
   claimedCycles: number;
 }
 
+export interface ReferralWithdrawalProgress {
+  friendsInvited: number;
+  targetFriends: number; // 10
+  canClaimReward: boolean;
+  isClaimed: boolean;
+  claimedAt?: string | null;
+}
+
 export interface WithdrawalEntitlement {
   canWithdraw: boolean;
   hasUnlimitedWithdrawals: boolean;
@@ -21,6 +29,7 @@ export interface WithdrawalEntitlement {
   requiredDepositTier1: number; // $1.00 for 3 withdrawals
   requiredDepositTier2: number; // $3.00 for unlimited withdrawals
   adWatchProgress: AdWatchWithdrawalProgress;
+  referralProgress: ReferralWithdrawalProgress;
 }
 
 export class WithdrawalEntitlementService {
@@ -130,6 +139,121 @@ export class WithdrawalEntitlementService {
   }
 
   /**
+   * Calculates the user's progress toward the "Invite 10 Friends" withdrawal unlock.
+   */
+  public static async getReferralProgress(userId: string): Promise<ReferralWithdrawalProgress> {
+    const TARGET_FRIENDS = 10;
+    const friendsInvited = await prisma.user.count({
+      where: { referredById: userId },
+    });
+
+    const existingClaim = await prisma.userMission.findUnique({
+      where: {
+        userId_missionId: {
+          userId,
+          missionId: 'pass_referral_10_unlock',
+        },
+      },
+    });
+
+    const isClaimed = existingClaim?.status === 'CLAIMED';
+    const canClaimReward = friendsInvited >= TARGET_FRIENDS && !isClaimed;
+
+    return {
+      friendsInvited,
+      targetFriends: TARGET_FRIENDS,
+      canClaimReward,
+      isClaimed,
+      claimedAt: existingClaim?.claimedAt ? existingClaim.claimedAt.toISOString() : null,
+    };
+  }
+
+  /**
+   * Explicitly claims a withdrawal request unlocked via the "Invite 10 Friends" quest.
+   */
+  public static async claimReferralWithdrawalUnlock(userId: string): Promise<{
+    success: boolean;
+    remainingWithdrawals: number;
+    message: string;
+  }> {
+    return prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: { id: true, remainingWithdrawals: true },
+      });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      const friendsInvited = await tx.user.count({
+        where: { referredById: userId },
+      });
+
+      if (friendsInvited < 10) {
+        throw new Error(
+          `You have invited ${friendsInvited}/10 friends. Invite 10 friends to unlock withdrawals.`
+        );
+      }
+
+      const existingClaim = await tx.userMission.findUnique({
+        where: {
+          userId_missionId: {
+            userId,
+            missionId: 'pass_referral_10_unlock',
+          },
+        },
+      });
+
+      if (existingClaim?.status === 'CLAIMED') {
+        throw new Error('You have already claimed this 10-friend referral withdrawal unlock.');
+      }
+
+      // Record claim in userMission
+      await tx.userMission.upsert({
+        where: {
+          userId_missionId: {
+            userId,
+            missionId: 'pass_referral_10_unlock',
+          },
+        },
+        create: {
+          userId,
+          missionId: 'pass_referral_10_unlock',
+          status: 'CLAIMED',
+          progress: friendsInvited,
+          total: 10,
+          claimedAt: new Date(),
+        },
+        update: {
+          status: 'CLAIMED',
+          progress: friendsInvited,
+          claimedAt: new Date(),
+        },
+      });
+
+      // Grant 3 free withdrawals
+      const updated = await tx.user.update({
+        where: { id: userId },
+        data: {
+          remainingWithdrawals: { increment: 3 },
+        },
+        select: { remainingWithdrawals: true },
+      });
+
+      logger.info(
+        `[WithdrawalEntitlement] User ${userId} unlocked 3 withdrawals via 10 friends invite pass. Remaining: ${updated.remainingWithdrawals}`
+      );
+
+      return {
+        success: true,
+        remainingWithdrawals: updated.remainingWithdrawals,
+        message: 'Congratulations! You unlocked 3 free withdrawal requests by inviting 10 friends!',
+      };
+    });
+  }
+
+  /**
    * Retrieves or auto-syncs the user's withdrawal entitlement.
    * Auto-detects existing confirmed deposits and completed ad quests to ensure zero desync.
    */
@@ -161,6 +285,13 @@ export class WithdrawalEntitlementService {
           canClaimReward: false,
           totalQualifyingDays: 0,
           claimedCycles: 0,
+        },
+        referralProgress: {
+          friendsInvited: 0,
+          targetFriends: 10,
+          canClaimReward: false,
+          isClaimed: false,
+          claimedAt: null,
         },
       };
     }
@@ -238,6 +369,9 @@ export class WithdrawalEntitlementService {
       }
     }
 
+    // Calculate Referral Progress
+    const referralProgress = await WithdrawalEntitlementService.getReferralProgress(userId);
+
     const canWithdraw = hasUnlimited || remaining > 0;
 
     return {
@@ -248,6 +382,7 @@ export class WithdrawalEntitlementService {
       requiredDepositTier1: 1.0,
       requiredDepositTier2: 3.0,
       adWatchProgress,
+      referralProgress,
     };
   }
 

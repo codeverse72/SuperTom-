@@ -148,3 +148,4 @@ export const LanguageFlag: React.FC<LanguageFlagProps> = ({
     </span>
   );
 };
+

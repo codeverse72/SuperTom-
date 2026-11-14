@@ -79,4 +79,12 @@ export const paymentService = {
   }>> => {
     return apiClient.post('/payouts/claim-ad-unlock');
   },
+
+  claimReferralWithdrawalUnlock: async (): Promise<ApiResponse<{
+    success: boolean;
+    remainingWithdrawals: number;
+    message: string;
+  }>> => {
+    return apiClient.post('/payouts/claim-referral-unlock');
+  },
 };

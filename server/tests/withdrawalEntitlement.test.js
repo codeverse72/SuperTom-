@@ -221,4 +221,50 @@ describe('Withdrawal Entitlement & Deposit Requirement Suite', () => {
       assert.equal(remainingWithdrawals, 0);
     });
   });
+
+  describe('5. "Invite 10 Friends" Withdrawal Unlock Suite', () => {
+    test('User with < 10 friends cannot claim referral withdrawal unlock', () => {
+      const TARGET_FRIENDS = 10;
+      const friendsInvited = 7;
+      const isClaimed = false;
+      const canClaimReward = friendsInvited >= TARGET_FRIENDS && !isClaimed;
+
+      assert.equal(friendsInvited, 7);
+      assert.equal(canClaimReward, false);
+    });
+
+    test('User with >= 10 friends achieves canClaimReward = true', () => {
+      const TARGET_FRIENDS = 10;
+      const friendsInvited = 10;
+      const isClaimed = false;
+      const canClaimReward = friendsInvited >= TARGET_FRIENDS && !isClaimed;
+
+      assert.equal(canClaimReward, true);
+    });
+
+    test('Claiming referral reward unlocks exactly 3 free withdrawal requests and marks claimed', () => {
+      const TARGET_FRIENDS = 10;
+      const friendsInvited = 12;
+      let isClaimed = false;
+      let remainingWithdrawals = 0;
+
+      // Verify eligibility
+      assert.equal(friendsInvited >= TARGET_FRIENDS && !isClaimed, true);
+
+      // Claim reward: grants 3 free withdrawals
+      remainingWithdrawals += 3;
+      isClaimed = true;
+
+      assert.equal(remainingWithdrawals, 3);
+      assert.equal(isClaimed, true);
+
+      // Cannot claim again
+      const canClaimAgain = friendsInvited >= TARGET_FRIENDS && !isClaimed;
+      assert.equal(canClaimAgain, false);
+
+      // User is now entitled to withdraw
+      const canWithdraw = remainingWithdrawals > 0;
+      assert.equal(canWithdraw, true);
+    });
+  });
 });

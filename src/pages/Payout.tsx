@@ -27,7 +27,8 @@ import {
   Lock,
   Unlock,
   Crown,
-  Tv
+  Tv,
+  Users
 } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { formatNumber, poopsToUsdt } from '../utils/probability';
@@ -40,6 +41,10 @@ import { DepositDto, WithdrawalEntitlementDto, CreateDepositIntentResponseDto } 
 import { CampaignBanner } from '../components/CampaignBanner';
 import { sound } from '../utils/sound';
 import { useTonConnect } from '../hooks/useTonConnect';
+import { shareViaTelegram } from '../utils/telegram';
+
+// Toggle to temporarily hide or bring back King VIP Pass ($3) per user preference
+const SHOW_KING_VIP_PASS = false;
 
 export interface CurrencyConfig {
   id: string;
@@ -755,6 +760,7 @@ Payment Reference / Memo: ${memo}`;
   }, [selectedPlanForDeposit]);
 
   const [isClaimingAdUnlock, setIsClaimingAdUnlock] = useState(false);
+  const [isClaimingReferralUnlock, setIsClaimingReferralUnlock] = useState(false);
 
   const fetchEntitlement = async () => {
     try {
@@ -790,6 +796,47 @@ Payment Reference / Memo: ${memo}`;
       setIsClaimingAdUnlock(false);
       showToast('Error', 'Failed to claim ad withdrawal unlock', 'error');
     }
+  };
+
+  const handleClaimReferralUnlock = async () => {
+    setIsClaimingReferralUnlock(true);
+    try {
+      const res = await paymentService.claimReferralWithdrawalUnlock();
+      setIsClaimingReferralUnlock(false);
+      if (res.success && res.data) {
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+          window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+        }
+        sound.playReward();
+        showToast(
+          'Withdrawals Unlocked!',
+          res.data.message || '3 Free Withdrawals unlocked via Friend Invite Pass!',
+          'reward'
+        );
+        setShowUnlockModal(false);
+        fetchEntitlement();
+      } else {
+        showToast('Claim Failed', res.error?.message || 'Failed to claim referral unlock', 'error');
+      }
+    } catch {
+      setIsClaimingReferralUnlock(false);
+      showToast('Error', 'Failed to claim referral withdrawal unlock', 'error');
+    }
+  };
+
+  const handleShareReferralPass = () => {
+    sound.playTap();
+    const refCode = user?.referralCode || telegramUserId;
+    const botUsername = 'SuperTom_robot';
+    const url = `https://t.me/${botUsername}?start=ref_${refCode}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url);
+    }
+    shareViaTelegram(
+      url,
+      '🐱 Join me on SuperTom and start mining with King Tom! 👑 Boost your mining rate and claim free TomCoins!'
+    );
+    showToast('Invite Link Copied!', 'Referral link copied & Telegram share opened!', 'success');
   };
 
   const handleSelectUnlockTier = (amount: number, label: string) => {
@@ -2765,7 +2812,7 @@ Payment Reference / Memo: ${memo}`;
                 Activate Withdrawals
               </h3>
               <p className="text-[11px] text-slate-300 leading-snug px-1">
-                To guarantee security and instant blockchain payouts, choose an activation deposit or complete the free 5-day ad quest:
+                To guarantee security and instant blockchain payouts, choose an activation deposit or complete a free unlock quest:
               </p>
             </div>
 
@@ -2921,52 +2968,149 @@ Payment Reference / Memo: ${memo}`;
                 )}
               </div>
 
-              {/* Option 3: $3 Deposit - RECOMMENDED / UNLIMITED */}
-              <div className="rounded-2xl bg-gradient-to-br from-[#1a1202] via-[#100e26] to-[#0c162c] border-2 border-amber-400/70 p-3 space-y-2 shadow-[0_0_20px_rgba(245,158,11,0.25)] relative overflow-hidden">
-                <div className="absolute top-0 right-0 bg-gradient-to-l from-amber-400 to-amber-500 text-slate-950 font-black text-[8px] uppercase px-2.5 py-0.5 rounded-bl-lg tracking-wider shadow-md">
-                  RECOMMENDED • UNLIMITED
+              {/* Option 3: Friend Invite Pass (Share with 10 Friends to Unlock Withdrawals) */}
+              <div className="rounded-2xl bg-gradient-to-br from-[#0c182c] via-[#091122] to-[#070b15] border border-cyan-500/50 p-3 space-y-2 shadow-md relative overflow-hidden">
+                <div className="absolute top-0 right-0 bg-gradient-to-l from-cyan-400 to-blue-500 text-slate-950 font-black text-[8px] uppercase px-2.5 py-0.5 rounded-bl-lg tracking-wider shadow-md">
+                  100% FREE • NO DEPOSIT
                 </div>
 
                 <div className="flex items-center justify-between pt-1">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-300 shrink-0">
-                      <Crown className="w-4 h-4 text-amber-400 fill-amber-400/30" />
+                    <div className="w-7 h-7 rounded-lg bg-cyan-500/20 border border-cyan-400/50 flex items-center justify-center text-cyan-300 shrink-0">
+                      <Users className="w-4 h-4 text-cyan-400" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-black text-amber-300 font-display">King VIP Pass</h4>
-                      <span className="text-[10px] text-amber-200/90 font-bold">Unlimited Lifetime Withdrawals</span>
+                      <h4 className="text-xs font-black text-cyan-300 font-display">Friend Invite Pass</h4>
+                      <span className="text-[10px] text-cyan-200/90 font-bold">Share with 10 Friends</span>
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="text-sm font-black text-amber-400 font-mono">$3.00</span>
-                    <span className="block text-[8px] text-slate-400 font-mono">USDT / Crypto</span>
+                    <span className="text-sm font-black text-emerald-400 font-mono">FREE</span>
+                    <span className="block text-[8px] text-slate-400 font-mono">0.00 USDT</span>
                   </div>
                 </div>
 
-                <div className="p-2 rounded-xl bg-[#08070d] border border-amber-500/20 text-[10px] space-y-1">
-                  <div className="flex items-center gap-1.5 text-amber-200 font-bold">
-                    <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
-                    <span>Unlimited Withdrawals Forever (Never locked)</span>
+                {/* 10 Friends Visual Tracker */}
+                <div className="p-2.5 rounded-xl bg-[#040813] border border-cyan-500/20 space-y-2">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-slate-300 font-semibold">10 Friends Quest:</span>
+                    <span className="font-mono font-bold text-cyan-300">
+                      {Math.min(10, user?.friendsInvited ?? entitlement?.referralProgress?.friendsInvited ?? 0)} / 10 Joined
+                    </span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-slate-300">
-                    <Check className="w-3 h-3 text-emerald-400 shrink-0" />
-                    <span>Full $3.00 (6,000 TomCoins) credited to balance</span>
+
+                  {/* 10 Step Progress Pills */}
+                  <div className="grid grid-cols-10 gap-1">
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((stepNum) => {
+                      const count = user?.friendsInvited ?? entitlement?.referralProgress?.friendsInvited ?? 0;
+                      const isDone = count >= stepNum;
+                      const isCurrent = count + 1 === stepNum;
+                      return (
+                        <div
+                          key={stepNum}
+                          className={`flex flex-col items-center justify-center py-1 rounded-md border text-[8px] font-mono font-bold transition-all ${
+                            isDone
+                              ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-300 shadow-xs'
+                              : isCurrent
+                              ? 'bg-cyan-600/30 border-cyan-400 text-cyan-200 animate-pulse'
+                              : 'bg-slate-900/60 border-cyan-900/40 text-slate-500'
+                          }`}
+                        >
+                          <span>{isDone ? '✓' : stepNum}</span>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="flex items-center gap-1.5 text-slate-300">
-                    <Check className="w-3 h-3 text-emerald-400 shrink-0" />
-                    <span>+30% Mining Boost + 5 Days Daily Bonus</span>
+
+                  <div className="pt-0.5 border-t border-cyan-950 flex items-center justify-between text-[9px] text-slate-400">
+                    <span>Unlock 3 Free Withdrawals + earn 450 TomCoins per friend</span>
+                    {(user?.friendsInvited ?? entitlement?.referralProgress?.friendsInvited ?? 0) >= 10 ? (
+                      <span className="text-emerald-400 font-bold">✓ 10/10 Joined!</span>
+                    ) : (
+                      <span className="text-cyan-300 font-mono">
+                        {10 - Math.min(10, user?.friendsInvited ?? entitlement?.referralProgress?.friendsInvited ?? 0)} more
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => handleSelectUnlockTier(3, 'Unlimited Lifetime Withdrawals ($3.00)')}
-                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:brightness-110 active:scale-95 text-slate-950 font-black text-xs uppercase tracking-wider shadow-[0_0_15px_rgba(245,158,11,0.4)] transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <span>Deposit $3 (Unlock Unlimited)</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
+                {/* Action button */}
+                {entitlement?.referralProgress?.isClaimed ? (
+                  <div className="w-full py-2 px-3 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-center text-[10px] font-black text-emerald-300 uppercase tracking-wider">
+                    ✓ Unlocked via 10 Friends (3 Withdrawals Credited)
+                  </div>
+                ) : (user?.friendsInvited ?? entitlement?.referralProgress?.friendsInvited ?? 0) >= 10 ? (
+                  <button
+                    type="button"
+                    onClick={handleClaimReferralUnlock}
+                    disabled={isClaimingReferralUnlock}
+                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-600 hover:brightness-110 active:scale-95 text-slate-950 font-black text-xs uppercase tracking-wider shadow-[0_0_15px_rgba(16,185,129,0.4)] transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    <Check className="w-4 h-4 stroke-[3]" />
+                    <span>{isClaimingReferralUnlock ? 'Unlocking...' : 'CLAIM 3 WITHDRAWALS (10/10 READY!)'}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleShareReferralPass}
+                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Users className="w-3.5 h-3.5 text-cyan-200" />
+                    <span>
+                      SHARE BOT WITH FRIENDS ({Math.min(10, user?.friendsInvited ?? entitlement?.referralProgress?.friendsInvited ?? 0)}/10) &gt;
+                    </span>
+                  </button>
+                )}
               </div>
+
+              {/* Option 4: King VIP Pass (Hidden temporarily per user request; set SHOW_KING_VIP_PASS = true to bring back) */}
+              {SHOW_KING_VIP_PASS && (
+                <div className="rounded-2xl bg-gradient-to-br from-[#1a1202] via-[#100e26] to-[#0c162c] border-2 border-amber-400/70 p-3 space-y-2 shadow-[0_0_20px_rgba(245,158,11,0.25)] relative overflow-hidden">
+                  <div className="absolute top-0 right-0 bg-gradient-to-l from-amber-400 to-amber-500 text-slate-950 font-black text-[8px] uppercase px-2.5 py-0.5 rounded-bl-lg tracking-wider shadow-md">
+                    RECOMMENDED • UNLIMITED
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-300 shrink-0">
+                        <Crown className="w-4 h-4 text-amber-400 fill-amber-400/30" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-amber-300 font-display">King VIP Pass</h4>
+                        <span className="text-[10px] text-amber-200/90 font-bold">Unlimited Lifetime Withdrawals</span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-black text-amber-400 font-mono">$3.00</span>
+                      <span className="block text-[8px] text-slate-400 font-mono">USDT / Crypto</span>
+                    </div>
+                  </div>
+
+                  <div className="p-2 rounded-xl bg-[#08070d] border border-amber-500/20 text-[10px] space-y-1">
+                    <div className="flex items-center gap-1.5 text-amber-200 font-bold">
+                      <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
+                      <span>Unlimited Withdrawals Forever (Never locked)</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-slate-300">
+                      <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                      <span>Full $3.00 (6,000 TomCoins) credited to balance</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-slate-300">
+                      <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                      <span>+30% Mining Boost + 5 Days Daily Bonus</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSelectUnlockTier(3, 'Unlimited Lifetime Withdrawals ($3.00)')}
+                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:brightness-110 active:scale-95 text-slate-950 font-black text-xs uppercase tracking-wider shadow-[0_0_15px_rgba(245,158,11,0.4)] transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <span>Deposit $3 (Unlock Unlimited)</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Note */}

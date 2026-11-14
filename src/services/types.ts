@@ -356,12 +356,21 @@ export interface AdWatchWithdrawalProgressDto {
   claimedCycles: number;
 }
 
+export interface ReferralWithdrawalProgressDto {
+  friendsInvited: number;
+  targetFriends: number;
+  canClaimReward: boolean;
+  isClaimed: boolean;
+  claimedAt?: string | null;
+}
+
 export interface WithdrawalEntitlementDto {
   canWithdraw: boolean;
   hasUnlimitedWithdrawals: boolean;
   remainingWithdrawals: number;
   totalDepositedUsd: number;
-  requiredDepositTier1: number; // $3.00 for 3 withdrawals
-  requiredDepositTier2: number; // $5.00 for unlimited withdrawals
+  requiredDepositTier1: number; // $1.00 for 3 withdrawals
+  requiredDepositTier2: number; // $3.00 for unlimited withdrawals
   adWatchProgress?: AdWatchWithdrawalProgressDto;
+  referralProgress?: ReferralWithdrawalProgressDto;
 }
