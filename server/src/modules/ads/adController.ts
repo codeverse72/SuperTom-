@@ -66,26 +66,6 @@ export class AdController {
       const now = new Date();
       const startOfToday = getUtcDayStart(now);
 
-      // Check if user already claimed today's daily 30 ads quest
-      const userMission = await prisma.userMission.findUnique({
-        where: { userId_missionId: { userId, missionId: WATCH_ADS_MISSION_ID } },
-      });
-
-      if (
-        userMission &&
-        userMission.status === 'CLAIMED' &&
-        userMission.claimedAt &&
-        new Date(userMission.claimedAt) >= startOfToday
-      ) {
-        sendError(
-          res,
-          'You have already completed and claimed all 30 daily ads today. Resets at 00:00 UTC!',
-          400,
-          'MISSION_ALREADY_CLAIMED'
-        );
-        return;
-      }
-
       // Rate limit / cooldown check: prevent spamming session creation
       const recentSession = await prisma.adSession.findFirst({
         where: {
@@ -250,33 +230,42 @@ export class AdController {
           Boolean(existingMission?.claimedAt && new Date(existingMission.claimedAt) < startOfToday) ||
           Boolean(existingMission?.updatedAt && new Date(existingMission.updatedAt) < startOfToday);
 
+        const isAlreadyClaimedToday =
+          !isFromPreviousDay &&
+          existingMission?.status === 'CLAIMED' &&
+          existingMission?.claimedAt &&
+          new Date(existingMission.claimedAt) >= startOfToday;
+
         const currentProgress = !existingMission || isFromPreviousDay ? 0 : existingMission.progress;
         const nextProgress = Math.min(WATCH_ADS_DAILY_TARGET, currentProgress + 1);
         const nextVerified = nextProgress >= WATCH_ADS_DAILY_TARGET;
         const nextStatus = nextVerified ? 'COMPLETED' : 'IN_PROGRESS';
 
-        await tx.userMission.upsert({
-          where: { userId_missionId: { userId, missionId: WATCH_ADS_MISSION_ID } },
-          create: {
-            userId,
-            missionId: WATCH_ADS_MISSION_ID,
-            status: nextStatus,
-            progress: nextProgress,
-            total: WATCH_ADS_DAILY_TARGET,
-          },
-          update: {
-            status: nextStatus,
-            progress: nextProgress,
-            total: WATCH_ADS_DAILY_TARGET,
-            ...(isFromPreviousDay ? { claimedAt: null } : {}),
-          },
-        });
+        if (!isAlreadyClaimedToday) {
+          await tx.userMission.upsert({
+            where: { userId_missionId: { userId, missionId: WATCH_ADS_MISSION_ID } },
+            create: {
+              userId,
+              missionId: WATCH_ADS_MISSION_ID,
+              status: nextStatus,
+              progress: nextProgress,
+              total: WATCH_ADS_DAILY_TARGET,
+            },
+            update: {
+              status: nextStatus,
+              progress: nextProgress,
+              total: WATCH_ADS_DAILY_TARGET,
+              ...(isFromPreviousDay ? { claimedAt: null } : {}),
+            },
+          });
+        }
 
         return {
           verified: true,
-          missionProgress: nextProgress,
+          missionProgress: isAlreadyClaimedToday ? WATCH_ADS_DAILY_TARGET : nextProgress,
           total: WATCH_ADS_DAILY_TARGET,
-          isQuestCompleted: nextVerified,
+          isQuestCompleted: nextVerified || isAlreadyClaimedToday,
+          isAlreadyClaimedToday: Boolean(isAlreadyClaimedToday),
         } as const;
       });
 

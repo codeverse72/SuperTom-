@@ -12,6 +12,7 @@ import { Profile } from './pages/Profile';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useTelegram } from './hooks/useTelegram';
 import { sound } from './utils/sound';
+import { adManager } from './services/adManager';
 
 // Lazy-load AdminApp so Telegram Mini App users do not download any admin bundle assets
 const AdminApp = React.lazy(() =>
@@ -39,8 +40,31 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const [activeTab, setActiveTab] = useState<NavTab>('home');
+  const [activeTab, setActiveTab] = useState<NavTab>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const tabParam = params.get('tab');
+        if (tabParam === 'missions' || tabParam === 'store' || tabParam === 'payout' || tabParam === 'profile') {
+          return tabParam as NavTab;
+        }
+        const startParam = params.get('tgWebAppStartParam') || params.get('startapp');
+        if (startParam === 'ads' || startParam === 'watch_ad' || startParam === 'missions') {
+          return 'missions';
+        }
+      } catch {
+        // Fallback to home
+      }
+    }
+    return 'home';
+  });
   const { showBack, hideBack, hapticSelection } = useTelegram();
+
+  // Trigger polite auto-ad on app startup / opening with a short delay so King Tom renders first
+  useEffect(() => {
+    if (isAdminRoute) return;
+    adManager.triggerAppOpenAd(1800);
+  }, [isAdminRoute]);
 
   // Telegram native BackButton integration:
   // Shows native BackButton on secondary tabs, returns to Home dashboard on click.
@@ -80,6 +104,8 @@ export default function App() {
       hapticSelection();
       setActiveTab(tab);
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      // Smart frequency-capped interstitial check on tab transitions
+      adManager.triggerTabSwitchAd(tab);
     }
   };
 

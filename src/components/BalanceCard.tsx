@@ -3,6 +3,8 @@ import { useGame } from '../context/GameContext';
 import { formatNumber, tomToUsdt } from '../utils/probability';
 import crownMascotImg from '../assets/dashboard/crown_3d.png';
 import chestPurpleImg from '../assets/dashboard/chest_purple.png';
+import { sound } from '../utils/sound';
+import { adManager } from '../services/adManager';
 
 export const BalanceCard: React.FC = () => {
   const { balance } = useGame();
@@ -47,11 +49,17 @@ export const BalanceCard: React.FC = () => {
         </div>
 
         {/* Right: 3D Glowing Purple Treasure Chest */}
-        <div className="relative shrink-0 w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center">
+        <div 
+          onClick={() => {
+            sound.playTap();
+            adManager.triggerActionAd('chest_click');
+          }}
+          className="relative shrink-0 w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center cursor-pointer"
+        >
           <img
             src={chestPurpleImg}
             alt="Treasure Chest"
-            className="w-full h-full object-contain filter drop-shadow-[0_4px_14px_rgba(0,0,0,0.6)] drop-shadow-[0_0_14px_rgba(168,85,247,0.45)] hover:scale-105 active:scale-95 transition-transform select-none cursor-pointer"
+            className="w-full h-full object-contain filter drop-shadow-[0_4px_14px_rgba(0,0,0,0.6)] drop-shadow-[0_0_14px_rgba(168,85,247,0.45)] hover:scale-105 active:scale-95 transition-transform select-none"
           />
         </div>
       </div>

@@ -16,13 +16,16 @@ import {
   Cookie,
   Headphones,
   ExternalLink,
-  Globe
+  Globe,
+  Tv
 } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { useI18n } from '../context/I18nContext';
 import { useTelegram } from '../hooks/useTelegram';
 import { generateReferralLink } from '../utils/telegram';
 import { formatNumber, poopsToUsdt } from '../utils/probability';
+import { sound } from '../utils/sound';
+import { adManager } from '../services/adManager';
 
 export const Profile: React.FC = () => {
   const { 
@@ -31,7 +34,8 @@ export const Profile: React.FC = () => {
     productionRate, 
     soundEnabled, 
     toggleSound, 
-    showToast 
+    showToast,
+    refreshMissions 
   } = useGame();
   const { language, setLanguage, t, currentLanguageOption, supportedLanguages } = useI18n();
 
@@ -39,6 +43,25 @@ export const Profile: React.FC = () => {
 
   const [copiedLink, setCopiedLink] = useState(false);
   const [activeModal, setActiveModal] = useState<'stats' | 'referral' | 'faq' | 'about' | 'language' | null>(null);
+  const [isWatchingAd, setIsWatchingAd] = useState(false);
+
+  const handleWatchAd = async () => {
+    if (isWatchingAd) return;
+    setIsWatchingAd(true);
+    sound.playTap();
+    try {
+      const res = await adManager.triggerAd('manual', { force: true });
+      if (res.completed) {
+        sound.playReward();
+        showToast('Reward Credited!', res.message || 'Ad reward credited to your daily quest!', 'reward');
+        if (refreshMissions) await refreshMissions();
+      } else {
+        showToast('Ad Notice', res.message || 'No ad available right now. Please try again shortly.', 'info');
+      }
+    } finally {
+      setIsWatchingAd(false);
+    }
+  };
 
   const referralUrl = generateReferralLink(user?.referralCode || 'UNLINKED');
 
@@ -219,7 +242,27 @@ export const Profile: React.FC = () => {
           <ChevronRight className="w-4 h-4 text-purple-400" />
         </button>
 
-        {/* 5. 24/7 Live Customer Support */}
+        {/* 5. Watch Ad & Earn Progress */}
+        <button
+          onClick={handleWatchAd}
+          disabled={isWatchingAd}
+          className="w-full p-3.5 rounded-2xl flex items-center justify-between hover:bg-purple-900/30 transition-all text-left cursor-pointer group disabled:opacity-60"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 group-hover:scale-105 transition-transform">
+              <Tv className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-sm font-bold text-white font-display">Watch Ad &amp; Earn</span>
+              <p className="text-[11px] text-purple-300/70">Watch sponsored video to earn TomCoins &amp; unlock withdrawals</p>
+            </div>
+          </div>
+          <span className="px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-400/30 text-[10px] font-black uppercase tracking-wider">
+            {isWatchingAd ? 'Loading...' : '+Progress'}
+          </span>
+        </button>
+
+        {/* 6. 24/7 Live Customer Support */}
         <a
           href="https://t.me/SuperTomCare"
           target="_blank"

@@ -5,6 +5,7 @@ import { BISCUIT_CONFIGS } from '../config/gameConfig';
 import { PLAN_USDT_RATES } from '../pages/Store';
 import { BiscuitSvg } from './BiscuitSvg';
 import { SYSTEM_MESSAGES } from '../config/featureConfig';
+import { adManager } from '../services/adManager';
 
 interface FeedingModalProps {
   isOpen: boolean;
@@ -45,6 +46,10 @@ export const FeedingModal: React.FC<FeedingModalProps> = ({ isOpen, onClose, onN
         'reward'
       );
       onClose();
+      // Frequently trigger ad on feeding milestone
+      setTimeout(() => {
+        adManager.triggerActionAd('feed_tom');
+      }, 700);
     }
   };
 

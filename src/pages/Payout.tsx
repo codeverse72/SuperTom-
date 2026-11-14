@@ -33,6 +33,7 @@ import { useGame } from '../context/GameContext';
 import { formatNumber, poopsToUsdt } from '../utils/probability';
 import { MIN_WITHDRAWAL_POOPS } from '../config/gameConfig';
 import { validateNetworkAddress } from '../utils/validation';
+import { adManager } from '../services/adManager';
 import { paymentService } from '../services/paymentService';
 import { QRCode } from '../components/QRCode';
 import { DepositDto, WithdrawalEntitlementDto, CreateDepositIntentResponseDto } from '../services/types';
@@ -331,6 +332,10 @@ export const Payout: React.FC<PayoutProps> = ({ onNavigateToMissions }) => {
   // Entitlement State ($3 for 3 withdrawals, $5 for unlimited)
   const [entitlement, setEntitlement] = useState<WithdrawalEntitlementDto | null>(null);
   const [showUnlockModal, setShowUnlockModal] = useState<boolean>(false);
+  const openUnlockModal = () => {
+    setShowUnlockModal(true);
+    adManager.triggerActionAd('open_deposit');
+  };
   const [showWalletModal, setShowWalletModal] = useState<boolean>(false);
   const [showTonWalletModal, setShowTonWalletModal] = useState<boolean>(false);
   const [showEvmWalletModal, setShowEvmWalletModal] = useState<boolean>(false);
@@ -1036,7 +1041,7 @@ Payment Reference / Memo: ${memo}`;
       if (window.Telegram?.WebApp?.HapticFeedback) {
         window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
       }
-      setShowUnlockModal(true);
+      openUnlockModal();
       return;
     }
 
@@ -1084,7 +1089,7 @@ Payment Reference / Memo: ${memo}`;
       fetchEntitlement();
     } else {
       if (res.code === 'WITHDRAWAL_DEPOSIT_REQUIRED') {
-        setShowUnlockModal(true);
+        openUnlockModal();
       }
       setWithdrawError(res.error || 'Failed to submit withdrawal request.');
     }
@@ -2445,7 +2450,7 @@ Payment Reference / Memo: ${memo}`;
                 </span>
                 <button
                   type="button"
-                  onClick={() => setShowUnlockModal(true)}
+                  onClick={openUnlockModal}
                   className="text-[9px] text-cyan-400 underline hover:text-white cursor-pointer"
                 >
                   Upgrade to Unlimited
@@ -2454,7 +2459,7 @@ Payment Reference / Memo: ${memo}`;
             </div>
           ) : (
             <div
-              onClick={() => setShowUnlockModal(true)}
+              onClick={openUnlockModal}
               className="rounded-2xl p-3.5 bg-gradient-to-r from-rose-950/60 via-purple-950/60 to-amber-950/50 border border-rose-500/40 shadow-lg flex items-center justify-between cursor-pointer hover:border-amber-400/60 transition-all active:scale-[0.99]"
             >
               <div className="flex items-center gap-2.5">
@@ -2589,7 +2594,7 @@ Payment Reference / Memo: ${memo}`;
                     {/* Deposit Required Callout if locked */}
                     {(!entitlement || !entitlement.canWithdraw) && (
                       <div
-                        onClick={() => setShowUnlockModal(true)}
+                        onClick={openUnlockModal}
                         className="p-2.5 rounded-xl bg-gradient-to-r from-amber-950/70 to-rose-950/70 border border-amber-500/40 text-amber-200 text-xs flex items-center justify-between cursor-pointer hover:border-amber-400 transition-colors shadow-sm"
                       >
                         <div className="flex items-center gap-2">
@@ -2618,7 +2623,7 @@ Payment Reference / Memo: ${memo}`;
                           if (window.Telegram?.WebApp?.HapticFeedback) {
                             window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
                           }
-                          setShowUnlockModal(true);
+                          openUnlockModal();
                         }
                       }}
                       disabled={isWithdrawing || (entitlement?.canWithdraw ? (!withdrawAddress.trim() || !withdrawAmountUsd) : false)}

@@ -256,3 +256,4 @@ export const TRANSLATIONS: Record<AppLanguage, Record<string, string>> = {
     'payout.freeAdPass': 'Pass Pub Gratuit (30 pubs/jour pendant 5 jours)',
   },
 };
+

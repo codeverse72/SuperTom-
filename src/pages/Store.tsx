@@ -12,6 +12,7 @@ import { useGame } from '../context/GameContext';
 import { BISCUIT_CONFIGS, BiscuitConfig } from '../config/gameConfig';
 import { formatNumber } from '../utils/probability';
 import { BiscuitSvg } from '../components/BiscuitSvg';
+import { adManager } from '../services/adManager';
 
 interface StoreProps {
   onNavigateToDeposit?: () => void;
@@ -60,6 +61,9 @@ export const Store: React.FC<StoreProps> = ({ onNavigateToDeposit }) => {
     const success = feedTom(biscuit.id, 1);
     if (success) {
       showToast('Tom Fed!', `Gave 1x ${biscuit.name} to King Tom!`, 'reward');
+      setTimeout(() => {
+        adManager.triggerActionAd('feed_tom');
+      }, 700);
     }
   };
 

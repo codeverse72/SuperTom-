@@ -29,6 +29,7 @@ export interface BotTranslation {
   btnPayoutChannel: string;
   btnSupport: string;
   btnChangeLang: string;
+  btnWatchAds: string;
 }
 
 export const BOT_TRANSLATIONS: Record<BotLanguage, BotTranslation> = {
@@ -53,6 +54,7 @@ export const BOT_TRANSLATIONS: Record<BotLanguage, BotTranslation> = {
     btnPayoutChannel: '💰 Payout Channel',
     btnSupport: '🆘 Support',
     btnChangeLang: '🌐 Change Language',
+    btnWatchAds: '🎬 Watch Ads & Earn Free TomCoins',
   },
   fa: {
     langName: 'فارسی',
@@ -75,6 +77,7 @@ export const BOT_TRANSLATIONS: Record<BotLanguage, BotTranslation> = {
     btnPayoutChannel: '💰 کانال پرداخت‌ها',
     btnSupport: '🆘 پشتیبانی ۲۴/۷',
     btnChangeLang: '🌐 تغییر زبان',
+    btnWatchAds: '🎬 تماشای تبلیغ و دریافت پاداش',
   },
   ru: {
     langName: 'Русский',
@@ -97,6 +100,7 @@ export const BOT_TRANSLATIONS: Record<BotLanguage, BotTranslation> = {
     btnPayoutChannel: '💰 Канал выплат',
     btnSupport: '🆘 Поддержка',
     btnChangeLang: '🌐 Сменить язык',
+    btnWatchAds: '🎬 Смотреть рекламу и зарабатывать',
   },
   fr: {
     langName: 'Français',
@@ -119,6 +123,7 @@ export const BOT_TRANSLATIONS: Record<BotLanguage, BotTranslation> = {
     btnPayoutChannel: '💰 Canal des Retraits',
     btnSupport: '🆘 Support 24/7',
     btnChangeLang: '🌐 Changer de langue',
+    btnWatchAds: '🎬 Regarder des pubs & Gagner des TomCoins',
   },
 };
 
@@ -305,6 +310,12 @@ export class TelegramBotController {
           callback_data: 'prompt_lang',
         },
       ],
+      [
+        {
+          text: t.btnWatchAds,
+          web_app: { url: `${miniAppUrl}&tab=missions&startapp=watch_ad` },
+        },
+      ],
     ];
 
     return { text: lines.join('\n'), inlineKeyboard };
@@ -339,6 +350,7 @@ export class TelegramBotController {
           commands: [
             { command: 'start', description: 'Start SuperTom & choose language' },
             { command: 'language', description: 'Change language (English, فارسی, Русский, Français)' },
+            { command: 'ads', description: 'Watch ads & earn free TomCoins' },
             { command: 'help', description: 'Support & payout instructions' },
           ],
         }),
@@ -716,6 +728,37 @@ export class TelegramBotController {
           chatId: message.chat.id,
           from: message.from,
         });
+      } else if (text.startsWith('/ads') || text.startsWith('/watch')) {
+        const token = env.TELEGRAM_BOT_TOKEN;
+        if (token && token !== 'TEST_BOT_TOKEN_PLACEHOLDER') {
+          const user = await prisma.user.findUnique({
+            where: { telegramId: BigInt(message.from.id) },
+            select: { languageCode: true, referralCode: true },
+          });
+          const lang = (user?.languageCode as BotLanguage) || 'en';
+          const t = BOT_TRANSLATIONS[lang] || BOT_TRANSLATIONS.en;
+          const miniAppUrl = TelegramBotController.resolveMiniAppUrl(user?.referralCode || null, lang);
+
+          await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: message.chat.id.toString(),
+              text: `🎬 <b>${t.btnWatchAds}</b>\n\nWatch sponsored video advertisements to earn TomCoins, boost your mining, and unlock <b>FREE cryptocurrency withdrawals</b> (30 ads/day for 5 days)!\n\n👇 Tap below to start watching:`,
+              parse_mode: 'HTML',
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: t.btnWatchAds,
+                      web_app: { url: `${miniAppUrl}&tab=missions&startapp=watch_ad` },
+                    },
+                  ],
+                ],
+              },
+            }),
+          }).catch((e) => logger.error('[TelegramBot] /ads command error:', e));
+        }
       }
     } catch (err) {
       logger.error('[TelegramBot] Error processing webhook update:', err);

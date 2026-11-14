@@ -89,6 +89,18 @@ function getAdsgramBlockId(): string {
 export function checkTelegramAuthFreshness(): { isFresh: boolean; reason?: string } {
   const initData = getRawTelegramInitData();
   if (!initData) {
+    const isDev = Boolean(
+      (import.meta as any).env?.DEV ||
+      (import.meta as any).env?.VITE_ADS_DEBUG === 'true' ||
+      (typeof window !== 'undefined' && (
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        window.localStorage?.getItem('supertom_test_ads') === 'true'
+      ))
+    );
+    if (isDev) {
+      return { isFresh: true };
+    }
     return {
       isFresh: false,
       reason: 'No Telegram authentication context found. Please open SuperTom inside Telegram.',

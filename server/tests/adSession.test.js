@@ -72,4 +72,41 @@ test('Rewarded Ad Session Management Suite', async (t) => {
     assert.ok(shortDuration < MIN_VIEW_DURATION_MS, 'Short duration must be below threshold');
     assert.ok(validDuration >= MIN_VIEW_DURATION_MS, 'Valid duration must meet threshold');
   });
+
+  await t.test('3. Frequency Capping & Smart Throttling Mathematics', () => {
+    const DEFAULT_COOLDOWN_MS = 50_000; // 50s cooldown
+    const APP_OPEN_MIN_INTERVAL_MS = 40_000; // 40s min interval for app open
+
+    function canTrigger(reason, lastAdTime, feedCount, now) {
+      const elapsed = now - lastAdTime;
+      if (reason === 'manual') return true;
+      if (reason === 'app_open') {
+        return lastAdTime === 0 || elapsed >= APP_OPEN_MIN_INTERVAL_MS;
+      }
+      if (reason === 'feed_tom') {
+        return feedCount >= 3 && elapsed >= DEFAULT_COOLDOWN_MS;
+      }
+      return elapsed >= DEFAULT_COOLDOWN_MS;
+    }
+
+    const t0 = 100_000;
+
+    // 1. App open on clean session (lastAdTime = 0) must trigger
+    assert.strictEqual(canTrigger('app_open', 0, 0, t0), true);
+
+    // 2. Tab switch immediately after ad (e.g. 5s later) must be BLOCKED
+    assert.strictEqual(canTrigger('tab_switch', t0, 0, t0 + 5000), false);
+
+    // 3. Tab switch after 51s must be ALLOWED
+    assert.strictEqual(canTrigger('tab_switch', t0, 0, t0 + 51_000), true);
+
+    // 4. Feeding Tom on only 1 or 2 feeds must be BLOCKED even after 51s
+    assert.strictEqual(canTrigger('feed_tom', t0, 2, t0 + 51_000), false);
+
+    // 5. Feeding Tom on 3rd feed after 51s must be ALLOWED
+    assert.strictEqual(canTrigger('feed_tom', t0, 3, t0 + 51_000), true);
+
+    // 6. Manual watch ad button must ALWAYS bypass cooldown
+    assert.strictEqual(canTrigger('manual', t0, 0, t0 + 1000), true);
+  });
 });

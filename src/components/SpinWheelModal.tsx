@@ -6,6 +6,7 @@ import { useGame } from '../context/GameContext';
 import { SPIN_REWARDS, SpinRewardConfig } from '../config/gameConfig';
 import { sound } from '../utils/sound';
 import { SpinClaimResultDto } from '../services/types';
+import { adManager } from '../services/adManager';
 
 export const SpinWheelModal: React.FC = () => {
   const { 
@@ -117,6 +118,10 @@ export const SpinWheelModal: React.FC = () => {
     setWonReward(null);
     setWonClaimData(null);
     setSpinError(null);
+    // Frequently check and trigger interstitial ad after wheel spin
+    setTimeout(() => {
+      adManager.triggerActionAd('spin_wheel');
+    }, 500);
   };
 
   if (!isWheelOpen) return null;
