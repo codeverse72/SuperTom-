@@ -42,6 +42,7 @@ export interface AdexiumWidgetInstance {
   requestAd?: (adFormat?: string, motivated?: boolean) => Promise<unknown[]>;
   requestRewardedAd?: (adFormat?: string) => void;
   displayAd: (ad: unknown, adFormat?: string) => void;
+  autoMode?: () => void;
 }
 
 export interface AdexiumWidgetConstructor {
@@ -167,6 +168,13 @@ export function getAdexiumWidget(): AdexiumWidgetInstance | null {
         adFormat: 'interstitial',
       });
       window.__adexiumWidget = widget;
+      try {
+        if (typeof widget.autoMode === 'function') {
+          widget.autoMode();
+        }
+      } catch (autoErr) {
+        console.warn('[Adexium] autoMode call notice:', autoErr);
+      }
       return widget;
     } catch (err) {
       console.warn('[Adexium] SDK initialization deferred:', err);

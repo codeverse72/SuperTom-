@@ -22,8 +22,7 @@
     <!-- Adexium Telegram Mini App Ads SDK -->
     <script type="text/javascript" src="https://cdn.tgads.space/assets/js/adexium-widget.min.js"></script>
     <script type="text/javascript">
-      (function() {
-        var wid = 'dd81f1ec-401b-498c-a2f3-0a4bb0032b59';
+      document.addEventListener('DOMContentLoaded', () => {
         var isAdmin = window.location.pathname.startsWith('/admin') ||
                       window.location.hash.startsWith('#/admin') ||
                       window.location.search.includes('admin=true');
@@ -33,24 +32,22 @@
           if (window.__adexiumWidget) return;
           try {
             if (typeof AdexiumWidget !== 'undefined') {
-              var adexiumWidget = new AdexiumWidget({ wid: wid, adFormat: 'interstitial' });
+              const adexiumWidget = new AdexiumWidget({wid: 'dd81f1ec-401b-498c-a2f3-0a4bb0032b59', adFormat: 'interstitial'});
               window.adexiumWidget = adexiumWidget;
               window.__adexiumWidget = adexiumWidget;
-              console.log('[Adexium] Placement dd81f1ec-401b-498c-a2f3-0a4bb0032b59 ready');
+              if (typeof adexiumWidget.autoMode === 'function') {
+                adexiumWidget.autoMode();
+              }
+              console.log('[Adexium] Placement dd81f1ec-401b-498c-a2f3-0a4bb0032b59 initialized with autoMode()');
             }
           } catch (err) {
-            console.warn('[Adexium] Init attempt skipped/retrying:', err);
+            console.warn('[Adexium] autoMode initialization notice:', err);
           }
         }
 
-        if (document.readyState === 'complete' || document.readyState === 'interactive') {
-          initAdexium();
-        } else {
-          document.addEventListener('DOMContentLoaded', initAdexium);
-        }
-        window.addEventListener('load', initAdexium);
+        initAdexium();
 
-        // Retry every 400ms for up to 6 seconds to ensure Telegram WebApp context is fully loaded
+        // Retry if CDN script loads shortly after DOMContentLoaded
         var attempts = 0;
         var interval = setInterval(function() {
           attempts++;
@@ -60,7 +57,7 @@
           }
           initAdexium();
         }, 400);
-      })();
+      });
     </script>
   </head>
   <body class="bg-[#070314] text-white antialiased overflow-x-hidden selection:bg-purple-600 selection:text-white">
