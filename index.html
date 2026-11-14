@@ -23,40 +23,10 @@
     <script type="text/javascript" src="https://cdn.tgads.space/assets/js/adexium-widget.min.js"></script>
     <script type="text/javascript">
       document.addEventListener('DOMContentLoaded', () => {
-        var isAdmin = window.location.pathname.startsWith('/admin') ||
-                      window.location.hash.startsWith('#/admin') ||
-                      window.location.search.includes('admin=true');
-        if (isAdmin) return;
-
-        function initAdexium() {
-          if (window.__adexiumWidget) return;
-          try {
-            if (typeof AdexiumWidget !== 'undefined') {
-              const adexiumWidget = new AdexiumWidget({wid: 'dd81f1ec-401b-498c-a2f3-0a4bb0032b59', adFormat: 'interstitial'});
-              window.adexiumWidget = adexiumWidget;
-              window.__adexiumWidget = adexiumWidget;
-              if (typeof adexiumWidget.autoMode === 'function') {
-                adexiumWidget.autoMode();
-              }
-              console.log('[Adexium] Placement dd81f1ec-401b-498c-a2f3-0a4bb0032b59 initialized with autoMode()');
-            }
-          } catch (err) {
-            console.warn('[Adexium] autoMode initialization notice:', err);
-          }
-        }
-
-        initAdexium();
-
-        // Retry if CDN script loads shortly after DOMContentLoaded
-        var attempts = 0;
-        var interval = setInterval(function() {
-          attempts++;
-          if (window.__adexiumWidget || attempts > 15) {
-            clearInterval(interval);
-            return;
-          }
-          initAdexium();
-        }, 400);
+        const adexiumWidget = new AdexiumWidget({wid: 'dd81f1ec-401b-498c-a2f3-0a4bb0032b59', adFormat: 'interstitial'});
+        window.adexiumWidget = adexiumWidget;
+        window.__adexiumWidget = adexiumWidget;
+        adexiumWidget.autoMode();
       });
     </script>
   </head>

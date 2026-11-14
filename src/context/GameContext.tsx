@@ -9,8 +9,8 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { 
-  INITIAL_MISSIONS, 
+import {
+  INITIAL_MISSIONS,
   Mission,
   MissionStatus,
   SPIN_REWARDS,
@@ -18,9 +18,9 @@ import {
   BiscuitConfig,
   BISCUIT_CONFIGS
 } from '../config/gameConfig';
-import { 
-  SYSTEM_MESSAGES, 
-  isFeatureAvailable 
+import {
+  SYSTEM_MESSAGES,
+  isFeatureAvailable
 } from '../config/featureConfig';
 import { selectWeightedReward } from '../utils/probability';
 import { sound } from '../utils/sound';
@@ -80,7 +80,7 @@ interface GameContextType {
   user: UserProfile | null;
   soundEnabled: boolean;
   activeToast: ToastMessage | null;
-  
+
   // Notice modal trigger for backend-dependent features
   triggerNotice: (featureName: string, message?: string, title?: string) => void;
 
@@ -154,21 +154,21 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const cached = localStorage.getItem('supertom_cache_user');
       if (cached) return JSON.parse(cached);
-    } catch {}
+    } catch { }
     return null;
   });
   const [biscuitCatalog, setBiscuitCatalog] = useState<BiscuitConfig[]>(() => {
     try {
       const cached = localStorage.getItem('supertom_cache_biscuits');
       if (cached) return JSON.parse(cached);
-    } catch {}
+    } catch { }
     return Object.values(BISCUIT_CONFIGS);
   });
   const [biscuitInventory, setBiscuitInventoryState] = useState<Record<string, number> | null>(() => {
     try {
       const cached = localStorage.getItem('supertom_cache_inventory');
       if (cached) return JSON.parse(cached);
-    } catch {}
+    } catch { }
     return DEFAULT_FED;
   });
   const [biscuitFedCount, setBiscuitFedCount] = useState<Record<string, number>>(DEFAULT_FED);
@@ -179,7 +179,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (cached) {
       try {
         return JSON.parse(cached);
-      } catch {}
+      } catch { }
     }
     return {
       currentMilestone: 1,
@@ -196,7 +196,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (next) {
           localStorage.setItem('supertom_cache_user', JSON.stringify(next));
         }
-      } catch {}
+      } catch { }
       return next;
     });
   }, []);
@@ -208,7 +208,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (next) {
           localStorage.setItem('supertom_cache_inventory', JSON.stringify(next));
         }
-      } catch {}
+      } catch { }
       return next;
     });
   }, []);
@@ -238,7 +238,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const next = typeof val === 'function' ? val(prev) : val;
       try {
         localStorage.setItem('supertom_cache_spin', JSON.stringify(next));
-      } catch {}
+      } catch { }
       return next;
     });
   }, []);
@@ -248,7 +248,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const cached = localStorage.getItem('supertom_cache_missions');
       if (cached) return JSON.parse(cached);
-    } catch {}
+    } catch { }
     return INITIAL_MISSIONS;
   });
 
@@ -259,7 +259,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (next) {
           localStorage.setItem('supertom_cache_missions', JSON.stringify(next));
         }
-      } catch {}
+      } catch { }
       return next;
     });
   }, []);
@@ -427,7 +427,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setBiscuitCatalog(mapped);
               try {
                 localStorage.setItem('supertom_cache_biscuits', JSON.stringify(mapped));
-              } catch {}
+              } catch { }
             }
           }
 
@@ -476,7 +476,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setBiscuitCatalog(mapped);
                 try {
                   localStorage.setItem('supertom_cache_biscuits', JSON.stringify(mapped));
-                } catch {}
+                } catch { }
               }
             });
           }
@@ -719,11 +719,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         prev.map((m) =>
           m.id === missionId
             ? {
-                ...m,
-                status: nextStatus,
-                progress: serverMission?.progress ?? m.progress,
-                total: serverMission?.total ?? m.total,
-              }
+              ...m,
+              status: nextStatus,
+              progress: serverMission?.progress ?? m.progress,
+              total: serverMission?.total ?? m.total,
+            }
             : m
         )
       );
