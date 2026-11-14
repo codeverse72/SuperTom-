@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { motion } from 'motion/react';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Heart } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import catThroneImg from '../assets/dashboard/cat_throne_coins.png';
+import { sound } from '../utils/sound';
 
 interface FloatingTap {
   id: number;
@@ -10,22 +11,46 @@ interface FloatingTap {
   y: number;
 }
 
-export const CatCharacter: React.FC = () => {
+interface CatCharacterProps {
+  onNavigateToDeposit?: () => void;
+}
+
+const CAT_SPEECHES = [
+  { text: 'Feed me more biscuits! 😻', isDeposit: false },
+  { text: '⚡ Deposit $1 to unlock instant cashouts! 💰', isDeposit: true },
+  { text: '👑 King VIPs get +30% cashback & infinite payouts!', isDeposit: true },
+  { text: '🐾 Top up crypto to boost mining by +30%! ⚡', isDeposit: true },
+  { text: 'Purr... your biscuits make me mine 30% faster! 🚀', isDeposit: false },
+];
+
+export const CatCharacter: React.FC<CatCharacterProps> = ({ onNavigateToDeposit }) => {
   const { petCat } = useGame();
   const [floatingTaps, setFloatingTaps] = useState<FloatingTap[]>([]);
+  const [speechIndex, setSpeechIndex] = useState(0);
+
+  // Cycle persuasive & playful cat speech bubbles every 4.2 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSpeechIndex((prev) => (prev + 1) % CAT_SPEECHES.length);
+    }, 4200);
+    return () => clearInterval(timer);
+  }, []);
+
+  const currentSpeech = CAT_SPEECHES[speechIndex];
 
   const handleCatClick = (e: React.MouseEvent<HTMLDivElement>) => {
     petCat();
+    sound.playCatMeow();
 
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
     const newTap: FloatingTap = { id: Date.now() + Math.random(), x, y };
-    setFloatingTaps(prev => [...prev.slice(-4), newTap]);
+    setFloatingTaps((prev) => [...prev.slice(-4), newTap]);
 
     setTimeout(() => {
-      setFloatingTaps(prev => prev.filter(t => t.id !== newTap.id));
+      setFloatingTaps((prev) => prev.filter((t) => t.id !== newTap.id));
     }, 900);
   };
 
@@ -46,19 +71,43 @@ export const CatCharacter: React.FC = () => {
       </div>
 
       {/* Speech Bubble - Precisely positioned at top-right of King Tom */}
-      <div className="relative w-full max-w-[400px] flex justify-end pr-2 z-20 -mb-3 pointer-events-none">
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.3 }}
-          className="relative bg-white text-black px-3.5 py-1.5 rounded-2xl shadow-[0_4px_18px_rgba(0,0,0,0.6)] flex items-center gap-1 border border-white/80 pointer-events-auto"
-        >
-          <span className="text-[12.5px] sm:text-[13px] font-black text-black tracking-tight whitespace-nowrap">
-            Feed me more biscuits! 😻
-          </span>
-          {/* Bubble tail pointing down-left towards King Tom */}
-          <div className="absolute -bottom-2 left-6 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-white" />
-        </motion.div>
+      <div className="relative w-full max-w-[400px] flex justify-end pr-2 z-20 -mb-3">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={speechIndex}
+            initial={{ scale: 0.85, opacity: 0, y: 5 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.85, opacity: 0, y: -5 }}
+            transition={{ duration: 0.25 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              sound.playCatMeow();
+              if (currentSpeech.isDeposit && onNavigateToDeposit) {
+                onNavigateToDeposit();
+              }
+            }}
+            className={`relative px-3.5 py-1.5 rounded-2xl shadow-[0_4px_18px_rgba(0,0,0,0.6)] flex items-center gap-1 border cursor-pointer select-none ${
+              currentSpeech.isDeposit
+                ? 'bg-gradient-to-r from-amber-200 via-yellow-100 to-amber-300 text-slate-950 border-amber-400 shadow-[0_0_14px_rgba(245,158,11,0.5)]'
+                : 'bg-white text-black border-white/80'
+            }`}
+          >
+            <span className="text-[12px] sm:text-[12.5px] font-black tracking-tight whitespace-nowrap">
+              {currentSpeech.text}
+            </span>
+            {currentSpeech.isDeposit && (
+              <span className="text-[9px] font-black uppercase bg-slate-950 text-amber-300 px-1 py-0.2 rounded-xs ml-0.5">
+                GO &gt;
+              </span>
+            )}
+            {/* Bubble tail pointing down-left towards King Tom */}
+            <div
+              className={`absolute -bottom-2 left-6 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] ${
+                currentSpeech.isDeposit ? 'border-t-amber-300' : 'border-t-white'
+              }`}
+            />
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       {/* Main King Tom Throne and Gold Coins Container */}

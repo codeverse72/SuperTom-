@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BalanceCard } from '../components/BalanceCard';
 import { CatCharacter } from '../components/CatCharacter';
+import { VipDepositBanner } from '../components/VipDepositBanner';
 import { SpinTimer } from '../components/SpinTimer';
 import { ProductionCard } from '../components/ProductionCard';
 import { FeedingModal } from '../components/FeedingModal';
@@ -9,26 +10,30 @@ import feedTomButtonImg from '../assets/dashboard/feed_tom_button_3d.png';
 
 interface HomeProps {
   onNavigateToStore: () => void;
+  onNavigateToDeposit?: () => void;
 }
 
-export const Home: React.FC<HomeProps> = ({ onNavigateToStore }) => {
+export const Home: React.FC<HomeProps> = ({ onNavigateToStore, onNavigateToDeposit }) => {
   const [isFeedingModalOpen, setIsFeedingModalOpen] = useState(false);
 
   return (
     <div className="space-y-4 pb-20">
-      {/* 1. Poops Balance Card with Treasure Chest & Dynamic USDT */}
-      <BalanceCard />
+      {/* 1. Poops Balance Card with Treasure Chest, Dynamic USDT & Quick Deposit CTA */}
+      <BalanceCard onNavigateToDeposit={onNavigateToDeposit} />
 
-      {/* 2. Main 3D Royal Cat Character sitting on Throne with Speech Bubbles */}
-      <CatCharacter />
+      {/* 2. Main 3D Royal Cat Character sitting on Throne with Interactive Speech Bubbles */}
+      <CatCharacter onNavigateToDeposit={onNavigateToDeposit} />
 
-      {/* 3. FREE SPIN TIMER SYSTEM (3 Milestones: 2h, 4h, 8h) */}
+      {/* 3. VIP Deposit Promotional Banner (30% Cashback + Instant Withdrawals) */}
+      <VipDepositBanner onNavigateToDeposit={onNavigateToDeposit} />
+
+      {/* 4. FREE SPIN TIMER SYSTEM (3 Milestones: 2h, 4h, 8h) */}
       <SpinTimer />
 
-      {/* 4. Poop Production Rate Card */}
+      {/* 5. Poop Production Rate Card */}
       <ProductionCard onOpenFeeding={() => setIsFeedingModalOpen(true)} />
 
-      {/* 5. Large Golden 3D "Feed Tom" Button */}
+      {/* 6. Large Golden 3D "Feed Tom" Button */}
       <div className="pt-1 pb-2 flex justify-center">
         <button
           onClick={() => setIsFeedingModalOpen(true)}

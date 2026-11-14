@@ -6,7 +6,11 @@ import chestPurpleImg from '../assets/dashboard/chest_purple.png';
 import { sound } from '../utils/sound';
 import { adManager } from '../services/adManager';
 
-export const BalanceCard: React.FC = () => {
+interface BalanceCardProps {
+  onNavigateToDeposit?: () => void;
+}
+
+export const BalanceCard: React.FC<BalanceCardProps> = ({ onNavigateToDeposit }) => {
   const { balance } = useGame();
 
   // If balance is set or default, format; if null fallback to reference '12,450'
@@ -28,7 +32,7 @@ export const BalanceCard: React.FC = () => {
           />
         </div>
 
-        {/* Center: "Your TomCoins" + Big Balance + Green Tether Conversion */}
+        {/* Center: "Your TomCoins" + Big Balance + Green Tether Conversion & Deposit CTA */}
         <div className="flex-1 min-w-0 px-3 sm:px-4">
           <p className="text-xs sm:text-sm font-semibold text-amber-200/90 tracking-wide flex items-center gap-1">
             <span>Your TomCoins</span>
@@ -37,14 +41,33 @@ export const BalanceCard: React.FC = () => {
           <p className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-none my-1 font-display">
             {balance !== null ? formatNumber(balance) : '--'}
           </p>
-          {/* Tether symbol + USDT text */}
-          <div className="flex items-center gap-1.5 text-xs sm:text-[13px] font-bold text-[#00e676] drop-shadow-[0_0_8px_rgba(0,230,118,0.4)]">
-            <span className="w-4 h-4 rounded-full bg-[#00e676]/20 border border-[#00e676]/60 flex items-center justify-center text-[10px] text-[#00e676] font-black leading-none shrink-0">
-              ₮
-            </span>
-            <span>
-              {balance !== null ? `≈ ${tomToUsdt(balance)} USDT` : 'Balance unavailable'}
-            </span>
+          
+          <div className="flex items-center justify-between gap-1.5 flex-wrap">
+            {/* Tether symbol + USDT text */}
+            <div className="flex items-center gap-1 text-xs sm:text-[13px] font-bold text-[#00e676] drop-shadow-[0_0_8px_rgba(0,230,118,0.4)]">
+              <span className="w-3.5 h-3.5 rounded-full bg-[#00e676]/20 border border-[#00e676]/60 flex items-center justify-center text-[9px] text-[#00e676] font-black leading-none shrink-0">
+                ₮
+              </span>
+              <span>
+                {balance !== null ? `≈ ${tomToUsdt(balance)} USDT` : 'Balance unavailable'}
+              </span>
+            </div>
+
+            {/* Quick Deposit Pill Button */}
+            {onNavigateToDeposit && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  sound.playCatMeow();
+                  onNavigateToDeposit();
+                }}
+                className="py-0.5 px-2 rounded-full bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-400 hover:brightness-110 active:scale-95 text-slate-950 font-black text-[10px] uppercase tracking-wider shadow-[0_0_10px_rgba(245,158,11,0.5)] cursor-pointer flex items-center gap-1 shrink-0"
+              >
+                <span>+ Deposit</span>
+                <span className="text-[8px] bg-slate-950 text-amber-300 font-black px-1 rounded-xs">+30%</span>
+              </button>
+            )}
           </div>
         </div>
 

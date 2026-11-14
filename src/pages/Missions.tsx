@@ -43,7 +43,11 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Tv
 };
 
-export const Missions: React.FC = () => {
+interface MissionsProps {
+  onNavigateToDeposit?: () => void;
+}
+
+export const Missions: React.FC<MissionsProps> = ({ onNavigateToDeposit }) => {
   const { missions, verifyMission, claimMission, refreshMissions, user, showToast } = useGame();
   const [activeCategory, setActiveCategory] = useState<MissionCategory | 'all'>('all');
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
@@ -371,7 +375,55 @@ export const Missions: React.FC = () => {
         })}
       </div>
 
-      {/* 5. MISSION CARDS LIST */}
+      {/* 5. FEATURED VIP DEPOSIT QUEST */}
+      <div className="rounded-3xl p-4 border-2 border-amber-400/60 bg-gradient-to-br from-[#24103a] via-[#160829] to-[#0c0318] shadow-[0_0_25px_rgba(245,158,11,0.25)] relative overflow-hidden">
+        <div className="absolute top-0 right-0 bg-gradient-to-l from-amber-400 to-amber-500 text-slate-950 font-black text-[9px] uppercase px-3 py-0.5 rounded-bl-xl tracking-wider shadow-md">
+          VIP QUEST • +30% BONUS
+        </div>
+
+        <div className="flex items-start gap-3">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.5)] shrink-0 mt-0.5">
+            <Crown className="w-6 h-6 fill-slate-950" />
+          </div>
+
+          <div className="flex-1 min-w-0 pr-16">
+            <h4 className="text-sm font-black text-white font-display flex items-center gap-1.5">
+              <span>Make First Deposit</span>
+              <span className="text-[10px] text-amber-300 font-bold">($1.00+)</span>
+            </h4>
+            <p className="text-xs text-purple-200/80 mt-0.5 leading-snug">
+              Deposit crypto to unlock cashouts, get 2,000+ TomCoins & +30% mining speed boost!
+            </p>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="px-2 py-0.5 rounded-md bg-amber-400/20 border border-amber-400/40 text-amber-300 font-mono font-black text-xs">
+                +2,000 TomCoins
+              </span>
+              <span className="text-[10px] text-emerald-400 font-bold">
+                ✓ Unlocks Cashouts
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            sound.playCatMeow();
+            if (onNavigateToDeposit) {
+              onNavigateToDeposit();
+            } else {
+              window.location.hash = '#payout';
+            }
+          }}
+          className="mt-3 w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:brightness-110 active:scale-95 text-slate-950 font-black text-xs uppercase tracking-wider shadow-[0_0_15px_rgba(245,158,11,0.5)] transition-all cursor-pointer flex items-center justify-center gap-1.5"
+        >
+          <Zap className="w-3.5 h-3.5 fill-slate-950 text-slate-950" />
+          <span>DEPOSIT & CLAIM VIP PASS (FROM $1.00)</span>
+          <ArrowRight className="w-3.5 h-3.5 stroke-[3]" />
+        </button>
+      </div>
+
+      {/* 6. MISSION CARDS LIST */}
       <div className="space-y-3">
         {filteredMissions.map((mission) => {
           const Icon = iconMap[mission.icon] || Sparkles;

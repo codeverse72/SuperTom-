@@ -69,6 +69,16 @@ export default function App() {
     return () => cleanupPeriodic();
   }, [isAdminRoute]);
 
+  // Global Cat Meow Sound on any click/tap across the mini app
+  useEffect(() => {
+    if (isAdminRoute) return;
+    const handleGlobalClick = () => {
+      sound.playCatMeow();
+    };
+    window.addEventListener('pointerdown', handleGlobalClick, { passive: true });
+    return () => window.removeEventListener('pointerdown', handleGlobalClick);
+  }, [isAdminRoute]);
+
   // Telegram native BackButton integration:
   // Shows native BackButton on secondary tabs, returns to Home dashboard on click.
   // Hides BackButton when user is on the main Home screen.
@@ -135,9 +145,14 @@ export default function App() {
           <main className="flex-1 p-4 pb-24 overflow-y-auto">
             <ErrorBoundary>
               {activeTab === 'home' && (
-                <Home onNavigateToStore={() => handleTabChange('store')} />
+                <Home 
+                  onNavigateToStore={() => handleTabChange('store')} 
+                  onNavigateToDeposit={() => handleTabChange('payout')}
+                />
               )}
-              {activeTab === 'missions' && <Missions />}
+              {activeTab === 'missions' && (
+                <Missions onNavigateToDeposit={() => handleTabChange('payout')} />
+              )}
               {activeTab === 'store' && (
                 <Store onNavigateToDeposit={() => handleTabChange('payout')} />
               )}
