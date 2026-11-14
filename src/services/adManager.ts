@@ -11,7 +11,7 @@
  * - Smart cooldown: 50 seconds minimum between automatic interstitial impressions
  * - Action-based throttle for high-frequency actions (feeding / petting)
  * - Persistent throttle timestamp in sessionStorage to respect navigation & quick reloads
- * - Seamless Adsgram Primary (#59392) -> Adexium Fallback (#15008) cascade
+ * - Parallel dual ad serving: Adexium (dd81f1ec-401b-498c-a2f3-0a4bb0032b59) + Adsgram (59392) with cross-network failover
  * - Completely non-blocking: network errors, ad blockers, or unfilled ads fail silently without disrupting gameplay
  * - Automatically credits backend ad sessions so passive views count towards the daily "Watch 30 Ads" quest & 5-day withdrawal unlock!
  */

@@ -12,7 +12,7 @@ import {
 } from '../missions/missionController.js';
 import { WithdrawalEntitlementService } from '../payouts/withdrawalEntitlementService.js';
 
-export const ADEXIUM_PLACEMENT_ID = 'b073a77c-3963-43dc-a846-99b5382cd341';
+export const ADEXIUM_PLACEMENT_ID = process.env.ADEXIUM_PLACEMENT_ID || 'dd81f1ec-401b-498c-a2f3-0a4bb0032b59';
 export const DEFAULT_ADSGRAM_BLOCK_ID = process.env.ADSGRAM_BLOCK_ID || '59392';
 export const AD_SESSION_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 export const MIN_VIEW_DURATION_MS = 4000; // Minimum 4 seconds playback before completion

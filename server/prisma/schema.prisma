@@ -694,7 +694,7 @@ model AdSession {
   id                String          @id @default(uuid())
   userId            String
   provider          String          @default("adexium") // "adexium"
-  placementId       String          // "b073a77c-3963-43dc-a846-99b5382cd341"
+  placementId       String          // "dd81f1ec-401b-498c-a2f3-0a4bb0032b59"
   status            AdSessionStatus @default(PENDING)
   isCompleted       Boolean         @default(false)
   rewardAmount      BigInt          @default(0)
