@@ -116,7 +116,7 @@ export class AuthController {
               lastName: tgUser.last_name,
               photoUrl: undefined,
               languageCode: tgUser.language_code || 'en',
-              poopsBalance: 0n,
+              poopsBalance: 1000n, // 1,000 TomCoins welcome starter bonus for every new player
               level: 1,
               levelTitle: 'Feline Cadet',
               referralCode,
@@ -128,6 +128,19 @@ export class AuthController {
               _count: {
                 select: { referees: true, feedingEvents: true },
               },
+            },
+          });
+
+          // Record welcome bonus in immutable audit ledger
+          await tx.ledgerEntry.create({
+            data: {
+              userId: user.id,
+              type: 'MISSION_REWARD',
+              amount: 1000n,
+              balanceBefore: 0n,
+              balanceAfter: 1000n,
+              description: 'Welcome starter bonus: 1,000 TomCoins for joining SuperTom',
+              idempotencyKey: `welcome_starter_bonus_${user.id}`,
             },
           });
 
@@ -311,6 +324,7 @@ export class AuthController {
           levelTitle: result.user.levelTitle,
           referralCode: result.user.referralCode,
           createdAt: result.user.createdAt.toISOString(),
+          isNewUser: result.isNewUser,
         },
         initialState: {
           balancePoops: settleResult.newBalance,

@@ -24,6 +24,7 @@ export interface UserSessionDto {
   levelTitle: string;
   referralCode: string;
   createdAt: string;
+  isNewUser?: boolean;
   initialState?: {
     balancePoops: number;
     mining?: {

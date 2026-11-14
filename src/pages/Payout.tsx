@@ -2810,54 +2810,7 @@ Payment Reference / Memo: ${memo}`;
                 </button>
               </div>
 
-              {/* Option 2: $3 Deposit - RECOMMENDED / UNLIMITED */}
-              <div className="rounded-2xl bg-gradient-to-br from-[#1a1202] via-[#100e26] to-[#0c162c] border-2 border-amber-400/70 p-3 space-y-2 shadow-[0_0_20px_rgba(245,158,11,0.25)] relative overflow-hidden">
-                <div className="absolute top-0 right-0 bg-gradient-to-l from-amber-400 to-amber-500 text-slate-950 font-black text-[8px] uppercase px-2.5 py-0.5 rounded-bl-lg tracking-wider shadow-md">
-                  RECOMMENDED • UNLIMITED
-                </div>
-
-                <div className="flex items-center justify-between pt-1">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-300 shrink-0">
-                      <Crown className="w-4 h-4 text-amber-400 fill-amber-400/30" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-black text-amber-300 font-display">King VIP Pass</h4>
-                      <span className="text-[10px] text-amber-200/90 font-bold">Unlimited Lifetime Withdrawals</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-sm font-black text-amber-400 font-mono">$3.00</span>
-                    <span className="block text-[8px] text-slate-400 font-mono">USDT / Crypto</span>
-                  </div>
-                </div>
-
-                <div className="p-2 rounded-xl bg-[#08070d] border border-amber-500/20 text-[10px] space-y-1">
-                  <div className="flex items-center gap-1.5 text-amber-200 font-bold">
-                    <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
-                    <span>Unlimited Withdrawals Forever (Never locked)</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-slate-300">
-                    <Check className="w-3 h-3 text-emerald-400 shrink-0" />
-                    <span>Full $3.00 (6,000 TomCoins) credited to balance</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-slate-300">
-                    <Check className="w-3 h-3 text-emerald-400 shrink-0" />
-                    <span>+30% Mining Boost + 5 Days Daily Bonus</span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleSelectUnlockTier(3, 'Unlimited Lifetime Withdrawals ($3.00)')}
-                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:brightness-110 active:scale-95 text-slate-950 font-black text-xs uppercase tracking-wider shadow-[0_0_15px_rgba(245,158,11,0.4)] transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <span>Deposit $3 (Unlock Unlimited)</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Option 3: Free Ad Pass (Watch 30 Ads/Day for 5 Days) */}
+              {/* Option 2: Free Ad Pass (Watch 30 Ads/Day for 5 Days) - 2nd Position */}
               <div className="rounded-2xl bg-gradient-to-br from-[#120a2a] via-[#0b0c20] to-[#070b15] border border-purple-500/50 p-3 space-y-2 shadow-md relative overflow-hidden">
                 <div className="absolute top-0 right-0 bg-gradient-to-l from-emerald-500 to-teal-500 text-slate-950 font-black text-[8px] uppercase px-2.5 py-0.5 rounded-bl-lg tracking-wider shadow-md">
                   100% FREE • NO DEPOSIT
@@ -2966,6 +2919,53 @@ Payment Reference / Memo: ${memo}`;
                     </span>
                   </button>
                 )}
+              </div>
+
+              {/* Option 3: $3 Deposit - RECOMMENDED / UNLIMITED */}
+              <div className="rounded-2xl bg-gradient-to-br from-[#1a1202] via-[#100e26] to-[#0c162c] border-2 border-amber-400/70 p-3 space-y-2 shadow-[0_0_20px_rgba(245,158,11,0.25)] relative overflow-hidden">
+                <div className="absolute top-0 right-0 bg-gradient-to-l from-amber-400 to-amber-500 text-slate-950 font-black text-[8px] uppercase px-2.5 py-0.5 rounded-bl-lg tracking-wider shadow-md">
+                  RECOMMENDED • UNLIMITED
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-300 shrink-0">
+                      <Crown className="w-4 h-4 text-amber-400 fill-amber-400/30" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-amber-300 font-display">King VIP Pass</h4>
+                      <span className="text-[10px] text-amber-200/90 font-bold">Unlimited Lifetime Withdrawals</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-black text-amber-400 font-mono">$3.00</span>
+                    <span className="block text-[8px] text-slate-400 font-mono">USDT / Crypto</span>
+                  </div>
+                </div>
+
+                <div className="p-2 rounded-xl bg-[#08070d] border border-amber-500/20 text-[10px] space-y-1">
+                  <div className="flex items-center gap-1.5 text-amber-200 font-bold">
+                    <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
+                    <span>Unlimited Withdrawals Forever (Never locked)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-slate-300">
+                    <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                    <span>Full $3.00 (6,000 TomCoins) credited to balance</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-slate-300">
+                    <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                    <span>+30% Mining Boost + 5 Days Daily Bonus</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelectUnlockTier(3, 'Unlimited Lifetime Withdrawals ($3.00)')}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:brightness-110 active:scale-95 text-slate-950 font-black text-xs uppercase tracking-wider shadow-[0_0_15px_rgba(245,158,11,0.4)] transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <span>Deposit $3 (Unlock Unlimited)</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
 

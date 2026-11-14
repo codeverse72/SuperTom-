@@ -395,7 +395,7 @@ export class TelegramBotController {
           firstName: params.from.first_name,
           lastName: params.from.last_name,
           languageCode: params.from.language_code || 'en',
-          poopsBalance: 0n,
+          poopsBalance: 1000n, // 1,000 TomCoins starter welcome bonus
           level: 1,
           levelTitle: 'Feline Cadet',
           referralCode,
@@ -425,6 +425,19 @@ export class TelegramBotController {
           claimedMilestones: '[]',
         },
       });
+
+      // Record welcome bonus in immutable audit ledger
+      await prisma.ledgerEntry.create({
+        data: {
+          userId: user.id,
+          type: 'MISSION_REWARD',
+          amount: 1000n,
+          balanceBefore: 0n,
+          balanceAfter: 1000n,
+          description: 'Welcome starter bonus: 1,000 TomCoins for joining SuperTom',
+          idempotencyKey: `welcome_starter_bonus_${user.id}`,
+        },
+      }).catch(() => {});
 
       logger.info(`[TelegramBot] New user registered via Telegram /start: ID ${user.id}, TG ${fromId}`);
     }

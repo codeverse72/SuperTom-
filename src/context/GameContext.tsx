@@ -347,6 +347,18 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // 1. Instantly set settled balance
             setBalance(init.balancePoops);
 
+            // Welcome starter bonus alert for brand new players
+            if (authRes.data.isNewUser) {
+              setTimeout(() => {
+                showToast(
+                  'Welcome to SuperTom!',
+                  '+1,000 TomCoins starter bonus credited to your balance! 🎁',
+                  'reward'
+                );
+                sound.playCelebration();
+              }, 800);
+            }
+
             // 2. Mining rate & countdown
             if (init.mining) {
               setProductionRate(init.mining.totalRatePerHour);
