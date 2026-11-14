@@ -7,10 +7,10 @@
  * - In-Game Actions (feeding King Tom, claiming mining income, lucky wheel spins, opening deposit)
  * - Direct "Watch & Earn" triggers (Missions tab, Profile menu)
  *
- * Enforces intelligent frequency capping ("not continuously but often"):
- * - Smart cooldown: 50 seconds minimum between automatic interstitial impressions
+ * Enforces intelligent frequency capping ("random ads occur once in 3 minutes"):
+ * - Smart cooldown: 3 minutes (180,000 ms) minimum between automatic/random interstitial impressions
  * - Action-based throttle for high-frequency actions (feeding / petting)
- * - Persistent throttle timestamp in sessionStorage to respect navigation & quick reloads
+ * - Persistent throttle timestamp in localStorage and sessionStorage to respect navigation & quick reloads
  * - Parallel dual ad serving: Adexium (dd81f1ec-401b-498c-a2f3-0a4bb0032b59) + Adsgram (59392) with cross-network failover
  * - Completely non-blocking: network errors, ad blockers, or unfilled ads fail silently without disrupting gameplay
  * - Automatically credits backend ad sessions so passive views count towards the daily "Watch 30 Ads" quest & 5-day withdrawal unlock!
@@ -26,6 +26,7 @@ export type AdTriggerReason =
   | 'claim_mining'
   | 'open_deposit'
   | 'chest_click'
+  | 'periodic'
   | 'manual';
 
 export interface TriggerAdOptions {
@@ -42,8 +43,8 @@ export interface TriggerAdResult {
 }
 
 const STORAGE_KEY_LAST_AD = 'supertom_last_auto_ad_time';
-const DEFAULT_COOLDOWN_MS = 50_000; // 50 seconds cooldown between automatic ads
-const APP_OPEN_MIN_INTERVAL_MS = 40_000; // Minimum 40s since last ad to show on app open
+const DEFAULT_COOLDOWN_MS = 180_000; // 3 minutes cooldown between automatic/random ads
+const APP_OPEN_MIN_INTERVAL_MS = 180_000; // Minimum 3 minutes since last ad to show on app open
 
 class AdManager {
   private isAdActive = false;
@@ -57,7 +58,9 @@ class AdManager {
   private initLastAdTimestamp() {
     if (typeof window !== 'undefined') {
       try {
-        const stored = window.sessionStorage?.getItem(STORAGE_KEY_LAST_AD);
+        const stored =
+          window.localStorage?.getItem(STORAGE_KEY_LAST_AD) ||
+          window.sessionStorage?.getItem(STORAGE_KEY_LAST_AD);
         if (stored) {
           const parsed = parseInt(stored, 10);
           if (!isNaN(parsed) && parsed > 0) {
@@ -74,6 +77,7 @@ class AdManager {
     this.lastAdTimestamp = ts;
     if (typeof window !== 'undefined') {
       try {
+        window.localStorage?.setItem(STORAGE_KEY_LAST_AD, String(ts));
         window.sessionStorage?.setItem(STORAGE_KEY_LAST_AD, String(ts));
       } catch {
         // Ignore storage exceptions
@@ -83,7 +87,7 @@ class AdManager {
 
   /**
    * Returns current active cooldown in milliseconds.
-   * Debug / test mode drops cooldown to 10s for rapid testing.
+   * Debug / test mode drops cooldown to 15s for rapid testing.
    */
   public getCooldownMs(): number {
     if (typeof window !== 'undefined') {
@@ -91,7 +95,7 @@ class AdManager {
         (import.meta as any).env?.VITE_ADS_DEBUG === 'true' ||
         new URLSearchParams(window.location.search).get('test_ads') === 'true' ||
         window.localStorage?.getItem('supertom_test_ads') === 'true';
-      if (isDebug) return 10_000;
+      if (isDebug) return 15_000;
     }
     return DEFAULT_COOLDOWN_MS;
   }
@@ -109,7 +113,7 @@ class AdManager {
 
     switch (reason) {
       case 'app_open':
-        // Show on app launch if no ad was shown in the last 40 seconds
+        // Show on app launch if no ad was shown in the last 3 minutes
         return this.lastAdTimestamp === 0 || elapsed >= APP_OPEN_MIN_INTERVAL_MS;
 
       case 'feed_tom':
@@ -125,6 +129,7 @@ class AdManager {
       case 'claim_mining':
       case 'open_deposit':
       case 'chest_click':
+      case 'periodic':
       default:
         return elapsed >= cooldown;
     }
@@ -221,6 +226,19 @@ class AdManager {
    */
   public triggerActionAd(action: 'feed_tom' | 'spin_wheel' | 'claim_mining' | 'open_deposit' | 'chest_click'): void {
     this.triggerAd(action, { silent: true }).catch(() => {});
+  }
+
+  /**
+   * Starts a background interval to gracefully trigger random ads once every 3 minutes.
+   */
+  public startPeriodicTimer(intervalMs = 180_000): () => void {
+    if (typeof window === 'undefined') return () => {};
+    const intervalId = window.setInterval(() => {
+      // Don't trigger if mini app is hidden / minimized in Telegram
+      if (typeof document !== 'undefined' && document.hidden) return;
+      this.triggerAd('periodic', { silent: true }).catch(() => {});
+    }, intervalMs);
+    return () => window.clearInterval(intervalId);
   }
 }
 
