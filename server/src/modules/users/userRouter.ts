@@ -6,4 +6,5 @@ export const userRouter = Router();
 
 userRouter.get('/me', requireAuth, UserController.getMe);
 userRouter.get('/balance', requireAuth, UserController.getBalance);
+userRouter.post('/language', requireAuth, UserController.updateLanguage);
 

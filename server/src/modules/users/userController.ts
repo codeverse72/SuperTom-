@@ -52,6 +52,7 @@ export class UserController {
         friendsInvited: user._count.referees,
         totalBiscuitsFed: user._count.feedingEvents,
         totalMissionsDone: user._count.userMissions,
+        languageCode: user.languageCode || 'en',
         createdAt: user.createdAt.toISOString(),
       });
     } catch {
@@ -102,6 +103,33 @@ export class UserController {
       });
     } catch {
       sendError(res, 'Failed to retrieve balance', 500, 'SERVER_ERROR');
+    }
+  }
+
+  /**
+   * POST /api/v1/user/language
+   * Updates user's preferred language (en, fa, ru, fr).
+   */
+  public static async updateLanguage(req: AuthenticatedRequest, res: Response): Promise<void> {
+    const userId = req.user?.userId;
+    if (!userId) {
+      sendError(res, 'Unauthorized', 401, 'UNAUTHORIZED');
+      return;
+    }
+
+    const { languageCode } = req.body as { languageCode?: string };
+    const clean = (languageCode || 'en').toLowerCase().trim();
+    const validLangs = ['en', 'fa', 'ru', 'fr'];
+    const chosen = validLangs.includes(clean) ? clean : 'en';
+
+    try {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { languageCode: chosen },
+      });
+      sendSuccess(res, { languageCode: chosen, message: 'Language preference updated successfully.' });
+    } catch {
+      sendError(res, 'Failed to update language', 500, 'SERVER_ERROR');
     }
   }
 }

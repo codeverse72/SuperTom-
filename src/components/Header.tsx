@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Volume2, VolumeX, X, HelpCircle, Bell, Sparkles, Headset } from 'lucide-react';
+import { Volume2, VolumeX, X, HelpCircle, Bell, Sparkles, Headset, Globe } from 'lucide-react';
 import { useGame } from '../context/GameContext';
+import { useI18n } from '../context/I18nContext';
 import { useTelegram } from '../hooks/useTelegram';
 import { formatNumber } from '../utils/probability';
 import { NavTab } from './BottomNavigation';
@@ -12,6 +13,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ activeTab = 'home' }) => {
   const { soundEnabled, toggleSound, balance, showToast } = useGame();
+  const { language, setLanguage, supportedLanguages, t } = useI18n();
   const { close: closeTelegram, isTelegram } = useTelegram();
   const [showMenu, setShowMenu] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
@@ -128,6 +130,37 @@ export const Header: React.FC<HeaderProps> = ({ activeTab = 'home' }) => {
                 >
                   {soundEnabled ? 'ON' : 'OFF'}
                 </button>
+              </div>
+
+              {/* Language Switcher Row */}
+              <div className="p-3 rounded-2xl bg-purple-950/40 border border-purple-500/20 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-indigo-400" />
+                  <span className="text-sm font-semibold text-white">{t('profile.language')}</span>
+                </div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {supportedLanguages.map((l) => {
+                    const isSelected = language === l.code;
+                    return (
+                      <button
+                        key={l.code}
+                        type="button"
+                        onClick={() => {
+                          setLanguage(l.code);
+                          showToast(t('profile.langSaved'), `${l.flag} ${l.nativeName}`, 'success');
+                        }}
+                        className={`py-1.5 px-1 rounded-xl text-xs font-bold transition-all border flex flex-col items-center justify-center cursor-pointer ${
+                          isSelected
+                            ? 'bg-purple-600 border-amber-400 text-white shadow-md'
+                            : 'bg-purple-900/40 border-purple-800/40 text-purple-200 hover:text-white'
+                        }`}
+                      >
+                        <span className="text-base">{l.flag}</span>
+                        <span className="text-[10px] mt-0.5 truncate max-w-full">{l.nativeName}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* 24/7 Official Customer Support */}

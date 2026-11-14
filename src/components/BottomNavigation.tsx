@@ -1,6 +1,7 @@
 import React from 'react';
 import { Home, Trophy, ShoppingBag, Wallet, User } from 'lucide-react';
 import { useGame } from '../context/GameContext';
+import { useI18n } from '../context/I18nContext';
 
 export type NavTab = 'home' | 'missions' | 'store' | 'payout' | 'profile';
 
@@ -11,15 +12,16 @@ interface BottomNavigationProps {
 
 export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, onTabChange }) => {
   const { isSpinReady, missions } = useGame();
+  const { t } = useI18n();
 
   const claimableMissionsCount = missions.filter(m => m.status === 'completed').length;
 
   const navItems: { id: NavTab; label: string; icon: React.ComponentType<{ className?: string }>; badge?: number | boolean }[] = [
-    { id: 'home', label: 'Home', icon: Home, badge: isSpinReady },
-    { id: 'missions', label: 'Missions', icon: Trophy, badge: claimableMissionsCount > 0 ? claimableMissionsCount : false },
-    { id: 'store', label: 'Store', icon: ShoppingBag },
-    { id: 'payout', label: 'Withdraw', icon: Wallet },
-    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'home', label: t('nav.home'), icon: Home, badge: isSpinReady },
+    { id: 'missions', label: t('nav.quests'), icon: Trophy, badge: claimableMissionsCount > 0 ? claimableMissionsCount : false },
+    { id: 'store', label: t('nav.store'), icon: ShoppingBag },
+    { id: 'payout', label: t('nav.payout'), icon: Wallet },
+    { id: 'profile', label: t('nav.profile'), icon: User },
   ];
 
   return (

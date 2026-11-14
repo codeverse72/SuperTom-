@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { I18nProvider } from './context/I18nContext';
 import { GameProvider } from './context/GameContext';
 import { Header } from './components/Header';
 import { BottomNavigation, NavTab } from './components/BottomNavigation';
@@ -83,8 +84,9 @@ export default function App() {
   };
 
   return (
-    <GameProvider>
-      <div className="min-h-screen bg-[#070114] text-white flex justify-center items-center sm:py-4 selection:bg-purple-600 selection:text-white">
+    <I18nProvider>
+      <GameProvider>
+        <div className="min-h-screen bg-[#070114] text-white flex justify-center items-center sm:py-4 selection:bg-purple-600 selection:text-white">
         {/* Mobile-first Telegram Mini App container with neon glowing border matching reference */}
         <div
           className="w-full max-w-[440px] min-h-screen sm:min-h-[920px] flex flex-col relative bg-gradient-to-b from-[#14052e] via-[#0c021d] to-[#070112] shadow-[0_0_50px_rgba(168,85,247,0.35)] sm:rounded-[36px] border sm:border-2 border-fuchsia-500/40 overflow-hidden"
@@ -124,6 +126,7 @@ export default function App() {
           />
         </div>
       </div>
-    </GameProvider>
+      </GameProvider>
+    </I18nProvider>
   );
 }

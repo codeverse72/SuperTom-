@@ -15,9 +15,11 @@ import {
   Trophy,
   Cookie,
   Headphones,
-  ExternalLink
+  ExternalLink,
+  Globe
 } from 'lucide-react';
 import { useGame } from '../context/GameContext';
+import { useI18n } from '../context/I18nContext';
 import { useTelegram } from '../hooks/useTelegram';
 import { generateReferralLink } from '../utils/telegram';
 import { formatNumber, poopsToUsdt } from '../utils/probability';
@@ -31,11 +33,12 @@ export const Profile: React.FC = () => {
     toggleSound, 
     showToast 
   } = useGame();
+  const { language, setLanguage, t, currentLanguageOption, supportedLanguages } = useI18n();
 
   const { shareLink, hapticSelection } = useTelegram();
 
   const [copiedLink, setCopiedLink] = useState(false);
-  const [activeModal, setActiveModal] = useState<'stats' | 'referral' | 'faq' | 'about' | null>(null);
+  const [activeModal, setActiveModal] = useState<'stats' | 'referral' | 'faq' | 'about' | 'language' | null>(null);
 
   const referralUrl = generateReferralLink(user?.referralCode || 'UNLINKED');
 
@@ -52,8 +55,8 @@ export const Profile: React.FC = () => {
     shareLink(referralUrl, 'Join me on SuperTom and start mining with King Tom! 👑🐱');
   };
 
-  const displayUsername = user?.username || 'Guest Player';
-  const displayLevel = user ? `Lvl ${user.level}` : 'Lvl --';
+  const displayUsername = user?.username || t('profile.guest');
+  const displayLevel = user ? `${t('header.level')} ${user.level}` : `${t('header.level')} --`;
   const displayPlayerId = user?.id || 'Unlinked';
   const displayRank = user?.levelTitle || 'Unauthenticated';
 
@@ -190,7 +193,33 @@ export const Profile: React.FC = () => {
           </button>
         </div>
 
-        {/* 4. 24/7 Live Customer Support */}
+        {/* 4. Language Selection Button */}
+        <button
+          onClick={() => setActiveModal('language')}
+          className="w-full p-3.5 rounded-2xl flex items-center justify-between hover:bg-purple-900/30 transition-all text-left cursor-pointer group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center text-indigo-300 group-hover:scale-105 transition-transform">
+              <Globe className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold text-white font-display">
+                  {t('profile.language')}
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 shrink-0">
+                  {currentLanguageOption.flag} {currentLanguageOption.nativeName}
+                </span>
+              </div>
+              <p className="text-[11px] text-purple-300/70">
+                {t('profile.languageSub')}
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-purple-400" />
+        </button>
+
+        {/* 5. 24/7 Live Customer Support */}
         <a
           href="https://t.me/SuperTomCare"
           target="_blank"
@@ -456,6 +485,73 @@ export const Profile: React.FC = () => {
             >
               Long Live The King
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Language Selection Modal */}
+      {activeModal === 'language' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-3xl bg-[#09041a] border border-purple-500/40 p-5 space-y-4 shadow-2xl relative">
+            <button
+              onClick={() => setActiveModal(null)}
+              className="absolute top-4 right-4 p-1.5 rounded-xl bg-purple-900/40 text-purple-300 hover:text-white cursor-pointer"
+            >
+              <span className="text-xs font-bold">✕</span>
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center text-indigo-300 text-lg">
+                🌐
+              </div>
+              <div>
+                <h3 className="text-base font-black text-white font-display">
+                  {t('profile.langModalTitle')}
+                </h3>
+                <p className="text-xs text-purple-300/70">
+                  {t('profile.langModalDesc')}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              {supportedLanguages.map((langOpt) => {
+                const isSelected = language === langOpt.code;
+                return (
+                  <button
+                    key={langOpt.code}
+                    onClick={() => {
+                      setLanguage(langOpt.code);
+                      showToast(t('profile.langSaved'), `${langOpt.flag} ${langOpt.nativeName}`, 'success');
+                      setActiveModal(null);
+                    }}
+                    className={`w-full p-3.5 rounded-2xl border flex items-center justify-between transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-purple-600/30 border-amber-400/80 shadow-[0_0_15px_rgba(234,179,8,0.25)]'
+                        : 'bg-purple-950/40 border-purple-900/50 hover:bg-purple-900/30 text-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{langOpt.flag}</span>
+                      <div className="text-left">
+                        <span className="text-sm font-bold text-white block">
+                          {langOpt.nativeName}
+                        </span>
+                        <span className="text-[11px] text-purple-300/70 font-mono">
+                          {langOpt.name}
+                        </span>
+                      </div>
+                    </div>
+
+                    {isSelected && (
+                      <div className="w-6 h-6 rounded-full bg-amber-400 text-purple-950 flex items-center justify-center shrink-0 shadow-md">
+                        <Check className="w-4 h-4 stroke-[3]" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

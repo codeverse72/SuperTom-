@@ -6,6 +6,122 @@ import { sendSuccess, sendError } from '../../utils/apiResponse.js';
 import { PayoutAutomationService } from '../payoutAutomation/payoutAutomationService.js';
 import { ReferralService } from '../referrals/referralService.js';
 
+export type BotLanguage = 'en' | 'fa' | 'ru' | 'fr';
+
+export interface BotTranslation {
+  langName: string;
+  flag: string;
+  langSwitchedAlert: string;
+  welcomeTitle: string;
+  welcomeBackHeading: string;
+  newWelcomeHeading: string;
+  miningActive: string;
+  feedTomIntro: string;
+  invitedBy: string;
+  whatYouCanDo: string;
+  featureFeed: string;
+  featureSpin: string;
+  featureMissions: string;
+  featurePayouts: string;
+  featureReferrals: string;
+  startMiningCta: string;
+  btnOpenApp: string;
+  btnPayoutChannel: string;
+  btnSupport: string;
+  btnChangeLang: string;
+}
+
+export const BOT_TRANSLATIONS: Record<BotLanguage, BotTranslation> = {
+  en: {
+    langName: 'English',
+    flag: '🇬🇧',
+    langSwitchedAlert: 'Language set to English! 🇬🇧',
+    welcomeTitle: '🐱 <b>WELCOME TO SUPERTOM!</b>',
+    welcomeBackHeading: '👋 Welcome back, <b>{name}</b>! 👑',
+    newWelcomeHeading: '👋 Welcome, <b>{name}</b>!',
+    miningActive: '🎉 <i>Your mining empire is active and generating rewards!</i>',
+    feedTomIntro: '💎 <b>Feed Tom with biscuits</b>, increase your mining rate, complete missions and collect rewards.',
+    invitedBy: '👑 <i>Invited by {referrer}! Your starter bonus is ready to claim.</i>',
+    whatYouCanDo: '<b>🚀 WHAT YOU CAN DO:</b>',
+    featureFeed: '🍪 <b>Feed Tom</b> — Increase your TomCoin production.',
+    featureSpin: '🎡 <b>Spin &amp; Earn</b> — Unlock exciting spin rewards.',
+    featureMissions: '🏆 <b>Missions</b> — Complete tasks and earn TomCoins.',
+    featurePayouts: '💰 <b>Payouts</b> — Request withdrawals according to the platform\'s rules.',
+    featureReferrals: '👥 <b>Referrals</b> — Invite friends and grow your rewards.',
+    startMiningCta: '👇 <b>Tap "Open SuperTom" below to start mining!</b>',
+    btnOpenApp: '🚀 Open SuperTom',
+    btnPayoutChannel: '💰 Payout Channel',
+    btnSupport: '🆘 Support',
+    btnChangeLang: '🌐 Change Language',
+  },
+  fa: {
+    langName: 'فارسی',
+    flag: '🇮🇷',
+    langSwitchedAlert: 'زبان با موفقیت به فارسی تغییر یافت! 🇮🇷',
+    welcomeTitle: '🐱 <b>به سوپرتام خوش آمدید!</b>',
+    welcomeBackHeading: '👋 خوش آمدید، <b>{name}</b> عزیز! 👑',
+    newWelcomeHeading: '👋 خوش آمدید، <b>{name}</b> عزیز!',
+    miningActive: '🎉 <i>امپراتوری استخراج شما فعال است و در حال تولید پاداش می‌باشد!</i>',
+    feedTomIntro: '💎 <b>به تام بیسکویت بدهید</b>، سرعت استخراج خود را افزایش دهید، ماموریت‌ها را تکمیل کنید و پاداش جمع‌آوری نمایید.',
+    invitedBy: '👑 <i>توسط {referrer} دعوت شده‌اید! پاداش اولیه شما آماده دریافت است.</i>',
+    whatYouCanDo: '<b>🚀 کارهایی که می‌توانید انجام دهید:</b>',
+    featureFeed: '🍪 <b>غذا دادن به تام</b> — افزایش تولید تام‌کوین.',
+    featureSpin: '🎡 <b>گردونه شانس</b> — برنده شدن جوایز هیجان‌انگیز روزانه.',
+    featureMissions: '🏆 <b>ماموریت‌ها</b> — انجام تسک‌ها و کسب تام‌کوین رایگان.',
+    featurePayouts: '💰 <b>برداشت و جوایز</b> — دریافت آنی ارز دیجیتال طبق قوانین پلتفرم.',
+    featureReferrals: '👥 <b>معرفی دوستان</b> — دعوت از دوستان و دریافت پاداش‌های شگفت‌انگیز.',
+    startMiningCta: '👇 <b>برای شروع استخراج، دکمه "ورود به سوپرتام" را در پایین لمس کنید!</b>',
+    btnOpenApp: '🚀 ورود به سوپرتام',
+    btnPayoutChannel: '💰 کانال پرداخت‌ها',
+    btnSupport: '🆘 پشتیبانی ۲۴/۷',
+    btnChangeLang: '🌐 تغییر زبان',
+  },
+  ru: {
+    langName: 'Русский',
+    flag: '🇷🇺',
+    langSwitchedAlert: 'Язык успешно изменен на русский! 🇷🇺',
+    welcomeTitle: '🐱 <b>ДОБРО ПОЖАЛОВАТЬ В SUPERTOM!</b>',
+    welcomeBackHeading: '👋 С возвращением, <b>{name}</b>! 👑',
+    newWelcomeHeading: '👋 Добро пожаловать, <b>{name}</b>!',
+    miningActive: '🎉 <i>Ваша империя майнинга активна и приносит награды!</i>',
+    feedTomIntro: '💎 <b>Кормите Тома печеньем</b>, увеличивайте скорость майнинга, выполняйте задания и собирайте награды.',
+    invitedBy: '👑 <i>Вас пригласил {referrer}! Приветственный бонус готов к получению.</i>',
+    whatYouCanDo: '<b>🚀 ЧТО ВЫ МОЖЕТЕ ДЕЛАТЬ:</b>',
+    featureFeed: '🍪 <b>Кормить Тома</b> — Увеличивайте добычу TomCoins.',
+    featureSpin: '🎡 <b>Колесо Фортуны</b> — Выигрывайте ежедневные ценные награды.',
+    featureMissions: '🏆 <b>Миссии</b> — Выполняйте задания и получайте TomCoins.',
+    featurePayouts: '💰 <b>Выплаты</b> — Запрашивайте вывод криптовалюты.',
+    featureReferrals: '👥 <b>Рефералы</b> — Приглашайте друзей и увеличивайте прибыль.',
+    startMiningCta: '👇 <b>Нажмите «Открыть SuperTom» ниже, чтобы начать майнинг!</b>',
+    btnOpenApp: '🚀 Открыть SuperTom',
+    btnPayoutChannel: '💰 Канал выплат',
+    btnSupport: '🆘 Поддержка',
+    btnChangeLang: '🌐 Сменить язык',
+  },
+  fr: {
+    langName: 'Français',
+    flag: '🇫🇷',
+    langSwitchedAlert: 'Langue définie sur le français ! 🇫🇷',
+    welcomeTitle: '🐱 <b>BIENVENUE SUR SUPERTOM !</b>',
+    welcomeBackHeading: '👋 Bon retour parmi nous, <b>{name}</b> ! 👑',
+    newWelcomeHeading: '👋 Bienvenue, <b>{name}</b> !',
+    miningActive: '🎉 <i>Votre empire de minage est actif et génère des récompenses !</i>',
+    feedTomIntro: '💎 <b>Nourrissez Tom avec des biscuits</b>, augmentez votre taux de minage, accomplissez des missions et récoltez des gains.',
+    invitedBy: '👑 <i>Invité par {referrer} ! Votre bonus de bienvenue est prêt.</i>',
+    whatYouCanDo: '<b>🚀 CE QUE VOUS POUVEZ FAIRE :</b>',
+    featureFeed: '🍪 <b>Nourrir Tom</b> — Boostez votre production de TomCoins.',
+    featureSpin: '🎡 <b>Roue de la Fortune</b> — Débloquez des récompenses exclusives.',
+    featureMissions: '🏆 <b>Missions</b> — Remplissez des objectifs et gagnez des TomCoins.',
+    featurePayouts: '💰 <b>Retraits</b> — Demandez des retraits en crypto.',
+    featureReferrals: '👥 <b>Parrainage</b> — Invitez vos amis et démultipliez vos gains.',
+    startMiningCta: '👇 <b>Appuyez sur « Ouvrir SuperTom » ci-dessous pour miner !</b>',
+    btnOpenApp: '🚀 Ouvrir SuperTom',
+    btnPayoutChannel: '💰 Canal des Retraits',
+    btnSupport: '🆘 Support 24/7',
+    btnChangeLang: '🌐 Changer de langue',
+  },
+};
+
 interface TelegramUser {
   id: number | bigint;
   is_bot?: boolean;
@@ -29,17 +145,28 @@ export class TelegramBotController {
   }
 
   /**
-   * Resolve destination URL for the SuperTom Mini App
+   * Resolve destination URL for the SuperTom Mini App with language parameter
    */
-  public static resolveMiniAppUrl(refCode?: string | null): string {
+  public static resolveMiniAppUrl(refCode?: string | null, lang: string = 'en'): string {
     const baseAppUrl = (env.FRONTEND_URL && env.FRONTEND_URL !== '*')
       ? env.FRONTEND_URL.split(',')[0].trim()
       : 'https://super-tom.vercel.app';
 
-    if (refCode && refCode.trim().length > 0) {
-      return `${baseAppUrl}?startapp=${encodeURIComponent(refCode.trim())}`;
+    try {
+      const url = new URL(baseAppUrl);
+      url.searchParams.set('lang', lang);
+      if (refCode && refCode.trim().length > 0) {
+        url.searchParams.set('startapp', refCode.trim());
+      }
+      return url.toString();
+    } catch {
+      const glue = baseAppUrl.includes('?') ? '&' : '?';
+      let full = `${baseAppUrl}${glue}lang=${encodeURIComponent(lang)}`;
+      if (refCode && refCode.trim().length > 0) {
+        full += `&startapp=${encodeURIComponent(refCode.trim())}`;
+      }
+      return full;
     }
-    return baseAppUrl;
   }
 
   /**
@@ -76,7 +203,115 @@ export class TelegramBotController {
   }
 
   /**
-   * Ensure Webhook is registered with Telegram API on server boot
+   * Builds the multilingual language selection prompt with inline buttons
+   */
+  public static renderLanguagePrompt(refCode?: string | null): {
+    text: string;
+    inlineKeyboard: any[][];
+  } {
+    const text = [
+      `🌐 <b>Choose Your Language / زبان خود را انتخاب کنید / Выберите язык / Choisissez votre langue</b>`,
+      ``,
+      `👋 Welcome to <b>SuperTom</b>! Please select the language in which you want to see the texts:`,
+      `لطفاً زبان مورد نظر خود را برای مشاهده پیام‌ها انتخاب کنید:`,
+      `Пожалуйста, выберите язык, на котором хотите читать сообщения:`,
+      `Veuillez choisir la langue dans laquelle vous souhaitez afficher les messages :`,
+    ].join('\n');
+
+    const refSuffix = refCode && refCode.trim().length > 0 ? `:${refCode.trim()}` : '';
+
+    const inlineKeyboard = [
+      [
+        { text: '🇬🇧 English', callback_data: `set_lang:en${refSuffix}` },
+        { text: '🇮🇷 فارسی', callback_data: `set_lang:fa${refSuffix}` },
+      ],
+      [
+        { text: '🇷🇺 Русский', callback_data: `set_lang:ru${refSuffix}` },
+        { text: '🇫🇷 Français', callback_data: `set_lang:fr${refSuffix}` },
+      ],
+    ];
+
+    return { text, inlineKeyboard };
+  }
+
+  /**
+   * Builds the translated welcome message and localized interactive buttons
+   */
+  public static async renderWelcomeMessage(
+    lang: BotLanguage,
+    params: {
+      firstName: string;
+      isReturningUser: boolean;
+      referrerName?: string | null;
+      refCode?: string | null;
+    }
+  ): Promise<{ text: string; inlineKeyboard: any[][] }> {
+    const t = BOT_TRANSLATIONS[lang] || BOT_TRANSLATIONS.en;
+    const name = this.escapeHtml(params.firstName || 'Miner');
+
+    const lines: string[] = [t.welcomeTitle, ''];
+
+    if (params.isReturningUser) {
+      lines.push(t.welcomeBackHeading.replace('{name}', name));
+      lines.push(t.miningActive);
+      lines.push('');
+      lines.push(t.feedTomIntro);
+    } else {
+      lines.push(t.newWelcomeHeading.replace('{name}', name));
+      lines.push(t.miningActive);
+      if (params.referrerName) {
+        lines.push('');
+        lines.push(t.invitedBy.replace('{referrer}', this.escapeHtml(params.referrerName)));
+      }
+      lines.push('');
+      lines.push(t.feedTomIntro);
+    }
+
+    lines.push('');
+    lines.push(t.whatYouCanDo);
+    lines.push('');
+    lines.push(t.featureFeed);
+    lines.push(t.featureSpin);
+    lines.push(t.featureMissions);
+    lines.push(t.featurePayouts);
+    lines.push(t.featureReferrals);
+    lines.push('');
+    lines.push(t.startMiningCta);
+
+    const miniAppUrl = this.resolveMiniAppUrl(params.refCode, lang);
+    const payoutChannelUrl = await this.resolvePayoutChannelUrl();
+    const supportUrl = this.resolveSupportUrl();
+
+    const inlineKeyboard = [
+      [
+        {
+          text: t.btnOpenApp,
+          web_app: { url: miniAppUrl },
+        },
+      ],
+      [
+        {
+          text: t.btnPayoutChannel,
+          url: payoutChannelUrl,
+        },
+        {
+          text: t.btnSupport,
+          url: supportUrl,
+        },
+      ],
+      [
+        {
+          text: t.btnChangeLang,
+          callback_data: 'prompt_lang',
+        },
+      ],
+    ];
+
+    return { text: lines.join('\n'), inlineKeyboard };
+  }
+
+  /**
+   * Ensure Webhook and Bot Commands are registered with Telegram API on server boot
    */
   public static async ensureWebhookRegistered(): Promise<void> {
     const token = env.TELEGRAM_BOT_TOKEN;
@@ -87,28 +322,34 @@ export class TelegramBotController {
       const infoRes = await fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`);
       const infoData: any = await infoRes.json();
 
-      if (infoData.ok && infoData.result?.url === webhookUrl) {
+      if (!infoData.ok || infoData.result?.url !== webhookUrl) {
+        logger.info(`[TelegramBot] Registering Telegram webhook: ${webhookUrl}...`);
+        await fetch(
+          `https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(webhookUrl)}&drop_pending_updates=false`
+        );
+      } else {
         logger.info(`[TelegramBot] Webhook verified and active: ${webhookUrl}`);
-        return;
       }
 
-      logger.info(`[TelegramBot] Registering Telegram webhook: ${webhookUrl}...`);
-      const setRes = await fetch(
-        `https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(webhookUrl)}&drop_pending_updates=false`
-      );
-      const setData: any = await setRes.json();
-      if (setData.ok) {
-        logger.info(`[TelegramBot] Webhook successfully set to ${webhookUrl}`);
-      } else {
-        logger.warn(`[TelegramBot] setWebhook returned:`, setData);
-      }
+      // Register standard bot commands menu in Telegram
+      await fetch(`https://api.telegram.org/bot${token}/setMyCommands`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          commands: [
+            { command: 'start', description: 'Start SuperTom & choose language' },
+            { command: 'language', description: 'Change language (English, فارسی, Русский, Français)' },
+            { command: 'help', description: 'Support & payout instructions' },
+          ],
+        }),
+      }).catch((cmdErr) => logger.warn('[TelegramBot] setMyCommands failed:', cmdErr));
     } catch (err) {
       logger.error(`[TelegramBot] Failed to verify/register webhook on startup:`, err);
     }
   }
 
   /**
-   * Core Handler: Responds to Telegram /start command with dynamic user info & inline buttons
+   * Core Handler: Responds to Telegram /start command by presenting the Language Selection prompt
    */
   public static async handleStartCommand(params: {
     chatId: number | string;
@@ -121,25 +362,18 @@ export class TelegramBotController {
     }
 
     const fromId = BigInt(params.from.id);
-    const firstName = this.escapeHtml(params.from.first_name || 'Miner');
     const chatId = params.chatId.toString();
 
     // 1. Extract optional referral code from "/start <refCode>"
     const parts = params.text.trim().split(/\s+/);
     const rawRefCode = parts.length > 1 ? parts[1].trim().toUpperCase() : null;
 
-    let validReferralCode: string | null = null;
-    let referrerName: string | null = null;
-
-    // 2. Check if user already exists in Supabase
+    // 2. Ensure user record exists in Supabase
     let user = await prisma.user.findUnique({
       where: { telegramId: fromId },
       include: { miningSettlement: true, spinState: true },
     });
 
-    const isReturningUser = !!user;
-
-    // If new user, create user record in Supabase immediately upon clicking Start
     if (!user) {
       const referralCode = `TOM${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
       user = await prisma.user.create({
@@ -157,7 +391,7 @@ export class TelegramBotController {
         include: { miningSettlement: true, spinState: true },
       });
 
-      // Initialize default mining engine for new player (10 Poops/hr base)
+      // Initialize default mining engine for new player
       await prisma.miningSettlement.create({
         data: {
           userId: user.id,
@@ -169,7 +403,7 @@ export class TelegramBotController {
         },
       });
 
-      // Initialize progressive lucky spin state (starts at milestone 1, 2-hour cooldown)
+      // Initialize progressive lucky spin state
       await prisma.spinState.create({
         data: {
           userId: user.id,
@@ -183,119 +417,16 @@ export class TelegramBotController {
       logger.info(`[TelegramBot] New user registered via Telegram /start: ID ${user.id}, TG ${fromId}`);
     }
 
-    // 3. Referral handling: immediately credit Referrer when referent opens the bot
-    if (rawRefCode && !user.referredById) {
-      try {
-        const referrer = await prisma.user.findUnique({
-          where: { referralCode: rawRefCode },
-          select: { id: true, telegramId: true, username: true, firstName: true },
-        });
+    // 3. Render and deliver the multilingual Language Selection prompt
+    const { text, inlineKeyboard } = this.renderLanguagePrompt(rawRefCode);
 
-        if (referrer && referrer.telegramId !== fromId) {
-          validReferralCode = rawRefCode;
-          referrerName = referrer.firstName || (referrer.username ? `@${referrer.username}` : 'a fellow feline miner');
-
-          // Immediately credit Referrer with configured referral bonus (default +450 Poops) and update in Supabase!
-          await ReferralService.attributeAndCreditReferral({
-            referrerId: referrer.id,
-            refereeId: user.id,
-            refereeName: params.from.first_name || (params.from.username ? `@${params.from.username}` : `Miner ${fromId}`),
-            refereeTelegramId: fromId,
-          });
-
-          logger.info(`[TelegramBot] Referrer ${referrer.id} immediately credited +${env.REFERRAL_SIGNUP_BONUS_POOPS} Poops for referee ${user.id} opening bot via /start!`);
-        }
-      } catch (refErr) {
-        logger.warn('[TelegramBot] Referral lookup failed:', refErr);
-      }
-    }
-
-    // 4. Update profile details for existing users if changed on Telegram (without resetting balances/progress)
-    if (isReturningUser && user) {
-      try {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            username: params.from.username || user.username,
-            firstName: params.from.first_name || user.firstName,
-            lastName: params.from.last_name || user.lastName,
-          },
-        });
-      } catch {
-        // Non-blocking profile update
-      }
-    }
-
-    // 5. Build dynamic personalized welcome message with Telegram HTML formatting
-    const welcomeHtmlLines: string[] = [
-      `🐱 <b>WELCOME TO SUPERTOM!</b>`,
-      ``,
-    ];
-
-    if (isReturningUser) {
-      welcomeHtmlLines.push(`👋 Welcome back, <b>${firstName}</b>! 👑`);
-      welcomeHtmlLines.push(`🎉 <i>Your mining empire is active and generating rewards!</i>`);
-      welcomeHtmlLines.push(``);
-      welcomeHtmlLines.push(`💎 <b>Feed Tom with biscuits</b>, increase your mining rate, complete missions and collect rewards.`);
-    } else {
-      welcomeHtmlLines.push(`👋 Welcome, <b>${firstName}</b>!`);
-      welcomeHtmlLines.push(`🎉 <i>Your journey to earning TomCoins ($TOM) starts here!</i>`);
-      if (validReferralCode && referrerName) {
-        welcomeHtmlLines.push(``);
-        welcomeHtmlLines.push(`👑 <i>Invited by ${this.escapeHtml(referrerName)}! Your starter bonus is ready to claim.</i>`);
-      }
-      welcomeHtmlLines.push(``);
-      welcomeHtmlLines.push(`💎 <b>Feed Tom with biscuits</b>, increase your mining rate, complete missions and collect rewards.`);
-    }
-
-    welcomeHtmlLines.push(``);
-    welcomeHtmlLines.push(`<b>🚀 WHAT YOU CAN DO:</b>`);
-    welcomeHtmlLines.push(``);
-    welcomeHtmlLines.push(`🍪 <b>Feed Tom</b> — Increase your TomCoin production.`);
-    welcomeHtmlLines.push(`🎡 <b>Spin &amp; Earn</b> — Unlock exciting spin rewards.`);
-    welcomeHtmlLines.push(`🏆 <b>Missions</b> — Complete tasks and earn TomCoins.`);
-    welcomeHtmlLines.push(`💰 <b>Payouts</b> — Request withdrawals according to the platform's rules.`);
-    welcomeHtmlLines.push(`👥 <b>Referrals</b> — Invite friends and grow your rewards.`);
-    welcomeHtmlLines.push(``);
-    welcomeHtmlLines.push(isReturningUser
-      ? `👇 <b>Tap "Open SuperTom" below to resume mining!</b>`
-      : `👇 <b>Tap "Open SuperTom" below to start mining!</b>`
-    );
-
-    const messageText = welcomeHtmlLines.join('\n');
-
-    // 6. Build interactive inline buttons (Row 1: Mini App, Row 2: Payout Channel + Support)
-    const miniAppUrl = this.resolveMiniAppUrl(validReferralCode);
-    const payoutChannelUrl = await this.resolvePayoutChannelUrl();
-    const supportUrl = this.resolveSupportUrl();
-
-    const inlineKeyboard = [
-      [
-        {
-          text: '🚀 Open SuperTom',
-          web_app: { url: miniAppUrl },
-        },
-      ],
-      [
-        {
-          text: '💰 Payout Channel',
-          url: payoutChannelUrl,
-        },
-        {
-          text: '🆘 Support',
-          url: supportUrl,
-        },
-      ],
-    ];
-
-    // 7. Dispatch message via Telegram Bot API
     try {
       const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_id: chatId,
-          text: messageText,
+          text,
           parse_mode: 'HTML',
           disable_web_page_preview: true,
           reply_markup: {
@@ -305,44 +436,208 @@ export class TelegramBotController {
       });
 
       const data: any = await res.json();
-
       if (!data.ok) {
-        // Fallback: Retry with plain text stripped of HTML tags
-        logger.warn('[TelegramBot] HTML sendMessage failed, retrying plain text:', data.description);
-        const fallbackRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: chatId,
-            text: messageText.replace(/<[^>]+>/g, ''),
-            disable_web_page_preview: true,
-            reply_markup: {
-              inline_keyboard: inlineKeyboard,
-            },
-          }),
-        });
-        const fallbackData: any = await fallbackRes.json();
-        if (!fallbackData.ok) {
-          logger.error('[TelegramBot] Fallback sendMessage also failed:', fallbackData);
-          return { ok: false, error: fallbackData.description || 'Failed to deliver message' };
-        }
-        return { ok: true, messageId: fallbackData.result?.message_id };
+        logger.error('[TelegramBot] Failed to send language prompt:', data);
+        return { ok: false, error: data.description };
       }
 
-      logger.info(`[TelegramBot] Sent welcome message to TG user ${fromId} (${firstName})`);
       return { ok: true, messageId: data.result?.message_id };
     } catch (err: unknown) {
-      logger.error('[TelegramBot] Network error delivering welcome message:', err);
+      logger.error('[TelegramBot] Network error delivering language prompt:', err);
       return { ok: false, error: err instanceof Error ? err.message : 'Network error' };
     }
   }
 
   /**
+   * Responds to /language or /lang command by re-prompting language selection
+   */
+  public static async handleLanguageCommand(params: {
+    chatId: number | string;
+    from: TelegramUser;
+  }): Promise<void> {
+    const token = env.TELEGRAM_BOT_TOKEN;
+    if (!token || token === 'TEST_BOT_TOKEN_PLACEHOLDER') return;
+
+    const { text, inlineKeyboard } = this.renderLanguagePrompt();
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: params.chatId.toString(),
+        text,
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+        reply_markup: {
+          inline_keyboard: inlineKeyboard,
+        },
+      }),
+    }).catch((e) => logger.error('[TelegramBot] handleLanguageCommand error:', e));
+  }
+
+  /**
+   * Handles interactive button clicks (callback queries for language selection)
+   */
+  public static async handleCallbackQuery(query: any): Promise<void> {
+    const token = env.TELEGRAM_BOT_TOKEN;
+    if (!token || token === 'TEST_BOT_TOKEN_PLACEHOLDER') return;
+
+    const queryId = query.id;
+    const data: string = query.data || '';
+    const chatId = query.message?.chat?.id;
+    const messageId = query.message?.message_id;
+    const from: TelegramUser = query.from;
+
+    if (!chatId || !from) return;
+
+    const fromId = BigInt(from.id);
+
+    // 1. User clicked "🌐 Change Language"
+    if (data === 'prompt_lang') {
+      await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ callback_query_id: queryId }),
+      }).catch(() => {});
+
+      const { text, inlineKeyboard } = this.renderLanguagePrompt();
+
+      if (messageId) {
+        await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            message_id: messageId,
+            text,
+            parse_mode: 'HTML',
+            disable_web_page_preview: true,
+            reply_markup: { inline_keyboard: inlineKeyboard },
+          }),
+        }).catch(async () => {
+          await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text,
+              parse_mode: 'HTML',
+              disable_web_page_preview: true,
+              reply_markup: { inline_keyboard: inlineKeyboard },
+            }),
+          });
+        });
+      }
+      return;
+    }
+
+    // 2. User selected a language: "set_lang:<lang>[:<refCode>]"
+    if (data.startsWith('set_lang:')) {
+      const parts = data.split(':');
+      const chosenLangRaw = parts[1] || 'en';
+      const refCode = parts[2] ? parts[2].trim().toUpperCase() : null;
+
+      const validLangs: BotLanguage[] = ['en', 'fa', 'ru', 'fr'];
+      const chosenLang: BotLanguage = validLangs.includes(chosenLangRaw as BotLanguage)
+        ? (chosenLangRaw as BotLanguage)
+        : 'en';
+
+      const t = BOT_TRANSLATIONS[chosenLang];
+
+      // Acknowledge Telegram callback immediately
+      await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          callback_query_id: queryId,
+          text: t.langSwitchedAlert,
+        }),
+      }).catch(() => {});
+
+      // Save user language in Supabase
+      let user = await prisma.user.findUnique({
+        where: { telegramId: fromId },
+      });
+
+      if (user) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { languageCode: chosenLang },
+        }).catch((e) => logger.warn('[TelegramBot] Failed to update languageCode:', e));
+      }
+
+      let referrerName: string | null = null;
+
+      // Handle referral if passed in callback and user not referred yet
+      if (refCode && user && !user.referredById) {
+        try {
+          const referrer = await prisma.user.findUnique({
+            where: { referralCode: refCode },
+            select: { id: true, telegramId: true, username: true, firstName: true },
+          });
+
+          if (referrer && referrer.telegramId !== fromId) {
+            referrerName = referrer.firstName || (referrer.username ? `@${referrer.username}` : 'a fellow feline miner');
+            await ReferralService.attributeAndCreditReferral({
+              referrerId: referrer.id,
+              refereeId: user.id,
+              refereeName: from.first_name || (from.username ? `@${from.username}` : `Miner ${fromId}`),
+              refereeTelegramId: fromId,
+            });
+            logger.info(`[TelegramBot] Referral credited: ${referrer.id} invited ${user.id}`);
+          }
+        } catch (refErr) {
+          logger.warn('[TelegramBot] Referral attribution error:', refErr);
+        }
+      }
+
+      // Build translated welcome message
+      const welcome = await this.renderWelcomeMessage(chosenLang, {
+        firstName: from.first_name || 'Miner',
+        isReturningUser: !!user,
+        referrerName,
+        refCode,
+      });
+
+      // Edit the existing message or send a fresh one
+      if (messageId) {
+        const editRes = await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            message_id: messageId,
+            text: welcome.text,
+            parse_mode: 'HTML',
+            disable_web_page_preview: true,
+            reply_markup: { inline_keyboard: welcome.inlineKeyboard },
+          }),
+        });
+
+        const editData: any = await editRes.json();
+        if (!editData.ok) {
+          // Fallback to sending new message if edit fails
+          await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: welcome.text,
+              parse_mode: 'HTML',
+              disable_web_page_preview: true,
+              reply_markup: { inline_keyboard: welcome.inlineKeyboard },
+            }),
+          });
+        }
+      }
+    }
+  }
+
+  /**
    * POST /api/v1/bot/webhook
-   * Receives incoming Telegram webhook updates (/start commands, channel posts, etc.)
+   * Receives incoming Telegram webhook updates (/start commands, callback queries, channel posts)
    */
   public static async handleWebhook(req: Request, res: Response): Promise<void> {
-    // Acknowledge Telegram immediately to prevent timeout retries
+    // Acknowledge Telegram immediately
     res.status(200).json({ ok: true });
 
     try {
@@ -387,7 +682,14 @@ export class TelegramBotController {
         }
       }
 
-      // 2. Handle Direct Player Messages (/start, commands)
+      // 2. Handle Interactive Button Clicks (Callback Queries)
+      const callbackQuery = req.body?.callback_query;
+      if (callbackQuery && callbackQuery.data && callbackQuery.from) {
+        await TelegramBotController.handleCallbackQuery(callbackQuery);
+        return;
+      }
+
+      // 3. Handle Direct Player Messages (/start, /language, /help)
       const message = req.body?.message;
       if (!message || !message.text || !message.chat?.id || !message.from?.id) {
         return;
@@ -401,6 +703,18 @@ export class TelegramBotController {
           chatId: message.chat.id,
           from: message.from,
           text,
+        });
+      } else if (
+        text.startsWith('/language') ||
+        text.startsWith('/lang') ||
+        text === '🌐 Change Language' ||
+        text === '🌐 تغییر زبان' ||
+        text === '🌐 Сменить язык' ||
+        text === '🌐 Changer de langue'
+      ) {
+        await TelegramBotController.handleLanguageCommand({
+          chatId: message.chat.id,
+          from: message.from,
         });
       }
     } catch (err) {
