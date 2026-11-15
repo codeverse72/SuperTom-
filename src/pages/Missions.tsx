@@ -64,8 +64,8 @@ export const Missions: React.FC<MissionsProps> = ({ onNavigateToDeposit }) => {
   const [adButtonState, setAdButtonState] = useState<AdLifecycleState>('READY');
   const [adStatusMessage, setAdStatusMessage] = useState<string | null>(null);
 
-  // 15 seconds cooldown gap between quest ads
-  const QUEST_AD_COOLDOWN_SECONDS = 15;
+  // 8 seconds cooldown gap between quest ads
+  const QUEST_AD_COOLDOWN_SECONDS = 8;
   const [adCooldownSeconds, setAdCooldownSeconds] = useState<number>(0);
 
   useEffect(() => {

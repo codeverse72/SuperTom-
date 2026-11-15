@@ -16,7 +16,7 @@ export const ADEXIUM_PLACEMENT_ID = process.env.ADEXIUM_PLACEMENT_ID || 'dd81f1e
 export const DEFAULT_ADSGRAM_BLOCK_ID = process.env.ADSGRAM_BLOCK_ID || '59392';
 export const AD_SESSION_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 export const MIN_VIEW_DURATION_MS = 4000; // Minimum 4 seconds playback before completion
-export const AD_SESSION_COOLDOWN_MS = 15_000; // 15 seconds gap between ad sessions
+export const AD_SESSION_COOLDOWN_MS = 7_500; // 7.5 seconds gap between ad sessions (matches 8s client countdown)
 
 export class AdController {
   /**
@@ -66,7 +66,7 @@ export class AdController {
       const now = new Date();
       const startOfToday = getUtcDayStart(now);
 
-      // Enforce 15-second gap between consecutive completed advertisements
+      // Enforce 7.5-second gap between consecutive completed advertisements (matching 8s client countdown)
       const lastCompletedSession = await prisma.adSession.findFirst({
         where: {
           userId,
@@ -88,19 +88,27 @@ export class AdController {
         return;
       }
 
-      // Rate limit / cooldown check: prevent spamming session creation
-      const recentSession = await prisma.adSession.findFirst({
+      // Invalidate any previous unfulfilled PENDING sessions for this user to allow seamless provider fallback
+      await prisma.adSession.updateMany({
         where: {
           userId,
-          createdAt: { gte: new Date(now.getTime() - 8000) },
+          status: 'PENDING',
         },
-        orderBy: { createdAt: 'desc' },
+        data: { status: 'FAILED' },
       });
 
-      if (recentSession) {
+      // Flood protection: max 6 creations within 10s (allows normal 1-retry fallback while preventing DDoS/spam)
+      const recentSessionCount = await prisma.adSession.count({
+        where: {
+          userId,
+          createdAt: { gte: new Date(now.getTime() - 10_000) },
+        },
+      });
+
+      if (recentSessionCount >= 6) {
         sendError(
           res,
-          'Please finish watching the current advertisement before starting a new one.',
+          'Too many ad requests. Please wait a moment before trying again.',
           429,
           'AD_SESSION_COOLDOWN'
         );

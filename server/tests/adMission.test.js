@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 const WATCH_ADS_MISSION_ID = 'm7_watch_30_ads';
 const WATCH_ADS_DAILY_TARGET = 12;
 const WATCH_ADS_REWARD_POOPS = 500n;
-const WATCH_ADS_COOLDOWN_MS = 15_000;
+const WATCH_ADS_COOLDOWN_MS = 7_500;
 
 function getUtcDayStart(date) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
@@ -111,19 +111,19 @@ describe('Daily Watch 12 Ads Quest (m7_watch_30_ads)', () => {
     );
   });
 
-  test('Enforces 15s cooldown between consecutive same-day ad completions', () => {
+  test('Enforces 8s cooldown between consecutive same-day ad completions', () => {
     const t0 = new Date('2026-11-12T12:00:00Z');
     const existing = { status: 'IN_PROGRESS', progress: 4, claimedAt: null, updatedAt: t0 };
 
     const tooFast = evaluateWatchAdsProgress({
       existing,
-      now: new Date(t0.getTime() + 5_000),
+      now: new Date(t0.getTime() + 4_000),
     });
     assert.equal(tooFast.errorCode, 'AD_WATCH_COOLDOWN');
 
     const afterCooldown = evaluateWatchAdsProgress({
       existing,
-      now: new Date(t0.getTime() + 16_000),
+      now: new Date(t0.getTime() + 8_500),
     });
     assert.equal(afterCooldown.progress, 5);
     assert.equal(afterCooldown.status, 'IN_PROGRESS');

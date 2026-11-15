@@ -9,7 +9,7 @@ import { MissionCategory } from '@prisma/client';
 export const WATCH_ADS_MISSION_ID = 'm7_watch_30_ads';
 export const WATCH_ADS_DAILY_TARGET = 12;
 export const WATCH_ADS_REWARD_POOPS = 500n;
-export const WATCH_ADS_COOLDOWN_MS = 15_000;
+export const WATCH_ADS_COOLDOWN_MS = 7_500;
 
 export const CONNECT_WALLET_MISSION_ID = 'm8_connect_wallet';
 export const CONNECT_WALLET_REWARD_POOPS = 500n;

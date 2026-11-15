@@ -75,7 +75,8 @@ export interface AdSessionResult {
 
 export const DEFAULT_ADSGRAM_BLOCK_ID = '59392';
 export const DEFAULT_ADEXIUM_WID = 'dd81f1ec-401b-498c-a2f3-0a4bb0032b59';
-const AD_REQUEST_TIMEOUT_MS = 45_000;
+const AD_LOAD_TIMEOUT_MS = 8_000; // 8s load timeout before triggering fallback
+const AD_PLAYBACK_TIMEOUT_MS = 90_000; // 90s max playback safety
 const MAX_TELEGRAM_AUTH_AGE_SECONDS = 900; // 15 minutes max age
 
 let currentActiveSession: Promise<AdSessionResult> | null = null;
@@ -230,9 +231,12 @@ async function runAdexiumSession(
     let settled = false;
     let adDisplayed = false;
     let displayStartTime = 0;
+    let loadTimeoutId: number | undefined;
+    let playbackTimeoutId: number | undefined;
 
     const cleanupListeners = () => {
-      clearTimeout(timeoutId);
+      if (loadTimeoutId) window.clearTimeout(loadTimeoutId);
+      if (playbackTimeoutId) window.clearTimeout(playbackTimeoutId);
       widget!.off('adReceived', handleAdReceived);
       widget!.off('adDisplayed', handleAdDisplayed);
       widget!.off('adPlaybackCompleted', handleAdCompleted);
@@ -249,7 +253,7 @@ async function runAdexiumSession(
       resolve(result);
     };
 
-    const timeoutId = window.setTimeout(() => {
+    loadTimeoutId = window.setTimeout(() => {
       finish({
         completed: false,
         state: 'FAILED',
@@ -257,7 +261,7 @@ async function runAdexiumSession(
         message: 'Adexium advertisement request timed out.',
         canFallback: true,
       });
-    }, AD_REQUEST_TIMEOUT_MS);
+    }, AD_LOAD_TIMEOUT_MS);
 
     const handleAdReceived = (ad: unknown, format?: string) => {
       try {
@@ -277,6 +281,21 @@ async function runAdexiumSession(
     const handleAdDisplayed = () => {
       adDisplayed = true;
       displayStartTime = Date.now();
+      if (loadTimeoutId) {
+        window.clearTimeout(loadTimeoutId);
+        loadTimeoutId = undefined;
+      }
+      // Safety timeout for playback
+      playbackTimeoutId = window.setTimeout(() => {
+        finish({
+          completed: false,
+          state: 'FAILED',
+          provider: 'adexium',
+          message: 'Advertisement playback timed out.',
+          canFallback: false,
+        });
+      }, AD_PLAYBACK_TIMEOUT_MS);
+
       onStateChange?.('AD_RUNNING', 'Advertisement in progress...');
     };
 
@@ -367,10 +386,25 @@ async function runAdexiumSession(
 
     try {
       if (typeof widget!.requestAd === 'function') {
-        widget!.requestAd('interstitial', false).catch((err) => {
-          console.warn('[Adexium] requestAd rejected:', err);
-          handleRequestError();
-        });
+        widget!
+          .requestAd('interstitial', false)
+          .then((ads) => {
+            if (ads && (!Array.isArray(ads) || ads.length > 0)) {
+              if (!adDisplayed) {
+                try {
+                  widget!.displayAd(ads, 'interstitial');
+                } catch (e) {
+                  console.warn('[Adexium] displayAd from promise error:', e);
+                }
+              }
+            } else {
+              handleNoAdFound();
+            }
+          })
+          .catch((err) => {
+            console.warn('[Adexium] requestAd rejected:', err);
+            handleRequestError();
+          });
       } else if (typeof widget!.requestRewardedAd === 'function') {
         widget!.requestRewardedAd('interstitial');
       } else {
@@ -545,9 +579,8 @@ export async function runServerVerifiedAdSession(
       };
     }
 
-    // 2. Parallel Provider Selection: Alternate between Adexium and Adsgram
-    const primaryProvider: 'adsgram' | 'adexium' =
-      preferredProvider || (lastServedProvider === 'adexium' ? 'adsgram' : 'adexium');
+    // 2. Strict Waterfall Mediation: Adexium 1st priority; fall back to Adsgram only when Adexium exhausts/errors
+    const primaryProvider: 'adsgram' | 'adexium' = preferredProvider || 'adexium';
     const fallbackProvider: 'adsgram' | 'adexium' =
       primaryProvider === 'adexium' ? 'adsgram' : 'adexium';
 
@@ -562,9 +595,9 @@ export async function runServerVerifiedAdSession(
       return primaryResult;
     }
 
-    // 3. Parallel Failover: If primary has no fill/error, try alternate provider
+    // 3. Failover: When Adexium has no inventory or fails, immediately try Adsgram
     if (primaryResult.canFallback) {
-      console.info(`[Ads] Parallel mediation: ${primaryProvider} unavailable/unfilled, switching to ${fallbackProvider}...`);
+      console.info(`[Ads] Waterfall mediation: ${primaryProvider} unavailable/unfilled, switching to ${fallbackProvider}...`);
       onStateChange?.('LOADING_AD', `Connecting to ${fallbackProvider === 'adexium' ? 'Adexium' : 'Adsgram'}...`);
 
       const fallbackResult = fallbackProvider === 'adexium'
