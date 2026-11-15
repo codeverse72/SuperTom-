@@ -7,8 +7,8 @@
  * - In-Game Actions (feeding King Tom, claiming mining income, lucky wheel spins, opening deposit)
  * - Direct "Watch & Earn" triggers (Missions tab, Profile menu)
  *
- * Enforces intelligent frequency capping ("random ads occur once in 3 minutes"):
- * - Smart cooldown: 3 minutes (180,000 ms) minimum between automatic/random interstitial impressions
+ * Enforces intelligent frequency capping ("random ads occur once in 1 minute"):
+ * - Smart cooldown: 1 minute (60,000 ms) minimum between automatic/random interstitial impressions
  * - Action-based throttle for high-frequency actions (feeding / petting)
  * - Persistent throttle timestamp in localStorage and sessionStorage to respect navigation & quick reloads
  * - Parallel dual ad serving: Adexium (dd81f1ec-401b-498c-a2f3-0a4bb0032b59) + Adsgram (59392) with cross-network failover
@@ -43,8 +43,8 @@ export interface TriggerAdResult {
 }
 
 const STORAGE_KEY_LAST_AD = 'supertom_last_auto_ad_time';
-const DEFAULT_COOLDOWN_MS = 180_000; // 3 minutes cooldown between automatic/random ads
-const APP_OPEN_MIN_INTERVAL_MS = 180_000; // Minimum 3 minutes since last ad to show on app open
+const DEFAULT_COOLDOWN_MS = 60_000; // 1 minute cooldown between automatic/random ads
+const APP_OPEN_MIN_INTERVAL_MS = 60_000; // Minimum 1 minute since last ad to show on app open
 
 class AdManager {
   private isAdActive = false;
@@ -229,9 +229,9 @@ class AdManager {
   }
 
   /**
-   * Starts a background interval to gracefully trigger random ads once every 3 minutes.
+   * Starts a background interval to gracefully trigger random ads once every 1 minute.
    */
-  public startPeriodicTimer(intervalMs = 180_000): () => void {
+  public startPeriodicTimer(intervalMs = 60_000): () => void {
     if (typeof window === 'undefined') return () => {};
     const intervalId = window.setInterval(() => {
       // Don't trigger if mini app is hidden / minimized in Telegram

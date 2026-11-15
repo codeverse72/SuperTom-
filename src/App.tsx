@@ -61,11 +61,11 @@ export default function App() {
   const { showBack, hideBack, hapticSelection } = useTelegram();
 
   // Trigger polite auto-ad on app startup / opening with a short delay so King Tom renders first,
-  // respecting the 3-minute minimum cooldown. Also run periodic interval every 3 minutes while playing.
+  // respecting the 1-minute minimum cooldown. Also run periodic interval every 1 minute while playing.
   useEffect(() => {
     if (isAdminRoute) return;
     adManager.triggerAppOpenAd(2000);
-    const cleanupPeriodic = adManager.startPeriodicTimer(180_000);
+    const cleanupPeriodic = adManager.startPeriodicTimer(60_000);
     return () => cleanupPeriodic();
   }, [isAdminRoute]);
 

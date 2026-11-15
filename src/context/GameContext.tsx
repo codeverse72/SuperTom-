@@ -730,11 +730,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (missionId === 'm7_watch_30_ads') {
         if (res.data.verified) {
-          showToast('Quest Complete!', 'All 30 ads watched today! Claim your 500 TomCoins reward.', 'reward');
+          showToast('Quest Complete!', 'All 12 ads watched today! Claim your 500 TomCoins reward.', 'reward');
         } else {
           showToast(
             'Ad Watched!',
-            `Progress: ${serverMission?.progress ?? 0}/${serverMission?.total ?? 30} ads today`,
+            `Progress: ${serverMission?.progress ?? 0}/${serverMission?.total ?? 12} ads today`,
             'success'
           );
         }

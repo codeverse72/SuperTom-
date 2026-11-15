@@ -7,9 +7,9 @@ import { env } from '../../config/env.js';
 import { MissionCategory } from '@prisma/client';
 
 export const WATCH_ADS_MISSION_ID = 'm7_watch_30_ads';
-export const WATCH_ADS_DAILY_TARGET = 30;
+export const WATCH_ADS_DAILY_TARGET = 12;
 export const WATCH_ADS_REWARD_POOPS = 500n;
-export const WATCH_ADS_COOLDOWN_MS = 10_000;
+export const WATCH_ADS_COOLDOWN_MS = 15_000;
 
 export const CONNECT_WALLET_MISSION_ID = 'm8_connect_wallet';
 export const CONNECT_WALLET_REWARD_POOPS = 500n;
@@ -20,11 +20,11 @@ export function getUtcDayStart(date: Date = new Date()): Date {
 
 // Default standard missions matching frontend initial catalog
 export const SEED_MISSIONS = [
-  // 1. TOP MISSION: WATCH 30 ADS DAILY
+  // 1. TOP MISSION: WATCH 12 ADS DAILY
   {
     id: WATCH_ADS_MISSION_ID,
-    title: 'Watch 30 Ads Daily',
-    description: 'Watch 30 sponsored ads per day to earn 500 TomCoins (resets daily at 00:00 UTC)',
+    title: 'Watch 12 Ads Daily',
+    description: 'Watch 12 sponsored ads per day to earn 500 TomCoins (resets daily at 00:00 UTC)',
     rewardPoops: WATCH_ADS_REWARD_POOPS,
     category: MissionCategory.DAILY,
     verificationType: 'GAME_ACTION' as const,
@@ -126,13 +126,14 @@ export async function ensureCoreMissionsSeeded(): Promise<void> {
   const present = new Set(existingIds.map((m) => m.id));
 
   for (const m of SEED_MISSIONS) {
-    if (!present.has(m.id)) {
-      await prisma.mission.upsert({
-        where: { id: m.id },
-        create: m,
-        update: {},
-      });
-    }
+    await prisma.mission.upsert({
+      where: { id: m.id },
+      create: m,
+      update: {
+        title: m.title,
+        description: m.description,
+      },
+    });
   }
 
   coreMissionsEnsured = true;

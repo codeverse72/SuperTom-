@@ -16,7 +16,7 @@ export const ADEXIUM_PLACEMENT_ID = process.env.ADEXIUM_PLACEMENT_ID || 'dd81f1e
 export const DEFAULT_ADSGRAM_BLOCK_ID = process.env.ADSGRAM_BLOCK_ID || '59392';
 export const AD_SESSION_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 export const MIN_VIEW_DURATION_MS = 4000; // Minimum 4 seconds playback before completion
-export const AD_SESSION_COOLDOWN_MS = 8000; // Minimum 8 seconds between new ad sessions
+export const AD_SESSION_COOLDOWN_MS = 15_000; // 15 seconds gap between ad sessions
 
 export class AdController {
   /**
@@ -66,11 +66,33 @@ export class AdController {
       const now = new Date();
       const startOfToday = getUtcDayStart(now);
 
+      // Enforce 15-second gap between consecutive completed advertisements
+      const lastCompletedSession = await prisma.adSession.findFirst({
+        where: {
+          userId,
+          status: 'COMPLETED',
+          completedAt: { gte: new Date(now.getTime() - AD_SESSION_COOLDOWN_MS) },
+        },
+        orderBy: { completedAt: 'desc' },
+      });
+
+      if (lastCompletedSession && lastCompletedSession.completedAt) {
+        const remainingSeconds = Math.ceil((AD_SESSION_COOLDOWN_MS - (now.getTime() - lastCompletedSession.completedAt.getTime())) / 1000);
+        sendError(
+          res,
+          `Please wait ${remainingSeconds}s before watching the next advertisement.`,
+          429,
+          'AD_SESSION_COOLDOWN',
+          { cooldownSeconds: remainingSeconds }
+        );
+        return;
+      }
+
       // Rate limit / cooldown check: prevent spamming session creation
       const recentSession = await prisma.adSession.findFirst({
         where: {
           userId,
-          createdAt: { gte: new Date(now.getTime() - AD_SESSION_COOLDOWN_MS) },
+          createdAt: { gte: new Date(now.getTime() - 8000) },
         },
         orderBy: { createdAt: 'desc' },
       });

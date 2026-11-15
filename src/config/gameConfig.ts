@@ -185,17 +185,17 @@ export interface Mission {
 }
 
 export const INITIAL_MISSIONS: Mission[] = [
-  // 1. TOP MISSION: WATCH 30 ADS DAILY
+  // 1. TOP MISSION: WATCH 12 ADS DAILY
   {
     id: 'm7_watch_30_ads',
-    title: 'Watch 30 Ads Daily',
-    description: 'Watch 30 sponsored ads per day to earn 500 TomCoins (resets daily at 00:00 UTC)',
+    title: 'Watch 12 Ads Daily',
+    description: 'Watch 12 sponsored ads per day to earn 500 TomCoins (resets daily at 00:00 UTC)',
     reward: 500,
     category: 'daily',
     icon: 'Tv',
     status: 'start',
     progress: 0,
-    total: 30,
+    total: 12,
     badge: 'Daily Ads'
   },
 

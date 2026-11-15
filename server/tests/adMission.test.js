@@ -2,9 +2,9 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 const WATCH_ADS_MISSION_ID = 'm7_watch_30_ads';
-const WATCH_ADS_DAILY_TARGET = 30;
+const WATCH_ADS_DAILY_TARGET = 12;
 const WATCH_ADS_REWARD_POOPS = 500n;
-const WATCH_ADS_COOLDOWN_MS = 10_000;
+const WATCH_ADS_COOLDOWN_MS = 15_000;
 
 function getUtcDayStart(date) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
@@ -69,19 +69,19 @@ function canClaimWatchAdsReward({ userMission, now }) {
   return true;
 }
 
-describe('Daily Watch 30 Ads Quest (m7_watch_30_ads)', () => {
-  test('Mission configuration matches 30 ads/day for 500 Poops', () => {
+describe('Daily Watch 12 Ads Quest (m7_watch_30_ads)', () => {
+  test('Mission configuration matches 12 ads/day for 500 Poops', () => {
     assert.equal(WATCH_ADS_MISSION_ID, 'm7_watch_30_ads');
-    assert.equal(WATCH_ADS_DAILY_TARGET, 30);
+    assert.equal(WATCH_ADS_DAILY_TARGET, 12);
     assert.equal(WATCH_ADS_REWARD_POOPS, 500n);
   });
 
-  test('Increments 1 ad at a time and completes only on 30/30', () => {
+  test('Increments 1 ad at a time and completes only on 12/12', () => {
     const base = new Date('2026-11-12T10:00:00Z');
     let state = null;
 
-    for (let i = 1; i <= 29; i++) {
-      const now = new Date(base.getTime() + i * 15_000);
+    for (let i = 1; i <= 11; i++) {
+      const now = new Date(base.getTime() + i * 16_000);
       const res = evaluateWatchAdsProgress({ existing: state, now });
       assert.equal(res.progress, i);
       assert.equal(res.verified, false);
@@ -92,38 +92,38 @@ describe('Daily Watch 30 Ads Quest (m7_watch_30_ads)', () => {
           now,
         }),
         false,
-        `Must NOT allow claiming at ${i}/30`
+        `Must NOT allow claiming at ${i}/12`
       );
       state = { status: res.status, progress: res.progress, claimedAt: null, updatedAt: now };
     }
 
-    const thirtiethTime = new Date(base.getTime() + 30 * 15_000);
-    const finalRes = evaluateWatchAdsProgress({ existing: state, now: thirtiethTime });
-    assert.equal(finalRes.progress, 30);
+    const twelfthTime = new Date(base.getTime() + 12 * 16_000);
+    const finalRes = evaluateWatchAdsProgress({ existing: state, now: twelfthTime });
+    assert.equal(finalRes.progress, 12);
     assert.equal(finalRes.verified, true);
     assert.equal(finalRes.status, 'COMPLETED');
     assert.equal(
       canClaimWatchAdsReward({
-        userMission: { status: finalRes.status, progress: finalRes.progress, claimedAt: null, updatedAt: thirtiethTime },
-        now: thirtiethTime,
+        userMission: { status: finalRes.status, progress: finalRes.progress, claimedAt: null, updatedAt: twelfthTime },
+        now: twelfthTime,
       }),
       true
     );
   });
 
-  test('Enforces 10s cooldown between consecutive same-day ad completions', () => {
+  test('Enforces 15s cooldown between consecutive same-day ad completions', () => {
     const t0 = new Date('2026-11-12T12:00:00Z');
     const existing = { status: 'IN_PROGRESS', progress: 4, claimedAt: null, updatedAt: t0 };
 
     const tooFast = evaluateWatchAdsProgress({
       existing,
-      now: new Date(t0.getTime() + 3_000),
+      now: new Date(t0.getTime() + 5_000),
     });
     assert.equal(tooFast.errorCode, 'AD_WATCH_COOLDOWN');
 
     const afterCooldown = evaluateWatchAdsProgress({
       existing,
-      now: new Date(t0.getTime() + 12_000),
+      now: new Date(t0.getTime() + 16_000),
     });
     assert.equal(afterCooldown.progress, 5);
     assert.equal(afterCooldown.status, 'IN_PROGRESS');
@@ -133,18 +133,18 @@ describe('Daily Watch 30 Ads Quest (m7_watch_30_ads)', () => {
     const yesterday = new Date('2026-11-12T23:59:50Z');
     const today = new Date('2026-11-13T00:00:05Z');
 
-    // Partial 18/30 from yesterday resets to 1/30 on first ad today
+    // Partial 8/12 from yesterday resets to 1/12 on first ad today
     const partialRes = evaluateWatchAdsProgress({
-      existing: { status: 'IN_PROGRESS', progress: 18, claimedAt: null, updatedAt: yesterday },
+      existing: { status: 'IN_PROGRESS', progress: 8, claimedAt: null, updatedAt: yesterday },
       now: today,
     });
     assert.equal(partialRes.progress, 1);
     assert.equal(partialRes.status, 'IN_PROGRESS');
 
-    // Yesterday's unclaimed 30/30 cannot be claimed today without re-watching
+    // Yesterday's unclaimed 12/12 cannot be claimed today without re-watching
     assert.equal(
       canClaimWatchAdsReward({
-        userMission: { status: 'COMPLETED', progress: 30, claimedAt: null, updatedAt: yesterday },
+        userMission: { status: 'COMPLETED', progress: 12, claimedAt: null, updatedAt: yesterday },
         now: today,
       }),
       false
@@ -152,7 +152,7 @@ describe('Daily Watch 30 Ads Quest (m7_watch_30_ads)', () => {
 
     // Yesterday's claimed quest resets cleanly today
     const afterClaimRes = evaluateWatchAdsProgress({
-      existing: { status: 'CLAIMED', progress: 30, claimedAt: yesterday, updatedAt: yesterday },
+      existing: { status: 'CLAIMED', progress: 12, claimedAt: yesterday, updatedAt: yesterday },
       now: today,
     });
     assert.equal(afterClaimRes.progress, 1);
@@ -160,7 +160,7 @@ describe('Daily Watch 30 Ads Quest (m7_watch_30_ads)', () => {
 
     // Same-day claimed quest rejects re-watching today
     const sameDayClaimed = evaluateWatchAdsProgress({
-      existing: { status: 'CLAIMED', progress: 30, claimedAt: today, updatedAt: today },
+      existing: { status: 'CLAIMED', progress: 12, claimedAt: today, updatedAt: today },
       now: new Date(today.getTime() + 20_000),
     });
     assert.equal(sameDayClaimed.errorCode, 'MISSION_ALREADY_CLAIMED');

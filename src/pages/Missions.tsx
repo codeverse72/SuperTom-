@@ -64,6 +64,37 @@ export const Missions: React.FC<MissionsProps> = ({ onNavigateToDeposit }) => {
   const [adButtonState, setAdButtonState] = useState<AdLifecycleState>('READY');
   const [adStatusMessage, setAdStatusMessage] = useState<string | null>(null);
 
+  // 15 seconds cooldown gap between quest ads
+  const QUEST_AD_COOLDOWN_SECONDS = 15;
+  const [adCooldownSeconds, setAdCooldownSeconds] = useState<number>(0);
+
+  useEffect(() => {
+    const checkCooldown = () => {
+      try {
+        const lastAdTimeStr = localStorage.getItem('supertom_last_quest_ad_time');
+        if (lastAdTimeStr) {
+          const lastTime = parseInt(lastAdTimeStr, 10);
+          const elapsedSeconds = Math.floor((Date.now() - lastTime) / 1000);
+          if (elapsedSeconds < QUEST_AD_COOLDOWN_SECONDS) {
+            setAdCooldownSeconds(QUEST_AD_COOLDOWN_SECONDS - elapsedSeconds);
+          } else {
+            setAdCooldownSeconds(0);
+          }
+        }
+      } catch {}
+    };
+
+    checkCooldown();
+    const interval = setInterval(() => {
+      setAdCooldownSeconds((prev) => {
+        if (prev <= 1) return 0;
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   // Wallet Quest State
   const [showWalletQuestModal, setShowWalletQuestModal] = useState(false);
   const [walletNetwork, setWalletNetwork] = useState<'TON' | 'USDT (TRC20)' | 'USDT (BEP20)'>('TON');
@@ -157,6 +188,11 @@ export const Missions: React.FC<MissionsProps> = ({ onNavigateToDeposit }) => {
     m.title.toLowerCase().includes('ad');
 
   const handleWatchAdQuest = async (mission: Mission) => {
+    if (adCooldownSeconds > 0) {
+      showToast('Cooldown Active', `Please wait ${adCooldownSeconds}s before watching the next ad.`, 'info');
+      return;
+    }
+
     if (
       adButtonState === 'LOADING_AD' ||
       adButtonState === 'AD_RUNNING' ||
@@ -174,6 +210,10 @@ export const Missions: React.FC<MissionsProps> = ({ onNavigateToDeposit }) => {
 
     if (result.completed) {
       sound.playReward();
+      try {
+        localStorage.setItem('supertom_last_quest_ad_time', String(Date.now()));
+      } catch {}
+      setAdCooldownSeconds(QUEST_AD_COOLDOWN_SECONDS);
       showToast(
         'Reward Credited!',
         result.message || 'Ad reward verified and credited to your quest!',
@@ -183,7 +223,7 @@ export const Missions: React.FC<MissionsProps> = ({ onNavigateToDeposit }) => {
       setTimeout(() => {
         setAdButtonState('READY');
         setAdStatusMessage(null);
-      }, 2500);
+      }, 1500);
     } else {
       if (result.state === 'NO_AD_AVAILABLE') {
         showToast(
@@ -800,6 +840,18 @@ export const Missions: React.FC<MissionsProps> = ({ onNavigateToDeposit }) => {
                           );
                         case 'READY':
                         default:
+                          if (adCooldownSeconds > 0) {
+                            return (
+                              <button
+                                disabled
+                                className="px-3.5 py-1.5 rounded-xl bg-purple-950/70 border border-purple-500/40 text-purple-200 text-xs font-bold flex items-center gap-1.5 shadow-md cursor-not-allowed opacity-80"
+                                title={`Please wait ${adCooldownSeconds}s before watching next ad`}
+                              >
+                                <Clock className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+                                <span>Next ad in {adCooldownSeconds}s</span>
+                              </button>
+                            );
+                          }
                           return (
                             <button
                               onClick={() => handleWatchAdQuest(mission)}
