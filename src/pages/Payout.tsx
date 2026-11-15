@@ -2945,10 +2945,6 @@ Payment Reference / Memo: ${memo}`;
               <p className="text-[11px] text-slate-300 leading-snug px-1">
                 To guarantee security and instant blockchain payouts, choose an activation deposit or complete a free unlock quest:
               </p>
-              <div className="p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-500/30 flex items-center gap-2 text-[10px] text-cyan-200 text-left">
-                <Info className="w-4 h-4 text-cyan-400 shrink-0" />
-                <span>Notice: After unlocking a pass, referring at least 5 friends is also required to submit withdrawal requests.</span>
-              </div>
             </div>
 
             {/* Plan Options */}
