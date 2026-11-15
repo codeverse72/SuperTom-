@@ -336,6 +336,26 @@ export const Payout: React.FC<PayoutProps> = ({ onNavigateToMissions }) => {
 
   // Entitlement State ($3 for 3 withdrawals, $5 for unlimited)
   const [entitlement, setEntitlement] = useState<WithdrawalEntitlementDto | null>(null);
+
+  // 5-Referral Requirement for Withdrawal Requests
+  const REQUIRED_WITHDRAWAL_REFERRALS = 5;
+  const friendsCount = useMemo(() => {
+    return user?.friendsInvited ?? entitlement?.currentReferrals ?? entitlement?.referralProgress?.friendsInvited ?? 0;
+  }, [user?.friendsInvited, entitlement?.currentReferrals, entitlement?.referralProgress?.friendsInvited]);
+
+  const hasPass = useMemo(() => {
+    if (!entitlement) return false;
+    return Boolean(entitlement.hasPass ?? (entitlement.hasUnlimitedWithdrawals || entitlement.remainingWithdrawals > 0));
+  }, [entitlement]);
+
+  const hasRequiredReferrals = useMemo(() => {
+    return friendsCount >= REQUIRED_WITHDRAWAL_REFERRALS;
+  }, [friendsCount]);
+
+  const canSubmitWithdrawal = useMemo(() => {
+    return hasPass && hasRequiredReferrals;
+  }, [hasPass, hasRequiredReferrals]);
+
   const [showUnlockModal, setShowUnlockModal] = useState<boolean>(false);
   const openUnlockModal = () => {
     setShowUnlockModal(true);
@@ -1082,13 +1102,22 @@ Payment Reference / Memo: ${memo}`;
     e.preventDefault();
     setWithdrawError(null);
 
-    // Strictly enforce deposit requirement for withdrawals:
-    // Deposit $3 for 3 withdrawals or $5 for unlimited lifetime withdrawals.
-    if (!entitlement || !entitlement.canWithdraw) {
+    // Strictly enforce pass requirement for withdrawals:
+    if (!hasPass) {
       if (window.Telegram?.WebApp?.HapticFeedback) {
         window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
       }
       openUnlockModal();
+      return;
+    }
+
+    // Strictly enforce 5-referral requirement for withdrawals:
+    if (!hasRequiredReferrals) {
+      if (window.Telegram?.WebApp?.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
+      }
+      setWithdrawError(`You need to refer at least 5 friends to send a withdrawal request (${Math.min(5, friendsCount)}/5 completed).`);
+      handleShareReferralPass();
       return;
     }
 
@@ -1137,6 +1166,8 @@ Payment Reference / Memo: ${memo}`;
     } else {
       if (res.code === 'WITHDRAWAL_DEPOSIT_REQUIRED') {
         openUnlockModal();
+      } else if (res.code === 'WITHDRAWAL_REFERRALS_REQUIRED') {
+        handleShareReferralPass();
       }
       setWithdrawError(res.error || 'Failed to submit withdrawal request.');
     }
@@ -2456,7 +2487,7 @@ Payment Reference / Memo: ${memo}`;
 
       {/* 5.5. Withdrawal Entitlement Status Banner */}
       {activeTab === 'payout' && entitlement && (
-        <div className="animate-in fade-in duration-200">
+        <div className="space-y-2.5 animate-in fade-in duration-200">
           {entitlement.hasUnlimitedWithdrawals ? (
             <div className="rounded-2xl p-3 bg-gradient-to-r from-amber-500/20 via-emerald-500/15 to-amber-500/20 border border-amber-400/50 shadow-lg flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -2519,7 +2550,7 @@ Payment Reference / Memo: ${memo}`;
                     <span className="px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 text-[9px] font-black uppercase tracking-wider">UNLOCK REQUIRED</span>
                   </div>
                   <p className="text-[10px] text-slate-300">
-                    Deposit $1, $3, or watch 30 ads/day for 5 days ({entitlement.adWatchProgress?.daysCompleted || 0}/5 days).
+                    Deposit $1, watch 30 ads/day for 5 days, or invite 10 friends.
                   </p>
                 </div>
               </div>
@@ -2528,6 +2559,78 @@ Payment Reference / Memo: ${memo}`;
                 <ChevronRight className="w-3.5 h-3.5" />
               </div>
             </div>
+          )}
+
+          {/* 5-Referral Requirement Card */}
+          {hasPass && (
+            !hasRequiredReferrals ? (
+              <div className="rounded-2xl p-3 bg-gradient-to-br from-[#0c182c] via-[#091122] to-[#070b15] border border-cyan-500/40 shadow-lg space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 shrink-0">
+                      <Users className="w-4 h-4 text-cyan-400" />
+                    </div>
+                    <div>
+                      <h5 className="text-xs font-black text-white font-display flex items-center gap-1.5">
+                        <span>REFERRAL REQUIREMENT</span>
+                        <span className="px-1.5 py-0.2 rounded bg-amber-500/20 border border-amber-400/40 text-amber-300 text-[8px] font-black uppercase">
+                          5 FRIENDS NEEDED
+                        </span>
+                      </h5>
+                      <p className="text-[10px] text-cyan-200/80">
+                        Refer at least 5 friends to send a withdrawal request.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-xs font-mono font-bold text-cyan-300">
+                      {Math.min(5, friendsCount)} / 5 Joined
+                    </span>
+                  </div>
+                </div>
+
+                {/* 5-Step Progress Pills */}
+                <div className="grid grid-cols-5 gap-1.5">
+                  {[1, 2, 3, 4, 5].map((step) => {
+                    const isDone = friendsCount >= step;
+                    const isCurrent = friendsCount + 1 === step;
+                    return (
+                      <div
+                        key={step}
+                        className={`py-1.5 rounded-lg border text-center text-[9px] font-mono font-bold transition-all ${
+                          isDone
+                            ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-300'
+                            : isCurrent
+                            ? 'bg-cyan-600/30 border-cyan-400 text-cyan-200 animate-pulse'
+                            : 'bg-slate-900/60 border-cyan-900/40 text-slate-500'
+                        }`}
+                      >
+                        {isDone ? '✓ Joined' : `Friend ${step}`}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleShareReferralPass}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:brightness-110 active:scale-95 text-white font-black text-[11px] uppercase tracking-wider shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Users className="w-3.5 h-3.5 text-cyan-200" />
+                  <span>SHARE BOT WITH FRIENDS ({Math.min(5, friendsCount)}/5) &gt;</span>
+                </button>
+              </div>
+            ) : (
+              <div className="rounded-xl px-3 py-2 bg-emerald-950/40 border border-emerald-500/40 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span className="text-[11px] text-emerald-200 font-semibold">
+                    Referral requirement met ({friendsCount} friends invited)
+                  </span>
+                </div>
+                <span className="text-[10px] font-black text-emerald-300 font-mono">✓ READY TO WITHDRAW</span>
+              </div>
+            )
           )}
         </div>
       )}
@@ -2638,21 +2741,36 @@ Payment Reference / Memo: ${memo}`;
                       </p>
                     </div>
 
-                    {/* Deposit Required Callout if locked */}
-                    {(!entitlement || !entitlement.canWithdraw) && (
+                    {/* Pass & Referral Requirements Callouts */}
+                    {!hasPass ? (
                       <div
                         onClick={openUnlockModal}
                         className="p-2.5 rounded-xl bg-gradient-to-r from-amber-950/70 to-rose-950/70 border border-amber-500/40 text-amber-200 text-xs flex items-center justify-between cursor-pointer hover:border-amber-400 transition-colors shadow-sm"
                       >
                         <div className="flex items-center gap-2">
                           <Lock className="w-4 h-4 text-amber-400 shrink-0" />
-                          <span className="text-[11px] font-bold">Unlock via Deposit ($1 / $3) or Watch 30 Ads/Day for 5 Days</span>
+                          <span className="text-[11px] font-bold">Unlock via Pass ($1 / Ads / 10 Friends)</span>
                         </div>
                         <span className="px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 font-black text-[10px] uppercase shrink-0">
                           Unlock Now
                         </span>
                       </div>
-                    )}
+                    ) : !hasRequiredReferrals ? (
+                      <div
+                        onClick={handleShareReferralPass}
+                        className="p-2.5 rounded-xl bg-gradient-to-r from-cyan-950/70 to-blue-950/70 border border-cyan-500/40 text-cyan-200 text-xs flex items-center justify-between cursor-pointer hover:border-cyan-400 transition-colors shadow-sm"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4 text-cyan-400 shrink-0" />
+                          <span className="text-[11px] font-bold">
+                            5 friends referral required ({Math.min(5, friendsCount)}/5 completed)
+                          </span>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-md bg-cyan-500 text-slate-950 font-black text-[10px] uppercase shrink-0">
+                          Invite Friends
+                        </span>
+                      </div>
+                    ) : null}
 
                     {withdrawError && (
                       <div className="p-2.5 rounded-xl bg-rose-950/80 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-1.5">
@@ -2661,19 +2779,28 @@ Payment Reference / Memo: ${memo}`;
                       </div>
                     )}
 
-                    {/* Big Cyan Confirm Button - Clicking when not entitled opens activation popup */}
+                    {/* Big Cyan Confirm Button - Clicking when not entitled opens activation popup or invite */}
                     <button
                       type="submit"
                       onClick={(e) => {
-                        if (!entitlement || !entitlement.canWithdraw) {
+                        if (!hasPass) {
                           e.preventDefault();
                           if (window.Telegram?.WebApp?.HapticFeedback) {
                             window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
                           }
                           openUnlockModal();
+                          return;
+                        }
+                        if (!hasRequiredReferrals) {
+                          e.preventDefault();
+                          if (window.Telegram?.WebApp?.HapticFeedback) {
+                            window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
+                          }
+                          handleShareReferralPass();
+                          return;
                         }
                       }}
-                      disabled={isWithdrawing || (entitlement?.canWithdraw ? (!withdrawAddress.trim() || !withdrawAmountUsd) : false)}
+                      disabled={isWithdrawing || (canSubmitWithdrawal ? (!withdrawAddress.trim() || !withdrawAmountUsd) : false)}
                       className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-cyan-500 hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                       {isWithdrawing ? (
@@ -2681,6 +2808,10 @@ Payment Reference / Memo: ${memo}`;
                           <RefreshCw className="w-4 h-4 animate-spin text-cyan-200" />
                           <span>Submitting Request...</span>
                         </>
+                      ) : !hasPass ? (
+                        <span>UNLOCK PASS TO WITHDRAW</span>
+                      ) : !hasRequiredReferrals ? (
+                        <span>INVITE 5 FRIENDS TO WITHDRAW ({Math.min(5, friendsCount)}/5)</span>
                       ) : (
                         <span>CONFIRM WITHDRAWAL ({parseFloat(withdrawAmountUsd) > 0 ? `$${parseFloat(withdrawAmountUsd).toFixed(2)}` : '$1.00'})</span>
                       )}
@@ -2814,6 +2945,10 @@ Payment Reference / Memo: ${memo}`;
               <p className="text-[11px] text-slate-300 leading-snug px-1">
                 To guarantee security and instant blockchain payouts, choose an activation deposit or complete a free unlock quest:
               </p>
+              <div className="p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-500/30 flex items-center gap-2 text-[10px] text-cyan-200 text-left">
+                <Info className="w-4 h-4 text-cyan-400 shrink-0" />
+                <span>Notice: After unlocking a pass, referring at least 5 friends is also required to submit withdrawal requests.</span>
+              </div>
             </div>
 
             {/* Plan Options */}

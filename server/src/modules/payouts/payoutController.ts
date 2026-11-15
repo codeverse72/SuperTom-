@@ -212,10 +212,24 @@ export class PayoutController {
         message: 'Withdrawal request submitted successfully. Pending administrative review.',
       });
     } catch (err: unknown) {
+      if ((err as any)?.code === 'WITHDRAWAL_REFERRALS_REQUIRED') {
+        sendError(
+          res,
+          (err as any).message || 'You must refer at least 5 friends to send a withdrawal request.',
+          403,
+          'WITHDRAWAL_REFERRALS_REQUIRED',
+          {
+            requiresReferrals: true,
+            requiredReferrals: (err as any).requiredReferrals || 5,
+            currentReferrals: (err as any).currentReferrals || 0,
+          }
+        );
+        return;
+      }
       if ((err as any)?.code === 'WITHDRAWAL_DEPOSIT_REQUIRED') {
         sendError(
           res,
-          'A deposit of $3.00 (for 3 withdrawals), $5.00 (for unlimited withdrawals), or watching 30 ads/day for 5 days is required to unlock payouts.',
+          'A deposit of $1.00 (for 3 withdrawals), $3.00 (for unlimited withdrawals), or watching 30 ads/day for 5 days is required to unlock payouts.',
           403,
           'WITHDRAWAL_DEPOSIT_REQUIRED',
           { requiresDeposit: true }

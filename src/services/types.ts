@@ -366,11 +366,15 @@ export interface ReferralWithdrawalProgressDto {
 
 export interface WithdrawalEntitlementDto {
   canWithdraw: boolean;
+  hasPass?: boolean;
   hasUnlimitedWithdrawals: boolean;
   remainingWithdrawals: number;
   totalDepositedUsd: number;
   requiredDepositTier1: number; // $1.00 for 3 withdrawals
   requiredDepositTier2: number; // $3.00 for unlimited withdrawals
+  requiredReferrals?: number; // 5 friends required
+  currentReferrals?: number;
+  hasRequiredReferrals?: boolean;
   adWatchProgress?: AdWatchWithdrawalProgressDto;
   referralProgress?: ReferralWithdrawalProgressDto;
 }

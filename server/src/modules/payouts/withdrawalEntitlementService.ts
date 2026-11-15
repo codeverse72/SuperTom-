@@ -23,11 +23,15 @@ export interface ReferralWithdrawalProgress {
 
 export interface WithdrawalEntitlement {
   canWithdraw: boolean;
+  hasPass: boolean;
   hasUnlimitedWithdrawals: boolean;
   remainingWithdrawals: number;
   totalDepositedUsd: number;
   requiredDepositTier1: number; // $1.00 for 3 withdrawals
   requiredDepositTier2: number; // $3.00 for unlimited withdrawals
+  requiredReferrals: number; // 5 friends required
+  currentReferrals: number;
+  hasRequiredReferrals: boolean;
   adWatchProgress: AdWatchWithdrawalProgress;
   referralProgress: ReferralWithdrawalProgress;
 }
@@ -271,11 +275,15 @@ export class WithdrawalEntitlementService {
     if (!user) {
       return {
         canWithdraw: false,
+        hasPass: false,
         hasUnlimitedWithdrawals: false,
         remainingWithdrawals: 0,
         totalDepositedUsd: 0,
         requiredDepositTier1: 1.0,
         requiredDepositTier2: 3.0,
+        requiredReferrals: 5,
+        currentReferrals: 0,
+        hasRequiredReferrals: false,
         adWatchProgress: {
           daysCompleted: 0,
           targetDays: 5,
@@ -372,15 +380,24 @@ export class WithdrawalEntitlementService {
     // Calculate Referral Progress
     const referralProgress = await WithdrawalEntitlementService.getReferralProgress(userId);
 
-    const canWithdraw = hasUnlimited || remaining > 0;
+    // Requirement: Must have an active pass AND have referred at least 5 friends
+    const REQUIRED_WITHDRAWAL_REFERRALS = 5;
+    const currentReferrals = referralProgress.friendsInvited;
+    const hasRequiredReferrals = currentReferrals >= REQUIRED_WITHDRAWAL_REFERRALS;
+    const hasPass = hasUnlimited || remaining > 0;
+    const canWithdraw = hasPass && hasRequiredReferrals;
 
     return {
       canWithdraw,
+      hasPass,
       hasUnlimitedWithdrawals: hasUnlimited,
       remainingWithdrawals: hasUnlimited ? 999999 : remaining,
       totalDepositedUsd,
       requiredDepositTier1: 1.0,
       requiredDepositTier2: 3.0,
+      requiredReferrals: REQUIRED_WITHDRAWAL_REFERRALS,
+      currentReferrals,
+      hasRequiredReferrals,
       adWatchProgress,
       referralProgress,
     };
@@ -485,34 +502,54 @@ export class WithdrawalEntitlementService {
     }
 
     // Check if user has completed the "Watch 30 Ads/Day for 5 Days" quest
+    let hasAdUnlock = false;
     if (!hasUnlimited && remaining <= 0) {
       const adProgress = await WithdrawalEntitlementService.getAdWatchProgress(
         userId,
         user.adWithdrawalsClaimed || 0
       );
-
       if (adProgress.canClaimReward) {
-        // Auto-consume 1 ad-unlocked withdrawal request for this payout
-        await tx.user.update({
-          where: { id: userId },
-          data: {
-            adWithdrawalsClaimed: { increment: 1 },
-          },
-        });
-        logger.info(
-          `[WithdrawalEntitlement] User ${userId} consumed 5-day ad watch reward directly for withdrawal request.`
-        );
-        return { hasUnlimited: false, remainingAfter: 0 };
+        hasAdUnlock = true;
       }
     }
 
-    if (!hasUnlimited && remaining <= 0) {
+    if (!hasUnlimited && remaining <= 0 && !hasAdUnlock) {
       const err = new Error(
         'A qualifying deposit ($1.00 for 3 payouts, $3.00 for unlimited) or watching 30 ads/day for 5 days is required to unlock payouts.'
       );
       (err as any).code = 'WITHDRAWAL_DEPOSIT_REQUIRED';
       (err as any).requiresDeposit = true;
       throw err;
+    }
+
+    // Strict requirement: User must have referred at least 5 friends to submit a withdrawal request
+    const REQUIRED_WITHDRAWAL_REFERRALS = 5;
+    const friendsCount = await tx.user.count({
+      where: { referredById: userId },
+    });
+
+    if (friendsCount < REQUIRED_WITHDRAWAL_REFERRALS) {
+      const err = new Error(
+        `You must refer at least ${REQUIRED_WITHDRAWAL_REFERRALS} friends to send a withdrawal request. Currently invited: ${friendsCount}/${REQUIRED_WITHDRAWAL_REFERRALS}.`
+      );
+      (err as any).code = 'WITHDRAWAL_REFERRALS_REQUIRED';
+      (err as any).requiredReferrals = REQUIRED_WITHDRAWAL_REFERRALS;
+      (err as any).currentReferrals = friendsCount;
+      throw err;
+    }
+
+    // If consuming 5-day ad watch reward directly for this payout
+    if (hasAdUnlock) {
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          adWithdrawalsClaimed: { increment: 1 },
+        },
+      });
+      logger.info(
+        `[WithdrawalEntitlement] User ${userId} consumed 5-day ad watch reward directly for withdrawal request.`
+      );
+      return { hasUnlimited: false, remainingAfter: 0 };
     }
 
     // Decrement finite quota

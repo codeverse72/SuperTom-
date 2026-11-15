@@ -262,9 +262,82 @@ describe('Withdrawal Entitlement & Deposit Requirement Suite', () => {
       const canClaimAgain = friendsInvited >= TARGET_FRIENDS && !isClaimed;
       assert.equal(canClaimAgain, false);
 
-      // User is now entitled to withdraw
-      const canWithdraw = remainingWithdrawals > 0;
+      // User has pass, but requires 5 referrals to submit request
+      const REQUIRED_REFERRALS = 5;
+      const canWithdraw = remainingWithdrawals > 0 && friendsInvited >= REQUIRED_REFERRALS;
       assert.equal(canWithdraw, true);
+    });
+  });
+
+  describe('6. 5-Referral Prerequisite To Submit Withdrawal Request', () => {
+    const REQUIRED_WITHDRAWAL_REFERRALS = 5;
+
+    test('User with $1 pass (remaining = 3) but < 5 friends cannot submit withdrawal request', () => {
+      const remainingWithdrawals = 3;
+      const hasUnlimitedWithdrawals = false;
+      const friendsInvited = 3;
+
+      const hasPass = hasUnlimitedWithdrawals || remainingWithdrawals > 0;
+      const hasRequiredReferrals = friendsInvited >= REQUIRED_WITHDRAWAL_REFERRALS;
+      const canWithdraw = hasPass && hasRequiredReferrals;
+
+      assert.equal(hasPass, true);
+      assert.equal(hasRequiredReferrals, false);
+      assert.equal(canWithdraw, false);
+    });
+
+    test('User with $1 pass and >= 5 friends invited CAN submit withdrawal request', () => {
+      const remainingWithdrawals = 3;
+      const hasUnlimitedWithdrawals = false;
+      const friendsInvited = 5;
+
+      const hasPass = hasUnlimitedWithdrawals || remainingWithdrawals > 0;
+      const hasRequiredReferrals = friendsInvited >= REQUIRED_WITHDRAWAL_REFERRALS;
+      const canWithdraw = hasPass && hasRequiredReferrals;
+
+      assert.equal(hasPass, true);
+      assert.equal(hasRequiredReferrals, true);
+      assert.equal(canWithdraw, true);
+    });
+
+    test('User with 5-day ad watch unlock but 0 friends cannot submit until 5 friends are invited', () => {
+      const remainingWithdrawals = 1; // ad reward unlocked
+      let friendsInvited = 0;
+
+      let canWithdraw = remainingWithdrawals > 0 && friendsInvited >= REQUIRED_WITHDRAWAL_REFERRALS;
+      assert.equal(canWithdraw, false);
+
+      // Friends join
+      friendsInvited = 5;
+      canWithdraw = remainingWithdrawals > 0 && friendsInvited >= REQUIRED_WITHDRAWAL_REFERRALS;
+      assert.equal(canWithdraw, true);
+    });
+
+    test('User with 10-friends pass naturally satisfies the 5-friends requirement (10 >= 5)', () => {
+      const remainingWithdrawals = 3;
+      const friendsInvited = 10;
+
+      const hasPass = remainingWithdrawals > 0;
+      const hasRequiredReferrals = friendsInvited >= REQUIRED_WITHDRAWAL_REFERRALS;
+      const canWithdraw = hasPass && hasRequiredReferrals;
+
+      assert.equal(hasPass, true);
+      assert.equal(hasRequiredReferrals, true);
+      assert.equal(canWithdraw, true);
+    });
+
+    test('User with 10 friends but NO withdrawal pass cannot withdraw', () => {
+      const remainingWithdrawals = 0;
+      const hasUnlimitedWithdrawals = false;
+      const friendsInvited = 10;
+
+      const hasPass = hasUnlimitedWithdrawals || remainingWithdrawals > 0;
+      const hasRequiredReferrals = friendsInvited >= REQUIRED_WITHDRAWAL_REFERRALS;
+      const canWithdraw = hasPass && hasRequiredReferrals;
+
+      assert.equal(hasPass, false);
+      assert.equal(hasRequiredReferrals, true);
+      assert.equal(canWithdraw, false);
     });
   });
 });
